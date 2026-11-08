@@ -192,6 +192,8 @@ class SalesController extends Controller
             ->where('status', 0)
             ->count();
 
+        $availableBanks = FinanceAccount::getBranchBankOptions($pharmacy_id);
+
         return response()
             ->view('kasir.transaction', compact(
                 'transaction_code',
@@ -213,7 +215,8 @@ class SalesController extends Controller
                 'parameterHV',
                 'parameterUP',
                 'service',
-                'ChangeFakturRounding'
+                'ChangeFakturRounding',
+                'availableBanks'
             ))
             ->header('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0')
             ->header('Pragma', 'no-cache')
@@ -1232,35 +1235,28 @@ class SalesController extends Controller
             $isCreditTransaction = strtoupper((string) ($transaction->transaction_type ?? '')) === 'KREDIT';
             $paymentMethod = $isCreditTransaction ? 'KREDIT' : strtoupper(trim($validated['paymentType'] ?? 'CASH'));
             $isUnpaid = in_array($paymentMethod, ['BELUM BAYAR', 'KREDIT'], true);
-            $nonCashPaymentMethods = ['QRIS', 'DEBIT', 'TRANSFER'];
+            $nonCashPaymentMethods = ['QRIS', 'DEBIT', 'TRANSFER', 'EDC'];
             $bankAccount = null;
+            $txPharmacyId = (int) ($transaction->pharmacy_id ?: getActivePharmacyId() ?: Auth::user()->pharmacy_id);
 
             if (in_array($paymentMethod, $nonCashPaymentMethods, true)) {
                 $bankName = trim((string) ($validated['bank_name'] ?? ''));
-                $normalizeBankName = static fn ($value) => preg_replace('/[^A-Z0-9]/', '', strtoupper((string) $value));
-                $bankKey = $normalizeBankName($bankName);
-                $matches = FinanceAccount::where('pharmacy_id', $transaction->pharmacy_id)
-                    ->where('category', 'Kas & Bank')
-                    ->where('account_type', 'bank')
-                    ->where('is_active', true)
-                    ->lockForUpdate()
-                    ->get()
-                    ->filter(function ($account) use ($normalizeBankName, $bankKey) {
-                        $accountName = $normalizeBankName($account->name);
-                        return $bankKey !== '' && str_contains($accountName, $bankKey);
-                    });
-
-                if ($matches->count() !== 1) {
+                if ($bankName === '') {
                     DB::rollBack();
                     return response()->json([
                         'success' => false,
-                        'message' => $matches->isEmpty()
-                            ? "Rekening {$bankName} belum tersedia atau belum aktif di cabang ini. Hubungi admin untuk mengatur rekening Kas & Bank."
-                            : "Ada lebih dari satu rekening {$bankName} aktif di cabang ini. Pastikan hanya satu rekening untuk setiap bank.",
+                        'message' => "Silakan pilih rekening bank terlebih dahulu untuk pembayaran {$paymentMethod}.",
                     ], 422);
                 }
 
-                $bankAccount = $matches->first();
+                $bankAccount = FinanceAccount::resolveBranchBankAccount($txPharmacyId, $bankName, true, true);
+                if (!$bankAccount) {
+                    DB::rollBack();
+                    return response()->json([
+                        'success' => false,
+                        'message' => "Rekening {$bankName} belum tersedia di cabang ini. Hubungi admin untuk mengatur rekening Kas & Bank.",
+                    ], 422);
+                }
             }
 
             $hasDoctorShippingFee = filter_var($request->input('has_doctor_shipping_fee', false), FILTER_VALIDATE_BOOLEAN);
@@ -1279,7 +1275,7 @@ class SalesController extends Controller
             $transaction->update([
                 'status' => 1,
                 'paid' => $validated['paid'],
-                'transaction_code' => $this->generateTransactionCode($meta['code'], (int) $transaction->pharmacy_id),
+                'transaction_code' => $this->generateTransactionCode($meta['code'], $txPharmacyId),
                 'discount' => $validated['discounsubtotalvalue'],
                 'subtotal' => $validated['totaltransaction'],
                 'changes' => $validated['changes'],
@@ -1296,65 +1292,58 @@ class SalesController extends Controller
                 'shift_logs_id' => $validated['shift_logs_id'] ?? null,
             ]);
 
+            $netTransactionAmount = round(
+                max(0, (float) $validated['totaltransaction'] - (float) ($validated['discounsubtotalvalue'] ?? 0)),
+                2
+            );
+
             // Penjualan tunai masuk otomatis ke akun Kas Apotek cabang transaksi.
-            if ($paymentMethod === 'CASH' && strtoupper((string) $transaction->transaction_type) !== 'KREDIT') {
-                $cashAccount = FinanceAccount::where('pharmacy_id', $transaction->pharmacy_id)
-                    ->where('category', 'Kas & Bank')
-                    ->where('account_type', 'kas_apotek')
-                    ->where('is_active', true)
-                    ->lockForUpdate()
-                    ->first();
+            if ($paymentMethod === 'CASH' && !$isCreditTransaction && $netTransactionAmount > 0) {
+                $cashAccount = FinanceAccount::resolveBranchCashAccount($txPharmacyId, true);
 
                 if ($cashAccount) {
-                    $cashAmount = round((float) $validated['totaltransaction'], 2);
                     FinancePayment::create([
-                        'pharmacy_id' => $transaction->pharmacy_id,
+                        'pharmacy_id' => $txPharmacyId,
                         'medicine_transaction_id' => $transaction->id,
                         'account_id' => $cashAccount->id,
                         'payment_type' => 'PENJUALAN TUNAI',
                         'payment_date' => Carbon::now()->toDateString(),
-                        'amount' => $cashAmount,
+                        'amount' => $netTransactionAmount,
                         'reference_number' => $transaction->transaction_code,
                         'notes' => 'Penerimaan penjualan tunai kasir',
                         'created_by' => Auth::id(),
                     ]);
-                    $cashAccount->increment('balance', $cashAmount);
-                    Cache::forget('finance_stats_summary_branch_' . $transaction->pharmacy_id . '_' . $transaction->pharmacy_id);
+                    $cashAccount->increment('balance', $netTransactionAmount);
+                    Cache::forget('finance_stats_summary_branch_' . $txPharmacyId . '_' . $txPharmacyId);
                 }
             }
 
-            // Pembayaran non-tunai masuk ke rekening bank sesuai nama bank yang dipilih kasir.
-            if ($bankAccount) {
-                $bankAmount = round((float) $validated['totaltransaction'], 2);
+            // Pembayaran non-tunai (QRIS, Debit, Transfer, dll.) masuk ke rekening bank sesuai nama bank & cabang transaksi.
+            if ($bankAccount && !$isCreditTransaction && $netTransactionAmount > 0) {
+                $bankShort = FinanceAccount::extractShortBankName($validated['bank_name'] ?? $bankAccount->name);
                 FinancePayment::create([
-                    'pharmacy_id' => $transaction->pharmacy_id,
+                    'pharmacy_id' => $txPharmacyId,
                     'medicine_transaction_id' => $transaction->id,
                     'account_id' => $bankAccount->id,
                     'payment_type' => 'PENJUALAN NON TUNAI',
                     'payment_date' => Carbon::now()->toDateString(),
-                    'amount' => $bankAmount,
+                    'amount' => $netTransactionAmount,
                     'reference_number' => $transaction->transaction_code,
-                    'notes' => "Penerimaan penjualan {$paymentMethod} melalui {$validated['bank_name']}",
+                    'notes' => "Penerimaan penjualan {$paymentMethod} melalui {$bankShort}",
                     'created_by' => Auth::id(),
                 ]);
-                $bankAccount->increment('balance', $bankAmount);
-                Cache::forget('finance_stats_summary_branch_' . $transaction->pharmacy_id . '_' . $transaction->pharmacy_id);
+                $bankAccount->increment('balance', $netTransactionAmount);
+                Cache::forget('finance_stats_summary_branch_' . $txPharmacyId . '_' . $txPharmacyId);
             }
 
-            // Penerimaan talangan Jasa Dokter & Ongkir ke kas / rekening bank apotek
+            // Penerimaan talangan Jasa Dokter & Ongkir ke kas / rekening bank apotek cabang transaksi
             if ($hasDoctorShippingFee && $doctorShippingFee > 0) {
-                $normalizeBankName = static fn ($value) => preg_replace('/[^A-Z0-9]/', '', strtoupper((string) $value));
                 if ($doctorShippingPaymentMethod === 'CASH') {
-                    $shippingCashAccount = FinanceAccount::where('pharmacy_id', $transaction->pharmacy_id)
-                        ->where('category', 'Kas & Bank')
-                        ->where('account_type', 'kas_apotek')
-                        ->where('is_active', true)
-                        ->lockForUpdate()
-                        ->first();
+                    $shippingCashAccount = FinanceAccount::resolveBranchCashAccount($txPharmacyId, true);
 
                     if ($shippingCashAccount) {
                         FinancePayment::create([
-                            'pharmacy_id' => $transaction->pharmacy_id,
+                            'pharmacy_id' => $txPharmacyId,
                             'medicine_transaction_id' => $transaction->id,
                             'account_id' => $shippingCashAccount->id,
                             'payment_type' => 'PENJUALAN TUNAI',
@@ -1367,35 +1356,25 @@ class SalesController extends Controller
                         $shippingCashAccount->increment('balance', $doctorShippingFee);
                     }
                 } elseif (in_array($doctorShippingPaymentMethod, $nonCashPaymentMethods, true) && !empty($doctorShippingBankName)) {
-                    $shippingBankKey = $normalizeBankName($doctorShippingBankName);
-                    $shippingBankMatches = FinanceAccount::where('pharmacy_id', $transaction->pharmacy_id)
-                        ->where('category', 'Kas & Bank')
-                        ->where('account_type', 'bank')
-                        ->where('is_active', true)
-                        ->lockForUpdate()
-                        ->get()
-                        ->filter(function ($account) use ($normalizeBankName, $shippingBankKey) {
-                            $accountName = $normalizeBankName($account->name);
-                            return $shippingBankKey !== '' && str_contains($accountName, $shippingBankKey);
-                        });
+                    $shippingBankAccount = FinanceAccount::resolveBranchBankAccount($txPharmacyId, $doctorShippingBankName, true, true);
 
-                    if ($shippingBankMatches->count() === 1) {
-                        $shippingBankAccount = $shippingBankMatches->first();
+                    if ($shippingBankAccount) {
+                        $shipBankShort = FinanceAccount::extractShortBankName($doctorShippingBankName);
                         FinancePayment::create([
-                            'pharmacy_id' => $transaction->pharmacy_id,
+                            'pharmacy_id' => $txPharmacyId,
                             'medicine_transaction_id' => $transaction->id,
                             'account_id' => $shippingBankAccount->id,
                             'payment_type' => 'PENJUALAN NON TUNAI',
                             'payment_date' => Carbon::now()->toDateString(),
                             'amount' => $doctorShippingFee,
                             'reference_number' => $transaction->transaction_code,
-                            'notes' => "Penerimaan talangan ongkir & jasa dokter ({$doctorShippingPaymentMethod} melalui {$doctorShippingBankName})",
+                            'notes' => "Penerimaan talangan ongkir & jasa dokter ({$doctorShippingPaymentMethod} melalui {$shipBankShort})",
                             'created_by' => Auth::id(),
                         ]);
                         $shippingBankAccount->increment('balance', $doctorShippingFee);
                     }
                 }
-                Cache::forget('finance_stats_summary_branch_' . $transaction->pharmacy_id . '_' . $transaction->pharmacy_id);
+                Cache::forget('finance_stats_summary_branch_' . $txPharmacyId . '_' . $txPharmacyId);
             }
 
             MedicineCart::where('transaction_id', $validated['transaction_id'])

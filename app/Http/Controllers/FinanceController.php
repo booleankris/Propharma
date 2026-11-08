@@ -14,6 +14,7 @@ use App\Exports\Finance\PiutangExport;
 use App\Models\Creditor;
 use App\Models\Debtors;
 use App\Models\FinanceAccount;
+use App\Models\FinanceBalanceAdjustment;
 use App\Models\FinancePayment;
 use App\Models\MedicineCart;
 use App\Models\MedicineTransactions;
@@ -316,6 +317,52 @@ class FinanceController extends Controller
         return back()->with('success', 'Setoran kas ke rekening berhasil dicatat.');
     }
 
+    /**
+     * Tarik tunai dari rekening bank ke Kas Apotek / Drawer.
+     * Tarik tunai = kurangi saldo bank, tambah saldo kas apotek.
+     */
+    public function storeTarikTunai(Request $request)
+    {
+        $validated = $request->validate([
+            'account_id' => 'required|exists:finance_accounts,id',
+            'payment_date' => 'required|date',
+            'amount' => 'required|numeric|gt:0',
+            'reference_number' => 'nullable|string|max:100',
+            'notes' => 'nullable|string|max:500',
+        ]);
+
+        $sourceBank = $this->branchKasBankAccountsQuery()->where('account_type', 'bank')->findOrFail($validated['account_id']);
+        $drawer = FinanceAccount::resolveBranchCashAccount((int) getActivePharmacyId(), false)
+            ?? $this->branchKasBankAccountsQuery()->where('account_type', 'kas_apotek')->firstOrFail();
+
+        if ($sourceBank->id === $drawer->id) {
+            return back()->withErrors(['account_id' => 'Pilih rekening bank sumber dana selain Kas Apotek / Drawer.']);
+        }
+
+        DB::transaction(function () use ($validated, $sourceBank, $drawer) {
+            $source = FinanceAccount::whereKey($sourceBank->id)->lockForUpdate()->firstOrFail();
+            $target = FinanceAccount::whereKey($drawer->id)->lockForUpdate()->firstOrFail();
+
+            FinancePayment::create([
+                'pharmacy_id' => getActivePharmacyId() ?: null,
+                'account_id' => $source->id,
+                'transfer_account_id' => $target->id,
+                'payment_type' => 'TARIK TUNAI',
+                'payment_date' => $validated['payment_date'],
+                'amount' => $validated['amount'],
+                'reference_number' => $validated['reference_number'] ?? null,
+                'notes' => $validated['notes'] ?? 'Tarik tunai dari rekening bank ke kas apotek',
+                'created_by' => Auth::id(),
+            ]);
+
+            $source->decrement('balance', $validated['amount']);
+            $target->increment('balance', $validated['amount']);
+            $this->clearStatsCache();
+        });
+
+        return back()->with('success', 'Penarikan tunai dari rekening bank ke kas apotek berhasil dicatat.');
+    }
+
     public function exportCashflow(Request $request, CashflowReportService $cashflowReport, MonitoringPenjualanService $monitoringPenjualan, KinerjaOmzetService $kinerjaOmzet, CashflowTradeReportService $tradeReport, KeuanganReportService $keuanganReport, NeracaReportService $neracaReport)
     {
         $request->merge(['download_xlsx' => true]);
@@ -500,6 +547,8 @@ class FinanceController extends Controller
             }
         }
 
+        $adjustmentLogs = $this->getBalanceAdjustmentLogs($accounts->pluck('id')->all());
+
         return Inertia::render('Finance/KasBank', [
             'accounts' => $accounts,
             'categories' => $categories,
@@ -507,6 +556,7 @@ class FinanceController extends Controller
             'stats' => $stats,
             'openingBalances' => $openingBalances,
             'monthlyOpeningBalances' => $monthlyOpeningBalances,
+            'adjustmentLogs' => $adjustmentLogs,
             'branchContext' => $this->getBranchContext(),
         ]);
     }
@@ -591,6 +641,168 @@ class FinanceController extends Controller
     }
 
     /**
+     * Sesuaikan saldo riil (Opname Kas & Bank) kapan saja dan catat riwayat log lengkap.
+     */
+    public function adjustBalance(Request $request)
+    {
+        $validated = $request->validate([
+            'account_id' => 'required_without:adjustments|nullable|exists:finance_accounts,id',
+            'real_balance' => 'required_without:adjustments|nullable',
+            'adjustment_date' => 'nullable|date|before_or_equal:today',
+            'notes' => 'nullable|string|max:500',
+            'adjustments' => 'nullable|array|min:1',
+            'adjustments.*.account_id' => 'required_with:adjustments|exists:finance_accounts,id',
+            'adjustments.*.real_balance' => 'required_with:adjustments',
+            'adjustments.*.notes' => 'nullable|string|max:500',
+        ], [
+            'adjustment_date.before_or_equal' => 'Tanggal penyesuaian tidak boleh melewati hari ini.',
+        ]);
+
+        $pharmacyId = (int) getActivePharmacyId();
+        $adjustmentDate = !empty($validated['adjustment_date'])
+            ? $validated['adjustment_date']
+            : now()->toDateString();
+
+        $items = [];
+        if (!empty($validated['adjustments'])) {
+            $items = $validated['adjustments'];
+        } elseif (!empty($validated['account_id'])) {
+            $items = [[
+                'account_id' => $validated['account_id'],
+                'real_balance' => $validated['real_balance'],
+                'notes' => $validated['notes'] ?? null,
+            ]];
+        }
+
+        if (empty($items)) {
+            return back()->withErrors(['account_id' => 'Pilih rekening dan masukkan saldo riil yang akan disesuaikan.']);
+        }
+
+        $processedCount = 0;
+        $totalDifference = 0.0;
+
+        DB::transaction(function () use ($items, $pharmacyId, $adjustmentDate, &$processedCount, &$totalDifference) {
+            foreach ($items as $item) {
+                $accId = (int) $item['account_id'];
+                $account = FinanceAccount::whereKey($accId)
+                    ->where('category', 'Kas & Bank')
+                    ->lockForUpdate()
+                    ->first();
+
+                if (!$account) {
+                    continue;
+                }
+
+                // Normalisasi nominal jika berformat rupiah string atau angka
+                $rawReal = (string) ($item['real_balance'] ?? '');
+                $cleanReal = str_replace(['Rp', ' ', '.'], '', $rawReal);
+                $cleanReal = str_replace(',', '.', $cleanReal);
+                $realBalance = round(max(0, (float) $cleanReal), 2);
+
+                $systemBalance = (float) $account->balance;
+                $diff = round($realBalance - $systemBalance, 2);
+                $itemNotes = trim((string) ($item['notes'] ?? ''));
+
+                // 1. Update Saldo Akun ke Saldo Riil saat ini
+                $account->update([
+                    'balance' => $realBalance,
+                ]);
+
+                // 2. Catat Mutasi Kas & Bank jika ada selisih
+                $payment = null;
+                if (abs($diff) >= 0.01) {
+                    $directionLabel = $diff > 0 ? '+' : '-';
+                    $fmtSys = number_format($systemBalance, 0, ',', '.');
+                    $fmtReal = number_format($realBalance, 0, ',', '.');
+                    $fmtDiff = number_format(abs($diff), 0, ',', '.');
+
+                    $paymentNotes = 'Opname Kas & Bank: Rp ' . $fmtSys . ' -> Rp ' . $fmtReal . ' (' . $directionLabel . 'Rp ' . $fmtDiff . ')';
+                    if ($itemNotes !== '') {
+                        $paymentNotes .= ' | Catatan: ' . $itemNotes;
+                    }
+
+                    $payment = FinancePayment::create([
+                        'pharmacy_id' => $account->pharmacy_id ?: ($pharmacyId > 0 ? $pharmacyId : null),
+                        'account_id' => $account->id,
+                        'payment_type' => 'PENYESUAIAN SALDO',
+                        'payment_date' => $adjustmentDate,
+                        'amount' => abs($diff),
+                        'reference_number' => $diff >= 0 ? 'OPNAME-IN' : 'OPNAME-OUT',
+                        'notes' => $paymentNotes,
+                        'created_by' => Auth::id(),
+                    ]);
+                }
+
+                // 3. Catat di Audit Log Lengkap (FinanceBalanceAdjustment)
+                FinanceBalanceAdjustment::create([
+                    'pharmacy_id' => $account->pharmacy_id ?: ($pharmacyId > 0 ? $pharmacyId : null),
+                    'account_id' => $account->id,
+                    'system_balance' => $systemBalance,
+                    'real_balance' => $realBalance,
+                    'difference' => $diff,
+                    'adjustment_date' => $adjustmentDate,
+                    'adjusted_at' => now(),
+                    'notes' => $itemNotes !== '' ? $itemNotes : null,
+                    'finance_payment_id' => $payment?->id,
+                    'created_by' => Auth::id(),
+                ]);
+
+                $processedCount++;
+                $totalDifference += $diff;
+            }
+
+            $this->clearStatsCache();
+        });
+
+        $msg = $processedCount === 1
+            ? 'Saldo riil berhasil disesuaikan dan tercatat di riwayat log opname.'
+            : "Berhasil menyesuaikan {$processedCount} rekening kas & bank ke saldo riil. Riwayat lengkap tercatat di log opname.";
+
+        return back()->with('success', $msg);
+    }
+
+    /**
+     * Ambil riwayat log penyesuaian saldo riil (opname kas & bank).
+     */
+    protected function getBalanceAdjustmentLogs(array $accountIds = [], int $limit = 200): array
+    {
+        $pharmacyId = (int) getActivePharmacyId();
+        $query = FinanceBalanceAdjustment::with(['account', 'creator.roles'])
+            ->where(function ($q) use ($pharmacyId, $accountIds) {
+                if ($pharmacyId > 0) {
+                    $q->where('pharmacy_id', $pharmacyId);
+                }
+                if (!empty($accountIds)) {
+                    $q->orWhereIn('account_id', $accountIds);
+                }
+            })
+            ->latest('adjusted_at')
+            ->latest('id')
+            ->take($limit);
+
+        return $query->get()->map(function ($item) {
+            $diff = (float) $item->difference;
+            return [
+                'id' => $item->id,
+                'account_id' => $item->account_id,
+                'account_name' => $item->account->name ?? 'Akun Kas/Bank',
+                'account_code' => $item->account->code ?? '-',
+                'account_type' => $item->account->account_type ?? 'bank',
+                'system_balance' => (float) $item->system_balance,
+                'real_balance' => (float) $item->real_balance,
+                'difference' => $diff,
+                'direction' => $diff > 0 ? 'IN' : ($diff < 0 ? 'OUT' : 'EQUAL'),
+                'adjustment_date' => $item->adjustment_date ? \Carbon\Carbon::parse($item->adjustment_date)->format('d/m/Y') : '-',
+                'raw_date' => $item->adjustment_date ? \Carbon\Carbon::parse($item->adjustment_date)->format('Y-m-d') : null,
+                'adjusted_at' => $item->adjusted_at ? \Carbon\Carbon::parse($item->adjusted_at)->format('d/m/Y H:i:s') : ($item->created_at ? $item->created_at->format('d/m/Y H:i:s') : '-'),
+                'notes' => $item->notes ?: '',
+                'user_name' => $item->creator->name ?? ($item->creator->username ?? 'Petugas'),
+                'user_role' => $item->creator?->roles?->first()?->name ?? 'Finance',
+            ];
+        })->values()->all();
+    }
+
+    /**
      * Catat ulang penjualan tunai lama yang belum memiliki mutasi Kas & Bank.
      */
     public function backfillPenjualanTunai(Request $request)
@@ -604,8 +816,8 @@ class FinanceController extends Controller
         ]);
 
         $pharmacyId = (int) getActivePharmacyId();
-        $pharmacyIds = $this->getTargetPharmacyIds();
-        $account = $this->branchKasBankAccountsQuery()->where('account_type', 'kas_apotek')->firstOrFail();
+        $account = FinanceAccount::resolveBranchCashAccount($pharmacyId, false)
+            ?? $this->branchKasBankAccountsQuery()->where('account_type', 'kas_apotek')->firstOrFail();
         $createdCount = 0;
         $createdTotal = 0.0;
         $createdGrossTotal = 0.0;
@@ -627,7 +839,7 @@ class FinanceController extends Controller
                 ->orderBy('id')
                 ->chunkById(500, function ($transactions) use ($lockedAccount, $pharmacyId, $opening, &$createdCount, &$createdTotal, &$createdGrossTotal) {
                     foreach ($transactions as $transaction) {
-                        $amount = round((float) $transaction->subtotal, 2);
+                        $amount = round(max(0, (float) $transaction->subtotal - (float) ($transaction->discount ?? 0)), 2);
                         if ($amount <= 0)
                             continue;
 
@@ -676,6 +888,164 @@ class FinanceController extends Controller
         return back()->with('success', $createdCount
             ? "Berhasil mencatat {$createdCount} penjualan tunai lama senilai Rp " . number_format($createdGrossTotal, 0, ',', '.') . '.'
             : 'Tidak ada penjualan tunai lama yang perlu ditambahkan pada rentang tanggal tersebut.');
+    }
+
+    /**
+     * Catat ulang transaksi non-tunai (QRIS, Debit, Transfer, EDC) lama ke rekening bank masing-masing di cabang ini.
+     */
+    public function backfillPenjualanNonTunai(Request $request)
+    {
+        $validated = $request->validate([
+            'from_date' => 'required|date|before_or_equal:to_date',
+            'to_date' => 'required|date|before_or_equal:today',
+        ], [
+            'from_date.before_or_equal' => 'Tanggal mulai harus sebelum atau sama dengan tanggal akhir.',
+            'to_date.before_or_equal' => 'Tanggal akhir tidak boleh melewati hari ini.',
+        ]);
+
+        $pharmacyId = (int) getActivePharmacyId();
+        FinanceAccount::ensureBranchDefaultAccounts($pharmacyId);
+
+        $createdCount = 0;
+        $skippedCount = 0;
+        $createdGrossTotal = 0.0;
+        $balanceAdditions = [];
+        $touchedAccountIds = [];
+
+        DB::transaction(function () use ($validated, $pharmacyId, &$createdCount, &$skippedCount, &$createdGrossTotal, &$balanceAdditions, &$touchedAccountIds) {
+            MedicineTransactions::query()
+                ->where('pharmacy_id', $pharmacyId)
+                ->where('status', 1)
+                ->whereRaw("UPPER(COALESCE(transaction_type, '')) NOT IN ('KREDIT', 'RESEP KREDIT')")
+                ->whereRaw("UPPER(COALESCE(transaction_type, '')) NOT LIKE 'RETUR%'")
+                ->whereBetween(DB::raw('DATE(created_at)'), [$validated['from_date'], $validated['to_date']])
+                ->where(function ($q) {
+                    $q->whereRaw('UPPER(TRIM(COALESCE(payment_method, ""))) IN (?, ?, ?, ?)', ['QRIS', 'DEBIT', 'TRANSFER', 'EDC'])
+                        ->orWhere(function ($ship) {
+                            $ship->where('has_doctor_shipping_fee', 1)
+                                ->where('doctor_shipping_fee', '>', 0)
+                                ->whereRaw('UPPER(TRIM(COALESCE(doctor_shipping_payment_method, ""))) IN (?, ?, ?, ?)', ['QRIS', 'DEBIT', 'TRANSFER', 'EDC']);
+                        });
+                })
+                ->orderBy('id')
+                ->chunkById(500, function ($transactions) use ($pharmacyId, &$createdCount, &$skippedCount, &$createdGrossTotal, &$balanceAdditions, &$touchedAccountIds) {
+                    foreach ($transactions as $transaction) {
+                        $txPharmacyId = (int) ($transaction->pharmacy_id ?: $pharmacyId);
+                        $paymentDate = $transaction->created_at?->toDateString() ?? now()->toDateString();
+                        $methodUpper = strtoupper(trim((string) ($transaction->payment_method ?? '')));
+
+                        // 1. Penjualan utama non-tunai
+                        if (in_array($methodUpper, ['QRIS', 'DEBIT', 'TRANSFER', 'EDC'], true)) {
+                            $amount = round(max(0, (float) $transaction->subtotal - (float) ($transaction->discount ?? 0)), 2);
+                            if ($amount > 0) {
+                                $alreadyRecorded = FinancePayment::where('medicine_transaction_id', $transaction->id)
+                                    ->where('payment_type', 'PENJUALAN NON TUNAI')
+                                    ->where(function ($q) {
+                                        $q->whereNull('notes')
+                                            ->orWhere('notes', 'not like', 'Penerimaan talangan ongkir%');
+                                    })
+                                    ->exists();
+
+                                if (!$alreadyRecorded) {
+                                    $account = FinanceAccount::resolveBranchBankAccount($txPharmacyId, $transaction->transfer_bank_name, true, true);
+                                    if (!$account) {
+                                        $skippedCount++;
+                                    } else {
+                                        $bankShort = FinanceAccount::extractShortBankName($transaction->transfer_bank_name ?: $account->name);
+                                        FinancePayment::create([
+                                            'pharmacy_id' => $txPharmacyId,
+                                            'medicine_transaction_id' => $transaction->id,
+                                            'account_id' => $account->id,
+                                            'payment_type' => 'PENJUALAN NON TUNAI',
+                                            'payment_date' => $paymentDate,
+                                            'amount' => $amount,
+                                            'reference_number' => $transaction->transaction_code,
+                                            'notes' => "Penerimaan penjualan {$methodUpper} melalui {$bankShort}",
+                                            'created_by' => Auth::id(),
+                                        ]);
+
+                                        $createdGrossTotal += $amount;
+                                        $opening = FinancePayment::where('payment_type', 'SALDO AWAL')
+                                            ->where('account_id', $account->id)
+                                            ->first();
+                                        if (!$opening || $paymentDate >= $opening->payment_date?->format('Y-m-d')) {
+                                            $balanceAdditions[$account->id] = ($balanceAdditions[$account->id] ?? 0) + $amount;
+                                        }
+                                        $touchedAccountIds[$account->id] = $account->id;
+                                        $createdCount++;
+                                    }
+                                }
+                            }
+                        }
+
+                        // 2. Talangan jasa dokter & ongkir non-tunai (jika ada)
+                        $shipFee = round((float) ($transaction->doctor_shipping_fee ?? 0), 2);
+                        $shipMethod = strtoupper(trim((string) ($transaction->doctor_shipping_payment_method ?? '')));
+                        if ($transaction->has_doctor_shipping_fee && $shipFee > 0 && in_array($shipMethod, ['QRIS', 'DEBIT', 'TRANSFER', 'EDC'], true)) {
+                            $alreadyRecordedShip = FinancePayment::where('medicine_transaction_id', $transaction->id)
+                                ->where('payment_type', 'PENJUALAN NON TUNAI')
+                                ->where('notes', 'like', 'Penerimaan talangan ongkir%')
+                                ->exists();
+
+                            if (!$alreadyRecordedShip) {
+                                $shipBankName = $transaction->doctor_shipping_bank_name ?: $transaction->transfer_bank_name;
+                                $shipAccount = FinanceAccount::resolveBranchBankAccount($txPharmacyId, $shipBankName, true, true);
+                                if ($shipAccount) {
+                                    $shipBankShort = FinanceAccount::extractShortBankName($shipBankName ?: $shipAccount->name);
+                                    FinancePayment::create([
+                                        'pharmacy_id' => $txPharmacyId,
+                                        'medicine_transaction_id' => $transaction->id,
+                                        'account_id' => $shipAccount->id,
+                                        'payment_type' => 'PENJUALAN NON TUNAI',
+                                        'payment_date' => $paymentDate,
+                                        'amount' => $shipFee,
+                                        'reference_number' => $transaction->transaction_code,
+                                        'notes' => "Penerimaan talangan ongkir & jasa dokter ({$shipMethod} melalui {$shipBankShort})",
+                                        'created_by' => Auth::id(),
+                                    ]);
+
+                                    $createdGrossTotal += $shipFee;
+                                    $opening = FinancePayment::where('payment_type', 'SALDO AWAL')
+                                        ->where('account_id', $shipAccount->id)
+                                        ->first();
+                                    if (!$opening || $paymentDate >= $opening->payment_date?->format('Y-m-d')) {
+                                        $balanceAdditions[$shipAccount->id] = ($balanceAdditions[$shipAccount->id] ?? 0) + $shipFee;
+                                    }
+                                    $touchedAccountIds[$shipAccount->id] = $shipAccount->id;
+                                    $createdCount++;
+                                }
+                            }
+                        }
+                    }
+                });
+
+            foreach ($touchedAccountIds as $accountId) {
+                $account = FinanceAccount::whereKey($accountId)->lockForUpdate()->first();
+                if (!$account) {
+                    continue;
+                }
+                $opening = FinancePayment::where('payment_type', 'SALDO AWAL')
+                    ->where('account_id', $account->id)
+                    ->first();
+                if ($opening) {
+                    $account->update([
+                        'balance' => $this->calculateBalanceFromOpening($account->id, $opening, now()->toDateString()),
+                    ]);
+                } elseif (($balanceAdditions[$account->id] ?? 0) > 0) {
+                    $account->increment('balance', $balanceAdditions[$account->id]);
+                }
+            }
+
+            $this->clearStatsCache();
+        });
+
+        $message = $createdCount
+            ? "Berhasil mencatat {$createdCount} transaksi non-tunai ke rekening bank cabang senilai Rp " . number_format($createdGrossTotal, 0, ',', '.') . '.'
+            : 'Tidak ada transaksi non-tunai lama yang perlu ditambahkan pada rentang tanggal tersebut.';
+        if ($skippedCount > 0) {
+            $message .= " {$skippedCount} transaksi dilewati karena belum memiliki nama bank tujuan.";
+        }
+        return back()->with('success', $message);
     }
 
     public function storePendapatanLainLain(Request $request)
@@ -850,10 +1220,17 @@ class FinanceController extends Controller
         foreach ($payments as $payment) {
             if (in_array($payment->payment_type, ['PIUTANG', 'PENDAPATAN', 'PENJUALAN TUNAI', 'PENJUALAN NON TUNAI'], true))
                 $balance += (float) $payment->amount;
-            elseif (in_array($payment->payment_type, ['KREDIT', 'CASH', 'KONSINYASI', 'BIAYA', 'SETOR'], true))
+            elseif (in_array($payment->payment_type, ['KREDIT', 'CASH', 'KONSINYASI', 'BIAYA', 'SETOR', 'TARIK TUNAI'], true))
                 $balance -= (float) $payment->amount;
+            elseif ($payment->payment_type === 'PENYESUAIAN SALDO') {
+                if ($payment->reference_number === 'OPNAME-OUT') {
+                    $balance -= (float) $payment->amount;
+                } else {
+                    $balance += (float) $payment->amount;
+                }
+            }
         }
-        $balance += (float) FinancePayment::where('payment_type', 'SETOR')
+        $balance += (float) FinancePayment::whereIn('payment_type', ['SETOR', 'TARIK TUNAI'])
             ->where('transfer_account_id', $accountId)
             ->whereDate('payment_date', '>=', $openingDate)
             ->whereDate('payment_date', '<=', $asOfDate)
@@ -1411,8 +1788,11 @@ class FinanceController extends Controller
      */
     protected function branchKasBankAccountsQuery(bool $activeOnly = true)
     {
+        $pharmacyId = (int) getActivePharmacyId();
+        FinanceAccount::ensureBranchDefaultAccounts($pharmacyId);
+
         return FinanceAccount::where('category', 'Kas & Bank')
-            ->where('pharmacy_id', getActivePharmacyId())
+            ->where('pharmacy_id', $pharmacyId)
             ->when($activeOnly, fn($query) => $query->where('is_active', true));
     }
 
@@ -2145,17 +2525,34 @@ class FinanceController extends Controller
                     $q->where('payment_type', 'PENDAPATAN')->whereIn('pharmacy_id', $targetPharmacyIds);
                 })->orWhere(function ($q) use ($targetPharmacyIds) {
                     $q->where('payment_type', 'SETOR')->whereIn('pharmacy_id', $targetPharmacyIds);
-                })->orWhere('payment_type', 'SALDO AWAL');
+                })->orWhere(function ($q) use ($targetPharmacyIds) {
+                    $q->where('payment_type', 'TARIK TUNAI')->whereIn('pharmacy_id', $targetPharmacyIds);
+                })->orWhere(function ($q) use ($targetPharmacyIds) {
+                    $q->whereIn('payment_type', ['PENJUALAN TUNAI', 'PENJUALAN NON TUNAI'])
+                        ->whereIn('pharmacy_id', $targetPharmacyIds);
+                })->orWhere('payment_type', 'SALDO AWAL')
+                  ->orWhere('payment_type', 'PENYESUAIAN SALDO');
             })
             ->orderByDesc('payment_date')
             ->orderByDesc('id')
             ->take($limit)
             ->get()
             ->flatMap(function ($p) {
-                $isMasuk = in_array($p->payment_type, ['PIUTANG', 'PENDAPATAN', 'PENJUALAN TUNAI'], true);
+                $isMasuk = in_array($p->payment_type, ['PIUTANG', 'PENDAPATAN', 'PENJUALAN TUNAI', 'PENJUALAN NON TUNAI'], true);
                 $isSaldoAwal = $p->payment_type === 'SALDO AWAL';
                 $isSetor = $p->payment_type === 'SETOR';
-                $tipeLabel = $isSaldoAwal ? 'Saldo Awal' : ($isSetor ? 'Setor Kas' : ($isMasuk ? 'Masuk (Debit)' : 'Keluar (Kredit)'));
+                $isTarikTunai = $p->payment_type === 'TARIK TUNAI';
+                $isPenyesuaian = $p->payment_type === 'PENYESUAIAN SALDO';
+                $isOpnameOut = $isPenyesuaian && $p->reference_number === 'OPNAME-OUT';
+                $tipeLabel = $isSaldoAwal
+                    ? 'Saldo Awal'
+                    : ($isSetor
+                        ? 'Setor Kas'
+                        : ($isTarikTunai
+                            ? 'Tarik Tunai'
+                            : ($isPenyesuaian
+                                ? ($isOpnameOut ? 'Opname Keluar (-)' : 'Opname Masuk (+)')
+                                : ($isMasuk ? 'Masuk (Debit)' : 'Keluar (Kredit)'))));
 
                 $pihakTerkait = '-';
                 $noDokumen = $p->reference_number ?: ('MUT-' . str_pad($p->id, 5, '0', STR_PAD_LEFT));
@@ -2168,6 +2565,16 @@ class FinanceController extends Controller
                         $noDokumen = $doc;
                     if (!$deskripsi)
                         $deskripsi = 'Penerimaan penjualan tunai';
+                } elseif ($p->payment_type === 'PENJUALAN NON TUNAI') {
+                    $pihakTerkait = $p->transaction->debtors->name ?? ($p->transaction->patients->name ?? 'Pelanggan Umum');
+                    $doc = $p->transaction->transaction_code ?? $p->reference_number;
+                    if ($doc)
+                        $noDokumen = $doc;
+                    if (!$deskripsi) {
+                        $method = $p->transaction->payment_method ?? 'NON-TUNAI';
+                        $bank = $p->transaction->transfer_bank_name ?? ($p->account->name ?? 'Bank');
+                        $deskripsi = "Penerimaan penjualan {$method} melalui {$bank}";
+                    }
                 } elseif ($p->payment_type === 'PIUTANG') {
                     $pihakTerkait = $p->transaction->debtors->name ?? ($p->transaction->patients->name ?? 'Pelanggan Umum');
                     $doc = $p->transaction->invoice_number ?? $p->reference_number;
@@ -2221,6 +2628,15 @@ class FinanceController extends Controller
                 } elseif ($isSetor) {
                     $pihakTerkait = $p->transferAccount->name ?? 'Rekening tujuan';
                     $deskripsi = $p->notes ?: 'Setoran kas ke rekening';
+                } elseif ($isTarikTunai) {
+                    $pihakTerkait = $p->transferAccount->name ?? 'Kas Apotek / Drawer';
+                    if (!$p->reference_number)
+                        $noDokumen = 'TRK-' . str_pad($p->id, 5, '0', STR_PAD_LEFT);
+                    $deskripsi = $p->notes ?: 'Tarik tunai dari rekening bank ke kas';
+                } elseif ($isPenyesuaian) {
+                    $pihakTerkait = $p->account->name ?? 'Kas / Bank';
+                    $noDokumen = 'OPN-' . str_pad($p->id, 5, '0', STR_PAD_LEFT);
+                    $deskripsi = $p->notes ?: 'Penyesuaian Saldo Riil (Opname)';
                 }
 
                 $row = [
@@ -2232,26 +2648,27 @@ class FinanceController extends Controller
                     'date' => \Carbon\Carbon::parse($p->payment_date)->format('d/m/Y'),
                     'raw_date' => \Carbon\Carbon::parse($p->payment_date)->format('Y-m-d'),
                     'amount' => (float) $p->amount,
-                    'direction' => $isSaldoAwal ? 'OPENING' : ($isMasuk ? 'IN' : 'OUT'),
+                    'direction' => $isSaldoAwal ? 'OPENING' : ($isPenyesuaian ? ($isOpnameOut ? 'OUT' : 'IN') : ($isMasuk ? 'IN' : 'OUT')),
                     'type_label' => $tipeLabel,
-                    'category_type' => $p->payment_type,  // PIUTANG, KREDIT, CASH
+                    'category_type' => $p->payment_type,  // PIUTANG, KREDIT, CASH, SETOR, TARIK TUNAI
                     'document_no' => $noDokumen,
                     'party' => $pihakTerkait,
                     'description' => $deskripsi ?: 'Transaksi Keuangan',
                     'user' => $p->creator->name ?? 'Admin',
                 ];
-                if (!$isSetor)
+                if (!$isSetor && !$isTarikTunai)
                     return [$row];
 
                 $destinationRow = $row;
                 $destinationRow['id'] = $p->id . '-in';
                 $destinationRow['account_id'] = $p->transfer_account_id;
-                $destinationRow['account_name'] = $p->transferAccount->name ?? 'Rekening tujuan';
+                $destinationRow['account_name'] = $p->transferAccount->name ?? ($isTarikTunai ? 'Kas Apotek / Drawer' : 'Rekening tujuan');
                 $destinationRow['account_code'] = $p->transferAccount->code ?? '-';
                 $destinationRow['account_number'] = $p->transferAccount->account_number ?? '-';
                 $destinationRow['direction'] = 'IN';
-                $destinationRow['type_label'] = 'Setor Masuk';
-                $destinationRow['party'] = $p->account->name ?? 'Kas Apotek / Drawer';
+                $destinationRow['type_label'] = $isTarikTunai ? 'Tarik Masuk (Kas)' : 'Setor Masuk';
+                $destinationRow['party'] = $p->account->name ?? ($isTarikTunai ? 'Rekening Bank' : 'Kas Apotek / Drawer');
+                $destinationRow['description'] = $isTarikTunai ? ($p->notes ?: 'Penerimaan tarik tunai dari rekening bank ke kas') : $deskripsi;
                 return [$row, $destinationRow];
             });
     }
@@ -2708,10 +3125,13 @@ class FinanceController extends Controller
         $kasMasukPenjualanTunai = (float) FinancePayment::where('payment_type', 'PENJUALAN TUNAI')
             ->where('pharmacy_id', getActivePharmacyId())
             ->sum('amount');
+        $kasMasukPenjualanNonTunai = (float) FinancePayment::where('payment_type', 'PENJUALAN NON TUNAI')
+            ->where('pharmacy_id', getActivePharmacyId())
+            ->sum('amount');
         $kasMasukPendapatan = (float) FinancePayment::where('payment_type', 'PENDAPATAN')
             ->whereIn('pharmacy_id', $targetPharmacyIds)
             ->sum('amount');
-        $kasMasuk = $kasMasukPiutang + $kasMasukPendapatan + $kasMasukPenjualanTunai;
+        $kasMasuk = $kasMasukPiutang + $kasMasukPendapatan + $kasMasukPenjualanTunai + $kasMasukPenjualanNonTunai;
 
         $kasKeluarHutangCash = (float) FinancePayment::whereIn('payment_type', ['KREDIT', 'CASH', 'KONSINYASI'])
             ->whereHas('receiving', function ($q) use ($targetPharmacyIds) {

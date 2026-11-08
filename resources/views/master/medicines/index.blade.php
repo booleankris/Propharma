@@ -387,7 +387,7 @@
                                     <select id="packaging" name="packaging"
                                         class="select2 w-full rounded-lg border border-gray-300 px-3.5 py-2 text-xs">
                                         <option value="">-- Pilih --</option>
-                                        @foreach (['UNIT', 'PACK', 'PCS', 'TUBE', 'VIAL', 'AMP', 'KTK', 'BKS', 'BTL', 'BOX', 'TAB', 'DUS', 'STRIP', 'KAPSUL', 'KAPLET'] as $opt)
+                                        @foreach (['UNIT', 'PACK', 'PCS', 'TUBE', 'VIAL', 'AMP', 'KTK', 'BKS', 'BTL', 'BOX', 'TAB', 'DUS', 'STRIP', 'KAPSUL', 'KAPLET', 'SACH', 'KLG', 'ROLL'] as $opt)
                                             <option value="{{ $opt }}">{{ $opt }}</option>
                                         @endforeach
                                     </select>
@@ -397,7 +397,7 @@
                                     <select id="unit" name="unit"
                                         class="select2 w-full rounded-lg border border-gray-300 px-3.5 py-2 text-xs">
                                         <option value="">-- Pilih --</option>
-                                        @foreach (['UNIT', 'PACK', 'PCS', 'TUBE', 'VIAL', 'AMP', 'KTK', 'BKS', 'BTL', 'BOX', 'TAB', 'DUS', 'STRIP', 'KAPSUL', 'KAPLET'] as $opt)
+                                        @foreach (['UNIT', 'PACK', 'PCS', 'TUBE', 'VIAL', 'AMP', 'KTK', 'BKS', 'BTL', 'BOX', 'TAB', 'DUS', 'STRIP', 'KAPSUL', 'KAPLET', 'SACH', 'KLG', 'ROLL'] as $opt)
                                             <option value="{{ $opt }}">{{ $opt }}</option>
                                         @endforeach
                                     </select>

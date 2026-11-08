@@ -583,6 +583,7 @@ Route::middleware(['auth', 'role:General Manager|Kasir|Gudang PMI|HO|administrat
         Route::get('/cashflow/trade-export', [\App\Http\Controllers\FinanceController::class, 'exportCashflowTrade'])->name('cashflow.trade-export');
         Route::get('/cashflow/neraca-export', [\App\Http\Controllers\FinanceController::class, 'exportNeraca'])->name('cashflow.neraca-export');
         Route::post('/setoran', [\App\Http\Controllers\FinanceController::class, 'storeSetoran'])->name('setoran.store');
+        Route::post('/tarik-tunai', [\App\Http\Controllers\FinanceController::class, 'storeTarikTunai'])->name('tarikTunai.store');
         Route::get('/konsinyasi', [\App\Http\Controllers\FinanceController::class, 'konsinyasi'])->name('konsinyasi');
         Route::get('/piutang', [\App\Http\Controllers\FinanceController::class, 'piutang'])->name('piutang');
         Route::get('/kas-bank', [\App\Http\Controllers\FinanceController::class, 'kasBank'])->name('kasBank');
@@ -604,6 +605,7 @@ Route::middleware(['auth', 'role:General Manager|Kasir|Gudang PMI|HO|administrat
         Route::post('/bulk-cash-payment', [\App\Http\Controllers\FinanceController::class, 'assignBulkCashAccount'])->name('cash.bulkAssign');
         Route::post('/piutang-payments', [\App\Http\Controllers\FinanceController::class, 'storePiutangPayment'])->name('piutang.store');
         Route::post('/saldo-awal', [\App\Http\Controllers\FinanceController::class, 'storeSaldoAwal'])->name('saldoAwal.store');
+        Route::post('/kas-bank/adjust-balance', [\App\Http\Controllers\FinanceController::class, 'adjustBalance'])->name('kasBank.adjustBalance');
         Route::post('/kas-bank/backfill-penjualan-tunai', [\App\Http\Controllers\FinanceController::class, 'backfillPenjualanTunai'])->name('kasBank.backfillPenjualanTunai');
         Route::post('/kas-bank/backfill-penjualan-non-tunai', [\App\Http\Controllers\FinanceController::class, 'backfillPenjualanNonTunai'])->name('kasBank.backfillPenjualanNonTunai');
         Route::post('/pendapatan-lain-lain', [\App\Http\Controllers\FinanceController::class, 'storePendapatanLainLain'])->name('pendapatanLainLain.store');

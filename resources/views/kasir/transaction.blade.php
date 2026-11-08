@@ -1357,9 +1357,16 @@
                             <span class="text-[10px] text-slate-400 font-medium">Navigasi: [Enter] untuk lanjut</span>
                         </div>
 
+                        @php
+                            $branchBankOptions = !empty($availableBanks) && count($availableBanks) > 0
+                                ? collect($availableBanks)
+                                : collect(['Mandiri', 'BNI', 'BCA', 'BRI', 'BTN'])->map(fn($b) => ['bank_name' => $b, 'name' => 'Bank ' . $b, 'account_number' => null]);
+                        @endphp
+
                         {{-- Quick-pick Bank Chips --}}
                         <div class="grid grid-cols-5 gap-1.5 mb-2.5" id="bankChipsGroup">
-                            @foreach (['Mandiri', 'BNI', 'BCA', 'BRI', 'BTN'] as $bankItem)
+                            @foreach ($branchBankOptions as $bankOpt)
+                                @php $bankItem = $bankOpt['bank_name'] ?? ''; @endphp
                                 <button type="button"
                                     class="bank-chip-btn py-2 px-2 rounded-xl border border-slate-200 bg-white text-xs font-semibold text-slate-700 hover:border-blue-400 hover:bg-blue-50/50 active:scale-95 transition-all text-center flex items-center justify-center gap-1 focus:outline-none focus:ring-2 focus:ring-blue-400"
                                     data-bank="{{ $bankItem }}" onclick="selectBankChip('{{ $bankItem }}')">
@@ -1374,11 +1381,11 @@
                                 class="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 shadow-sm transition"
                                 name="bank_name" id="bank_name" onchange="syncChipFromSelect(this.value)">
                                 <option value="">-- Pilih Bank --</option>
-                                <option value="Mandiri">Bank Mandiri</option>
-                                <option value="BNI">Bank BNI</option>
-                                <option value="BCA">Bank BCA</option>
-                                <option value="BRI">Bank BRI</option>
-                                <option value="BTN">Bank BTN</option>
+                                @foreach ($branchBankOptions as $bankOpt)
+                                    <option value="{{ $bankOpt['bank_name'] }}">
+                                        {{ $bankOpt['name'] }}@if (!empty($bankOpt['account_number'])) ({{ $bankOpt['account_number'] }})@endif
+                                    </option>
+                                @endforeach
                             </select>
                         </div>
                     </div>
@@ -1513,8 +1520,14 @@
                                 <span>Pilih Bank Tujuan Ongkir:</span>
                             </label>
                         </div>
+                        @php
+                            $shippingBankOptions = !empty($availableBanks) && count($availableBanks) > 0
+                                ? collect($availableBanks)
+                                : collect(['Mandiri', 'BNI', 'BCA', 'BRI', 'BTN'])->map(fn($b) => ['bank_name' => $b, 'name' => 'Bank ' . $b, 'account_number' => null]);
+                        @endphp
                         <div class="grid grid-cols-5 gap-1 mb-1.5">
-                            @foreach (['Mandiri', 'BNI', 'BCA', 'BRI', 'BTN'] as $bankItem)
+                            @foreach ($shippingBankOptions as $bankOpt)
+                                @php $bankItem = $bankOpt['bank_name'] ?? ''; @endphp
                                 <button type="button"
                                     class="shipping-bank-chip-btn py-1 px-1 rounded-lg border border-slate-200 bg-slate-50 text-[10px] font-semibold text-slate-700 hover:border-blue-400 hover:bg-blue-50/50 transition text-center"
                                     data-bank="{{ $bankItem }}"
@@ -1527,11 +1540,11 @@
                             class="w-full rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-xs font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
                             id="shipping_bank_name" onchange="syncShippingBankSelect(this.value, true)">
                             <option value="">-- Pilih Bank --</option>
-                            <option value="Mandiri">Bank Mandiri</option>
-                            <option value="BNI">Bank BNI</option>
-                            <option value="BCA">Bank BCA</option>
-                            <option value="BRI">Bank BRI</option>
-                            <option value="BTN">Bank BTN</option>
+                            @foreach ($shippingBankOptions as $bankOpt)
+                                <option value="{{ $bankOpt['bank_name'] }}">
+                                    {{ $bankOpt['name'] }}@if (!empty($bankOpt['account_number'])) ({{ $bankOpt['account_number'] }})@endif
+                                </option>
+                            @endforeach
                         </select>
                     </div>
                 </div>

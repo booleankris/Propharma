@@ -51,6 +51,10 @@ class KeuanganReportService
                     ->orWhere(function ($sub) use ($drawerAccountId) {
                         $sub->where('payment_type', 'SETOR')
                             ->where('account_id', $drawerAccountId ?? 0);
+                    })
+                    ->orWhere(function ($sub) use ($drawerAccountId) {
+                        $sub->where('payment_type', 'TARIK TUNAI')
+                            ->where('transfer_account_id', $drawerAccountId ?? 0);
                     });
             })
             ->get();
@@ -75,6 +79,9 @@ class KeuanganReportService
                     $label = (string) ($payment->transferAccount?->name ?? 'Rekening');
                     $days[$date]['setoran'][$label] = ($days[$date]['setoran'][$label] ?? 0) + $amount;
                     break;
+                case 'TARIK TUNAI':
+                    $days[$date]['bank'] += $amount;
+                    break;
             }
         }
 
@@ -92,7 +99,7 @@ class KeuanganReportService
         foreach ($days as $date => &$day) {
             if ($openingDate === $date) $balance = (float) $opening->amount;
             $day['jumlah'] = $day['pagi'] + $day['sore'];
-            $day['total_pemasukan'] = $day['jumlah'] + $day['piutang'] + $day['pendapatan_lain'] + $day['cashbond_masuk'];
+            $day['total_pemasukan'] = $day['jumlah'] + $day['piutang'] + $day['pendapatan_lain'] + $day['bank'] + $day['cashbond_masuk'];
             $day['total_biaya'] = $day['hutang_dagang'] + $day['retur_pembelian'] + $day['pembelian_cash'] + $day['biaya_pajak'] + $day['biaya_operasional'];
             $day['total_pengeluaran'] = $day['total_biaya'] + $day['cashbond_keluar'] + array_sum($day['setoran']);
             $day['sisa'] = $balance + $day['total_pemasukan'];

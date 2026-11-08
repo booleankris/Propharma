@@ -424,9 +424,14 @@
 
                             <div class="w-full sm:w-32">
                                 <div class="py-1 text-[13px] font-bold">Satuan</div>
-                                <input id="unit"
+                                <input id="unit" list="unit-options"
                                     class="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-[13px] focus:ring-2 focus:ring-blue-200"
                                     placeholder="Satuan">
+                                <datalist id="unit-options">
+                                    @foreach (['UNIT', 'PACK', 'PCS', 'TUBE', 'VIAL', 'AMP', 'KTK', 'BKS', 'BTL', 'BOX', 'TAB', 'DUS', 'STRIP', 'KAPSUL', 'KAPLET', 'SACH', 'KLG', 'ROLL'] as $opt)
+                                        <option value="{{ $opt }}"></option>
+                                    @endforeach
+                                </datalist>
                             </div>
                         </div>
 

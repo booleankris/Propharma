@@ -245,11 +245,17 @@ class NeracaReportService
         foreach ($payments as $payment) {
             if (in_array($payment->payment_type, ['PIUTANG', 'PENDAPATAN', 'PENJUALAN TUNAI', 'PENJUALAN NON TUNAI'], true)) {
                 $balance += (float) $payment->amount;
-            } elseif (in_array($payment->payment_type, ['KREDIT', 'CASH', 'KONSINYASI', 'BIAYA', 'SETOR'], true)) {
+            } elseif (in_array($payment->payment_type, ['KREDIT', 'CASH', 'KONSINYASI', 'BIAYA', 'SETOR', 'TARIK TUNAI'], true)) {
                 $balance -= (float) $payment->amount;
+            } elseif ($payment->payment_type === 'PENYESUAIAN SALDO') {
+                if ($payment->reference_number === 'OPNAME-OUT') {
+                    $balance -= (float) $payment->amount;
+                } else {
+                    $balance += (float) $payment->amount;
+                }
             }
         }
-        $balance += (float) FinancePayment::where('payment_type', 'SETOR')
+        $balance += (float) FinancePayment::whereIn('payment_type', ['SETOR', 'TARIK TUNAI'])
             ->where('transfer_account_id', $accountId)
             ->whereDate('payment_date', '>=', $openingDate)
             ->whereDate('payment_date', '<=', $asOfDate)
