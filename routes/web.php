@@ -590,6 +590,12 @@ Route::middleware(['auth', 'role:General Manager|Kasir|Gudang PMI|HO|administrat
         Route::get('/pendapatan-lain-lain', [\App\Http\Controllers\FinanceController::class, 'pendapatanLainLain'])->name('pendapatanLainLain');
         Route::get('/biaya', [\App\Http\Controllers\FinanceController::class, 'biaya'])->name('biaya');
         Route::get('/diskon', [\App\Http\Controllers\FinanceController::class, 'diskon'])->name('diskon');
+        Route::get('/cashbond', [\App\Http\Controllers\FinanceController::class, 'cashbond'])->name('cashbond');
+        Route::post('/cashbond', [\App\Http\Controllers\FinanceController::class, 'storeCashbond'])->name('cashbond.store');
+        Route::put('/cashbond/{id}', [\App\Http\Controllers\FinanceController::class, 'updateCashbond'])->name('cashbond.update');
+        Route::post('/cashbond/{id}/settle', [\App\Http\Controllers\FinanceController::class, 'settleCashbond'])->name('cashbond.settle');
+        Route::post('/cashbond/{id}/reopen', [\App\Http\Controllers\FinanceController::class, 'reopenCashbond'])->name('cashbond.reopen');
+        Route::delete('/cashbond/{id}', [\App\Http\Controllers\FinanceController::class, 'destroyCashbond'])->name('cashbond.destroy');
         Route::get('/accounts', [\App\Http\Controllers\FinanceController::class, 'accounts'])->name('accounts');
 
         Route::post('/payments', [\App\Http\Controllers\FinanceController::class, 'storePayment'])->name('payments.store');

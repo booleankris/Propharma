@@ -744,7 +744,11 @@ class ReceivingController extends Controller
             $query->whereDate('created_at', '<=', $request->end_date);
         }
 
-        $query->orderByDesc('created_at');
+        if ($request->filled('change_type')) {
+            $this->applyPriceChangeTypeFilter($query, (string) $request->input('change_type'));
+        }
+
+        $query->orderByDesc('created_at')->orderByDesc('id');
 
         return DataTables::of($query)
             ->addIndexColumn()
@@ -763,6 +767,18 @@ class ReceivingController extends Controller
                 }
                 return 'Rp ' . number_format((float) $row->new_price, 0, ',', '.');
             })
+            ->addColumn('old_het_price_fmt', function ($row) {
+                if ($row->old_het_price === null || $row->old_het_price === '' || (float) $row->old_het_price <= 0) {
+                    return '-';
+                }
+                return 'Rp ' . number_format((float) $row->old_het_price, 0, ',', '.');
+            })
+            ->addColumn('new_het_price_fmt', function ($row) {
+                if ($row->new_het_price === null || $row->new_het_price === '') {
+                    return '-';
+                }
+                return 'Rp ' . number_format((float) $row->new_het_price, 0, ',', '.');
+            })
             ->addColumn('changed_by', fn($row) => $row->user?->name ?? '-')
             ->addColumn('source_pharmacy', function ($row) {
                 $item = $row->sourceReceivingItem;
@@ -775,30 +791,63 @@ class ReceivingController extends Controller
                 return '<div class="font-semibold">' . e($pharmacy) . '</div><div class="text-xs text-slate-500">Terima ' . e($receipt) . ' · Faktur ' . e($invoice) . '</div>';
             })
             ->addColumn('changed_at', fn($row) => $row->created_at?->format('d/m/Y H:i') ?? '-')
-            ->addColumn('direction', function ($row) {
-                if ($row->old_price === null || $row->old_price === '' || (float) $row->old_price <= 0) {
-                    return '<span class="badge-same">—</span>';
-                }
-                $old = (float) $row->old_price;
-                $new = (float) $row->new_price;
-                $diff = $new - $old;
-
-                if ($old <= 0) {
-                    return '<span class="badge-same">—</span>';
-                }
-
-                $pct = round(abs($diff) / $old * 100, 1);
-                $pctFormatted = ($pct == (int) $pct) ? (int) $pct . '%' : number_format($pct, 1, ',', '.') . '%';
-
-                if ($new > $old) {
-                    return '<span class="badge-up">▲ Naik ' . $pctFormatted . '</span>';
-                } elseif ($new < $old) {
-                    return '<span class="badge-down">▼ Turun ' . $pctFormatted . '</span>';
-                }
-                return '<span class="badge-same">— Tetap</span>';
-            })
-            ->rawColumns(['direction', 'source_pharmacy'])
+            ->addColumn('direction', fn($row) => $this->priceDirectionBadge($row->old_price, $row->new_price))
+            ->addColumn('het_direction', fn($row) => $this->priceDirectionBadge($row->old_het_price, $row->new_het_price))
+            ->addColumn('het_changed', fn($row) => $this->pricesDiffer($row->old_het_price, $row->new_het_price))
+            ->rawColumns(['direction', 'het_direction', 'source_pharmacy'])
             ->make(true);
+    }
+
+    /**
+     * Apakah dua nilai harga berbeda (dipakai untuk mendeteksi perubahan HET).
+     */
+    private function pricesDiffer($oldPrice, $newPrice): bool
+    {
+        return abs((float) ($oldPrice ?? 0) - (float) ($newPrice ?? 0)) > 0.001;
+    }
+
+    /**
+     * Badge arah perubahan harga (HNA maupun HET).
+     */
+    private function priceDirectionBadge($oldPrice, $newPrice): string
+    {
+        if ($oldPrice === null || $oldPrice === '' || (float) $oldPrice <= 0) {
+            return '<span class="badge-same">—</span>';
+        }
+
+        $old = (float) $oldPrice;
+        $new = (float) $newPrice;
+
+        if ($new === $old) {
+            return '<span class="badge-same">— Tetap</span>';
+        }
+
+        $pct = round(abs($new - $old) / $old * 100, 1);
+        $pctFormatted = ($pct == (int) $pct) ? (int) $pct . '%' : number_format($pct, 1, ',', '.') . '%';
+
+        if ($new > $old) {
+            return '<span class="badge-up">▲ Naik ' . $pctFormatted . '</span>';
+        }
+
+        return '<span class="badge-down">▼ Turun ' . $pctFormatted . '</span>';
+    }
+
+    /**
+     * Filter riwayat berdasarkan jenis harga yang berubah: hna, het, het_only, atau both.
+     */
+    private function applyPriceChangeTypeFilter($query, string $type): void
+    {
+        // Harga disimpan sebagai string, jadi dibandingkan sebagai angka.
+        $hnaChanged = "(COALESCE(medicine_price_history.old_price, '0') + 0) <> (COALESCE(medicine_price_history.new_price, '0') + 0)";
+        $hetChanged = "(COALESCE(medicine_price_history.old_het_price, '0') + 0) <> (COALESCE(medicine_price_history.new_het_price, '0') + 0)";
+
+        match ($type) {
+            'hna'      => $query->whereRaw($hnaChanged),
+            'het'      => $query->whereRaw($hetChanged),
+            'het_only' => $query->whereRaw($hetChanged)->whereRaw("NOT ({$hnaChanged})"),
+            'both'     => $query->whereRaw($hnaChanged)->whereRaw($hetChanged),
+            default    => null,
+        };
     }
 
     private function buildBuyPriceHistoryQuery(Request $request)
@@ -1255,6 +1304,7 @@ class ReceivingController extends Controller
             ], 422);
         }
         $oldPrice = (float) ($medicine->raw_price ?? $medicine->pharmacy_net_price ?? 0);
+        $currentHetPrice = $medicine->het_price;
         $newRawPrice = (float) $request->new_raw_price;
 
         $medicine->update([
@@ -1268,7 +1318,10 @@ class ReceivingController extends Controller
             'medicine_id' => $medicine->id,
             'source_receiving_item_id' => $sourceItem->id,
             'old_price' => $oldPrice,
+            'old_het_price' => $currentHetPrice,
             'new_price' => $newRawPrice,
+            // Sinkronisasi dari penerimaan hanya mengubah HNA, HET tetap.
+            'new_het_price' => $currentHetPrice,
         ]);
 
         return response()->json([

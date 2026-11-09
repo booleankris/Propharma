@@ -225,19 +225,80 @@
         .medicine-option-enter { color: #94a3b8; font-size: 11px; }
 
         /* ── Price value styling ── */
+        .price-cell {
+            white-space: nowrap;
+            font-size: 12px;
+            line-height: 1.45;
+        }
+
         .price-old {
             font-weight: 600;
             color: #64748b;
+            white-space: nowrap;
         }
 
         .price-new {
             font-weight: 700;
             color: #1d4ed8;
+            white-space: nowrap;
         }
 
         .price-current {
             font-size: 12px;
             color: #6b7280;
+        }
+
+        /* Satu baris harga: tag + nominal + badge, tidak boleh pecah */
+        .price-line {
+            display: flex;
+            flex-wrap: nowrap;
+            align-items: center;
+            gap: 4px;
+            white-space: nowrap;
+        }
+
+        .price-line + .price-line { margin-top: 3px; }
+
+        /* ── Tag pembeda HNA / HET ── */
+        .price-tag {
+            display: inline-flex;
+            flex: 0 0 auto;
+            align-items: center;
+            padding: 0 4px;
+            border-radius: 4px;
+            font-size: 9px;
+            font-weight: 800;
+            letter-spacing: .03em;
+            line-height: 14px;
+            white-space: nowrap;
+        }
+
+        .price-tag-hna {
+            background: #dbeafe;
+            color: #1d4ed8;
+        }
+
+        .price-tag-het {
+            background: #fef3c7;
+            color: #b45309;
+        }
+
+        .price-het {
+            font-size: 11px;
+            font-weight: 700;
+            color: #b45309;
+            white-space: nowrap;
+        }
+
+        /* Badge arah di dalam tabel dibuat lebih ringkas */
+        #historyTable tbody .badge-up,
+        #historyTable tbody .badge-down,
+        #historyTable tbody .badge-same {
+            flex: 0 0 auto;
+            padding: 0 6px;
+            font-size: 10px;
+            line-height: 16px;
+            gap: 2px;
         }
     </style>
 @endsection
@@ -260,7 +321,7 @@
                     </div>
                     <div>
                         <h2 class="text-base font-bold text-slate-800 leading-tight">History Perubahan Harga</h2>
-                        <p class="text-xs text-slate-400">Riwayat perubahan harga obat oleh Superadmin & Manager</p>
+                        <p class="text-xs text-slate-400">Riwayat perubahan HNA (Harga Netto Apotek) & HET (Harga Eceran Tertinggi) obat oleh Superadmin & Manager</p>
                     </div>
                 </div>
 
@@ -321,6 +382,18 @@
                             autocomplete="off" readonly>
                     </div>
 
+                    {{-- Jenis perubahan --}}
+                    <div class="min-w-[190px]">
+                        <div class="filter-label">Jenis Perubahan</div>
+                        <select id="changeType" class="filter-input">
+                            <option value="">Semua Perubahan</option>
+                            <option value="hna">HNA Berubah</option>
+                            <option value="het">HET Berubah</option>
+                            <option value="het_only">Hanya HET Berubah</option>
+                            <option value="both">HNA &amp; HET Berubah</option>
+                        </select>
+                    </div>
+
                     {{-- Reset --}}
                     <div>
                         <button id="btnReset"
@@ -333,8 +406,8 @@
             </div>
 
             {{-- ─── DataTable ─── --}}
-            <div class="bg-white rounded-2xl shadow-sm p-5">
-                <table id="historyTable" class="w-full">
+            <div class="bg-white rounded-2xl shadow-sm p-5 overflow-x-auto">
+                <table id="historyTable" class="w-full min-w-[1120px]">
                     <thead>
                         <tr>
                             <th>#</th>
@@ -489,12 +562,14 @@
             historyTable = $('#historyTable').DataTable({
                 processing: true,
                 serverSide: true,
+                autoWidth: false,
                 ajax: {
                     url: "{{ route('receiving.gethistory') }}",
                     data: function(d) {
                         d.medicine_id = document.getElementById('selectedMedicineId').value;
                         d.start_date = startDate;
                         d.end_date = endDate;
+                        d.change_type = document.getElementById('changeType').value;
                     }
                 },
                 columns: [{
@@ -526,15 +601,34 @@
                     {
                         // Harga lama (sebelum diubah)
                         data: 'old_price_fmt',
-                        render: (data) => `<span class="price-old">${data}</span>`,
+                        width: '105px',
+                        render: (data) => `<div class="price-cell"><span class="price-old">${data}</span></div>`,
                         orderable: false
                     },
                     {
-                        // Harga baru (setelah diubah)
+                        // Harga baru (HNA) + info perubahan HET di bawahnya bila ada
                         data: 'new_price_fmt',
+                        width: '215px',
                         render: (data, type, row) => {
-                            const badge = row.direction && !row.direction.includes('badge-same') ? ` ${row.direction}` : '';
-                            return `<div class="flex items-center gap-1.5"><span class="price-new">${data}</span>${badge}</div>`;
+                            const hnaBadge = row.direction && !row.direction.includes('badge-same') ? row.direction : '';
+                            let html = `<div class="price-cell">
+                                    <div class="price-line">
+                                        <span class="price-tag price-tag-hna">HNA</span>
+                                        <span class="price-new">${data}</span>
+                                        ${hnaBadge}
+                                    </div>`;
+
+                            if (row.het_changed) {
+                                const oldHet = row.old_het_price_fmt && row.old_het_price_fmt !== '-' ? row.old_het_price_fmt : null;
+                                const hetBadge = row.het_direction && !row.het_direction.includes('badge-same') ? row.het_direction : '';
+                                html += `<div class="price-line">
+                                        <span class="price-tag price-tag-het">HET</span>
+                                        <span class="price-het">${oldHet ? oldHet + ' → ' : ''}${row.new_het_price_fmt}</span>
+                                        ${hetBadge}
+                                    </div>`;
+                            }
+
+                            return html + '</div>';
                         },
                         orderable: false
                     },
@@ -609,12 +703,18 @@
                 }
             });
 
+            // ── Jenis perubahan (HNA / HET) ──
+            document.getElementById('changeType').addEventListener('change', function() {
+                historyTable.ajax.reload(null, false);
+            });
+
             // ── Reset button ──
             document.getElementById('btnReset').addEventListener('click', function() {
                 document.getElementById('searchMedicine').value = '';
                 document.getElementById('selectedMedicineId').value = '';
                 closeMedicineOptions();
                 document.getElementById('dateRange').value = '';
+                document.getElementById('changeType').value = '';
                 startDate = '';
                 endDate = '';
                 // Re-initialise flatpickr clear

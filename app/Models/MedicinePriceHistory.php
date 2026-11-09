@@ -16,7 +16,9 @@ class MedicinePriceHistory extends Model
         'medicine_id',
         'source_receiving_item_id',
         'old_price',
+        'old_het_price',
         'new_price',
+        'new_het_price',
     ];
 
     public function user()

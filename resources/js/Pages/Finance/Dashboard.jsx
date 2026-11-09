@@ -22,6 +22,8 @@ import {
     PackageCheck,
     Wallet,
     CheckCircle2,
+    Percent,
+    Boxes,
 } from 'lucide-react';
 
 const MONTH_OPTIONS = [
@@ -67,11 +69,12 @@ export default function Dashboard({
         );
     };
 
-    const penjualan = realtime.penjualan || { total: 0, tunaiBank: 0, kredit: 0 };
-    const pembelian = realtime.pembelian || { total: 0, fakturBruto: 0, retur: 0, pbf: 0, cash: 0, konsinyasi: 0 };
-    const biaya = realtime.biaya || { total: 0 };
-    const pendapatan = realtime.pendapatan || { total: 0, pendapatanLain: 0, diskonOff: 0 };
-    const laba = realtime.laba || { total: 0, marginPersen: 0 };
+    const penjualan = realtime.penjualan || { total: 0, tunaiBank: 0, kredit: 0, akumulasi: 0 };
+    const pembelian = realtime.pembelian || { total: 0, fakturBruto: 0, retur: 0, pbf: 0, cash: 0, konsinyasi: 0, akumulasi: 0 };
+    const biaya = realtime.biaya || { total: 0, akumulasi: 0 };
+    const pendapatan = realtime.pendapatan || { total: 0, pendapatanLain: 0, diskonOff: 0, akumulasi: 0 };
+    const laba = realtime.laba || { total: 0, marginPersen: 0, akumulasi: 0 };
+    const hpp = realtime.hpp || { persen: 0, total: 0, persenAkumulasi: 0, totalAkumulasi: 0 };
     const isProfitable = Number(laba.total || 0) >= 0;
 
     return (
@@ -154,8 +157,8 @@ export default function Dashboard({
                     </div>
                 </div>
 
-                {/* BARIS 1: PENJUALAN, PEMBELIAN, BIAYA, PENDAPATAN, LABA */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-4">
+                {/* BARIS 1: PENJUALAN, PEMBELIAN, BIAYA, PENDAPATAN, LABA, PRESENTASE HPP */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
                     {/* 1. Penjualan */}
                     <Link
                         href="/finance/cashflow?tab=sheet"
@@ -170,6 +173,9 @@ export default function Dashboard({
                             </div>
                             <p className="text-xl sm:text-2xl font-black text-slate-900 mt-2 tracking-tight tabular-nums">
                                 {formatRupiah(penjualan.total)}
+                            </p>
+                            <p className="text-[11px] text-slate-500 font-medium mt-0.5">
+                                Akumulasi: <span className="font-semibold text-slate-700">{formatRupiah(penjualan.akumulasi || 0)}</span>
                             </p>
                         </div>
 
@@ -200,6 +206,9 @@ export default function Dashboard({
                             <p className="text-xl sm:text-2xl font-black text-slate-900 mt-2 tracking-tight tabular-nums">
                                 {formatRupiah(pembelian.total)}
                             </p>
+                            <p className="text-[11px] text-slate-500 font-medium mt-0.5">
+                                Akumulasi: <span className="font-semibold text-slate-700">{formatRupiah(pembelian.akumulasi || 0)}</span>
+                            </p>
                         </div>
 
                         <div className="mt-4 pt-3 border-t border-slate-100 space-y-1.5 text-xs">
@@ -229,6 +238,9 @@ export default function Dashboard({
                             <p className="text-xl sm:text-2xl font-black text-rose-700 mt-2 tracking-tight tabular-nums">
                                 {formatRupiah(biaya.total)}
                             </p>
+                            <p className="text-[11px] text-slate-500 font-medium mt-0.5">
+                                Akumulasi: <span className="font-semibold text-rose-600">{formatRupiah(biaya.akumulasi || 0)}</span>
+                            </p>
                             <p className="text-xs text-slate-500 mt-1">
                                 Pengeluaran biaya operasional
                             </p>
@@ -254,6 +266,9 @@ export default function Dashboard({
                             </div>
                             <p className="text-xl sm:text-2xl font-black text-teal-700 mt-2 tracking-tight tabular-nums">
                                 {formatRupiah(pendapatan.total)}
+                            </p>
+                            <p className="text-[11px] text-slate-500 font-medium mt-0.5">
+                                Akumulasi: <span className="font-semibold text-teal-700">{formatRupiah(pendapatan.akumulasi || 0)}</span>
                             </p>
                         </div>
 
@@ -287,6 +302,11 @@ export default function Dashboard({
                             <p className={`text-xl sm:text-2xl font-black mt-2 tracking-tight tabular-nums ${isProfitable ? 'text-emerald-700' : 'text-rose-600'}`}>
                                 {isProfitable ? '' : '−'}{formatRupiah(Math.abs(laba.total))}
                             </p>
+                            <p className="text-[11px] text-slate-500 font-medium mt-0.5">
+                                Akumulasi: <span className={`font-semibold ${Number(laba.akumulasi || 0) >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
+                                    {Number(laba.akumulasi || 0) < 0 ? '−' : ''}{formatRupiah(Math.abs(laba.akumulasi || 0))}
+                                </span>
+                            </p>
                         </div>
 
                         <div className="mt-4 pt-3 border-t border-slate-100 space-y-1.5 text-xs">
@@ -301,67 +321,141 @@ export default function Dashboard({
                             </p>
                         </div>
                     </div>
+
+                    {/* 6. Presentase HPP */}
+                    <Link
+                        href="/finance/cashflow?tab=kinerja"
+                        className="bg-white border border-slate-200/80 rounded-2xl p-5 shadow-2xs hover:border-indigo-300 hover:shadow-xs transition group flex flex-col justify-between"
+                    >
+                        <div>
+                            <div className="flex items-center justify-between">
+                                <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Presentase HPP</span>
+                                <div className="w-9 h-9 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center group-hover:scale-105 transition">
+                                    <Percent className="w-5 h-5" />
+                                </div>
+                            </div>
+                            <p className="text-xl sm:text-2xl font-black text-indigo-700 mt-2 tracking-tight tabular-nums">
+                                {hpp.persen}%
+                            </p>
+                            <p className="text-[11px] text-slate-500 font-medium mt-0.5">
+                                Akumulasi: <span className="font-semibold text-indigo-600">{hpp.persenAkumulasi}%</span>
+                            </p>
+                        </div>
+
+                        <div className="mt-4 pt-3 border-t border-slate-100 space-y-1.5 text-xs">
+                            <div className="flex items-center justify-between">
+                                <span className="text-slate-500">Nominal HPP</span>
+                                <span className="font-semibold text-slate-800 tabular-nums">{formatRupiah(pembelian.total)}</span>
+                            </div>
+                            <p className="text-[11px] text-slate-400 leading-snug">
+                                Total Pembelian / Penjualan
+                            </p>
+                        </div>
+                    </Link>
                 </div>
 
-                {/* BARIS 2: SALDO KAS & BANK, HUTANG DAGANG, PIUTANG DAGANG */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                {/* BARIS 2: SALDO KAS & BANK, HUTANG DAGANG, PIUTANG DAGANG, NILAI STOK */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                     {/* 1. Saldo Kas & Bank */}
                     <Link
                         href="/finance/kas-bank"
-                        className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-2xs hover:border-blue-300 hover:shadow-xs transition group block"
+                        className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-2xs hover:border-blue-300 hover:shadow-xs transition group flex flex-col justify-between"
                     >
-                        <div className="flex items-center justify-between">
-                            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Saldo Kas &amp; Bank</span>
-                            <div className="w-9 h-9 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center group-hover:scale-105 transition">
-                                <Landmark className="w-5 h-5" />
+                        <div>
+                            <div className="flex items-center justify-between">
+                                <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Saldo Kas &amp; Bank</span>
+                                <div className="w-9 h-9 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center group-hover:scale-105 transition">
+                                    <Landmark className="w-5 h-5" />
+                                </div>
                             </div>
+                            <p className={`text-xl sm:text-2xl font-black mt-2 tracking-tight tabular-nums ${Number(stats.totalSaldoKasBank || 0) < 0 ? 'text-rose-600' : 'text-slate-900'}`}>
+                                {formatRupiah(stats.totalSaldoKasBank || 0)}
+                            </p>
                         </div>
-                        <p className={`text-xl sm:text-2xl font-black mt-2 tracking-tight tabular-nums ${Number(stats.totalSaldoKasBank || 0) < 0 ? 'text-rose-600' : 'text-slate-900'}`}>
-                            {formatRupiah(stats.totalSaldoKasBank || 0)}
-                        </p>
-                        <div className="text-[11px] text-blue-600 font-medium mt-1 flex items-center gap-1">
+                        <div className="text-[11px] text-blue-600 font-medium mt-2 pt-2 border-t border-slate-100 flex items-center justify-between">
                             <span>Lihat {stats.accountsCount || accounts.length || 0} akun kas &amp; bank</span>
-                            <ChevronRight className="w-3 h-3 group-hover:translate-x-0.5 transition" />
+                            <ChevronRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition" />
                         </div>
                     </Link>
 
                     {/* 2. Hutang Dagang (Pembelian) */}
                     <Link
                         href="/finance/hutang"
-                        className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-2xs hover:border-rose-300 hover:shadow-xs transition group block"
+                        className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-2xs hover:border-rose-300 hover:shadow-xs transition group flex flex-col justify-between"
                     >
-                        <div className="flex items-center justify-between">
-                            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Hutang Dagang (Pembelian)</span>
-                            <div className="w-9 h-9 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center group-hover:scale-105 transition">
-                                <CreditCard className="w-5 h-5" />
+                        <div>
+                            <div className="flex items-center justify-between">
+                                <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Hutang Dagang (Pembelian)</span>
+                                <div className="w-9 h-9 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center group-hover:scale-105 transition">
+                                    <CreditCard className="w-5 h-5" />
+                                </div>
                             </div>
+                            <p className="text-xl sm:text-2xl font-black text-rose-600 mt-2 tracking-tight tabular-nums">
+                                {formatRupiah(stats.totalSisaHutang || 0)}
+                            </p>
                         </div>
-                        <p className="text-xl sm:text-2xl font-black text-rose-600 mt-2 tracking-tight tabular-nums">
-                            {formatRupiah(stats.totalSisaHutang || 0)}
-                        </p>
-                        <div className="text-[11px] text-rose-600 font-medium mt-1 flex items-center gap-1">
+                        <div className="text-[11px] text-rose-600 font-medium mt-2 pt-2 border-t border-slate-100 flex items-center justify-between">
                             <span>{stats.countHutangBelumLunas || 0} Faktur Belum Lunas</span>
-                            <ChevronRight className="w-3 h-3 group-hover:translate-x-0.5 transition" />
+                            <ChevronRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition" />
                         </div>
                     </Link>
 
                     {/* 3. Piutang Dagang (Penjualan Kredit) */}
                     <Link
                         href="/finance/piutang"
-                        className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-2xs hover:border-amber-300 hover:shadow-xs transition group block"
+                        className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-2xs hover:border-amber-300 hover:shadow-xs transition group flex flex-col justify-between"
                     >
-                        <div className="flex items-center justify-between">
-                            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Piutang Dagang (Penjualan Kredit)</span>
-                            <div className="w-9 h-9 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center group-hover:scale-105 transition">
-                                <ShoppingCart className="w-5 h-5" />
+                        <div>
+                            <div className="flex items-center justify-between">
+                                <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Piutang Dagang (Penjualan Kredit)</span>
+                                <div className="w-9 h-9 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center group-hover:scale-105 transition">
+                                    <ShoppingCart className="w-5 h-5" />
+                                </div>
                             </div>
+                            <p className="text-xl sm:text-2xl font-black text-amber-700 mt-2 tracking-tight tabular-nums">
+                                {formatRupiah(stats.totalSisaPiutang || 0)}
+                            </p>
                         </div>
-                        <p className="text-xl sm:text-2xl font-black text-amber-700 mt-2 tracking-tight tabular-nums">
-                            {formatRupiah(stats.totalSisaPiutang || 0)}
-                        </p>
-                        <div className="text-[11px] text-amber-600 font-medium mt-1 flex items-center gap-1">
+                        <div className="text-[11px] text-amber-600 font-medium mt-2 pt-2 border-t border-slate-100 flex items-center justify-between">
                             <span>{stats.countPiutangBelumBayar || 0} Tagihan Belum Dibayar</span>
-                            <ChevronRight className="w-3 h-3 group-hover:translate-x-0.5 transition" />
+                            <ChevronRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition" />
+                        </div>
+                    </Link>
+
+                    {/* 4. Nilai Stok */}
+                    <Link
+                        href="/stock-data"
+                        className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-2xs hover:border-purple-300 hover:shadow-xs transition group flex flex-col justify-between"
+                    >
+                        <div>
+                            <div className="flex items-center justify-between">
+                                <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Nilai Stok</span>
+                                <div className="w-9 h-9 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center group-hover:scale-105 transition">
+                                    <Boxes className="w-5 h-5" />
+                                </div>
+                            </div>
+                            <p className="text-xl sm:text-2xl font-black text-purple-700 mt-2 tracking-tight tabular-nums">
+                                {formatRupiah(stats.totalNilaiStok || stats.nilaiStok?.total || 0)}
+                            </p>
+                        </div>
+                        <div className="mt-2 pt-2 border-t border-slate-100 text-[11px]">
+                            {stats.nilaiStok?.isPmi ? (
+                                <div className="space-y-0.5 text-slate-600">
+                                    <div className="flex items-center justify-between">
+                                        <span>Etalase:</span>
+                                        <span className="font-semibold text-slate-800 tabular-nums">{formatRupiah(stats.nilaiStok?.etalase || 0)}</span>
+                                    </div>
+                                    <div className="flex items-center justify-between">
+                                        <span>Gudang:</span>
+                                        <span className="font-semibold text-slate-800 tabular-nums">{formatRupiah(stats.nilaiStok?.gudang || 0)}</span>
+                                    </div>
+                                </div>
+                            ) : (
+                                <div className="text-purple-600 font-medium flex items-center justify-between">
+                                    <span>Stok Etalase ({stats.nilaiStok?.totalItems || 0} Obat)</span>
+                                    <ChevronRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition" />
+                                </div>
+                            )}
                         </div>
                     </Link>
                 </div>

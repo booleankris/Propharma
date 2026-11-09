@@ -28,7 +28,23 @@ import {
     Clock,
     UserCheck,
     AlertCircle,
+    Calendar,
 } from 'lucide-react';
+
+const MONTH_OPTIONS = [
+    { value: 1, label: 'Januari' },
+    { value: 2, label: 'Februari' },
+    { value: 3, label: 'Maret' },
+    { value: 4, label: 'April' },
+    { value: 5, label: 'Mei' },
+    { value: 6, label: 'Juni' },
+    { value: 7, label: 'Juli' },
+    { value: 8, label: 'Agustus' },
+    { value: 9, label: 'September' },
+    { value: 10, label: 'Oktober' },
+    { value: 11, label: 'November' },
+    { value: 12, label: 'Desember' },
+];
 
 const localToday = () => {
     const date = new Date();
@@ -53,7 +69,32 @@ export default function KasBank({
     openingBalances = {},
     monthlyOpeningBalances = {},
     adjustmentLogs = [],
+    selectedMonth: propMonth,
+    selectedYear: propYear,
+    monthLabel: propMonthLabel,
 }) {
+    const now = new Date();
+    const selectedMonth = Number(propMonth || (now.getMonth() + 1));
+    const selectedYear = Number(propYear || now.getFullYear());
+    const currentYear = now.getFullYear();
+    const yearOptions = Array.from({ length: 6 }, (_, i) => currentYear - 4 + i);
+    const [isFilteringPeriod, setIsFilteringPeriod] = useState(false);
+
+    const monthLabel = propMonthLabel || `${MONTH_OPTIONS[selectedMonth - 1]?.label || ''} ${selectedYear}`;
+
+    const handlePeriodChange = (nextMonth, nextYear) => {
+        setIsFilteringPeriod(true);
+        router.get(
+            '/finance/kas-bank',
+            { month: nextMonth, year: nextYear },
+            {
+                preserveState: true,
+                preserveScroll: true,
+                onFinish: () => setIsFilteringPeriod(false),
+            }
+        );
+    };
+
     // State Filter & Search Mutasi
     const [selectedKasBankFilter, setSelectedKasBankFilter] = useState('all'); // 'all' | account_id
     const [mutasiTypeFilter, setMutasiTypeFilter] = useState('all'); // 'all' | 'IN' | 'OUT'
@@ -539,15 +580,52 @@ export default function KasBank({
 
             <div className="finance-kas-bank space-y-6">
                 {/* Header Action Toolbar */}
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-5 rounded-2xl border border-slate-200 shadow-xs">
+                <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 bg-white p-5 rounded-2xl border border-slate-200 shadow-xs">
                     <div>
-                        <h2 className="text-base font-bold text-slate-900">Buku Kas & Rekening Bank</h2>
+                        <div className="flex items-center gap-2">
+                            <h2 className="text-base font-bold text-slate-900">Buku Kas & Rekening Bank</h2>
+                            {isFilteringPeriod && (
+                                <span className="text-[11px] text-blue-600 font-medium animate-pulse">
+                                    Memuat...
+                                </span>
+                            )}
+                        </div>
                         <p className="text-xs text-slate-500 mt-0.5">
-                            Total {kasBankAccounts.length} rekening aktif kas & bank terdaftar dalam sistem
+                            Total {kasBankAccounts.length} rekening aktif • Periode Mutasi: <strong className="text-blue-700 font-semibold">{monthLabel}</strong> (Reset tiap bulan)
                         </p>
                     </div>
 
                     <div className="flex flex-wrap items-center gap-2">
+                        {/* Filter Periode Bulan & Tahun (Otomatis Reset Tiap Awal Bulan) */}
+                        <div className="flex items-center gap-1.5 bg-slate-50 p-1 rounded-xl border border-slate-200">
+                            <Calendar className="w-3.5 h-3.5 text-slate-400 ml-1.5" />
+                            <select
+                                value={selectedMonth}
+                                onChange={(e) => handlePeriodChange(Number(e.target.value), selectedYear)}
+                                className="px-2 py-1 text-xs font-semibold bg-white border border-slate-200 rounded-lg text-slate-700 hover:bg-slate-50 focus:outline-hidden focus:border-blue-500 cursor-pointer shadow-2xs"
+                                aria-label="Pilih Bulan Mutasi"
+                            >
+                                {MONTH_OPTIONS.map((m) => (
+                                    <option key={m.value} value={m.value}>
+                                        {m.label}
+                                    </option>
+                                ))}
+                            </select>
+
+                            <select
+                                value={selectedYear}
+                                onChange={(e) => handlePeriodChange(selectedMonth, Number(e.target.value))}
+                                className="px-2 py-1 text-xs font-semibold bg-white border border-slate-200 rounded-lg text-slate-700 hover:bg-slate-50 focus:outline-hidden focus:border-blue-500 cursor-pointer shadow-2xs"
+                                aria-label="Pilih Tahun Mutasi"
+                            >
+                                {yearOptions.map((y) => (
+                                    <option key={y} value={y}>
+                                        {y}
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
+
                         <button
                             type="button"
                             onClick={() => openOpnameModal(null)}
@@ -646,7 +724,7 @@ export default function KasBank({
                     {/* Total Kas Masuk (Debit) */}
                     <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs relative overflow-hidden group hover:border-emerald-300 transition">
                         <div className="flex items-center justify-between">
-                            <span className="text-xs font-medium text-slate-500">Total Kas Masuk (Debit)</span>
+                            <span className="text-xs font-medium text-slate-500">Total Kas Masuk ({monthLabel})</span>
                             <div className="w-9 h-9 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
                                 <ArrowDownLeft className="w-4 h-4" />
                             </div>
@@ -656,7 +734,7 @@ export default function KasBank({
                                 + {formatRupiah(kasBankSummary.totalMasuk)}
                             </div>
                             <div className="text-[11px] text-slate-400 mt-1">
-                                Penjualan kasir (tunai & bank), piutang & pendapatan
+                                Penjualan kasir, piutang & pendapatan ({monthLabel})
                             </div>
                         </div>
                     </div>
@@ -664,7 +742,7 @@ export default function KasBank({
                     {/* Total Kas Keluar (Kredit) */}
                     <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs relative overflow-hidden group hover:border-rose-300 transition">
                         <div className="flex items-center justify-between">
-                            <span className="text-xs font-medium text-slate-500">Total Kas Keluar (Kredit)</span>
+                            <span className="text-xs font-medium text-slate-500">Total Kas Keluar ({monthLabel})</span>
                             <div className="w-9 h-9 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center">
                                 <ArrowUpRight className="w-4 h-4" />
                             </div>
@@ -674,7 +752,7 @@ export default function KasBank({
                                 - {formatRupiah(kasBankSummary.totalKeluar)}
                             </div>
                             <div className="text-[11px] text-slate-400 mt-1">
-                                Pembelian cash & bayar hutang
+                                Pembelian cash & bayar hutang ({monthLabel})
                             </div>
                         </div>
                     </div>
@@ -682,7 +760,7 @@ export default function KasBank({
                     {/* Arus Kas Bersih (Net Cashflow) */}
                     <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs relative overflow-hidden group hover:border-indigo-300 transition">
                         <div className="flex items-center justify-between">
-                            <span className="text-xs font-medium text-slate-500">Arus Kas Bersih (Net Flow)</span>
+                            <span className="text-xs font-medium text-slate-500">Arus Kas Bersih ({monthLabel})</span>
                             <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${kasBankSummary.netCashflow >= 0 ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'}`}>
                                 {kasBankSummary.netCashflow >= 0 ? <TrendingUp className="w-4 h-4" /> : <TrendingDown className="w-4 h-4" />}
                             </div>
@@ -692,7 +770,7 @@ export default function KasBank({
                                 {kasBankSummary.netCashflow >= 0 ? '+ ' : ''}{formatRupiah(kasBankSummary.netCashflow)}
                             </div>
                             <div className="text-[11px] text-slate-400 mt-1">
-                                Total {(mutasiKasBank || []).length} transaksi mutasi
+                                Total {(mutasiKasBank || []).length} transaksi mutasi {monthLabel}
                             </div>
                         </div>
                     </div>
@@ -707,9 +785,12 @@ export default function KasBank({
                                 <h3 className="font-bold text-slate-900 text-sm flex items-center gap-2">
                                     <BarChart3 className="w-4 h-4 text-blue-600" />
                                     Rekening Kas & Bank
+                                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200">
+                                        {monthLabel}
+                                    </span>
                                 </h3>
                                 <p className="text-xs text-slate-400 mt-0.5">
-                                    Pilih rekening untuk melihat mutasi. Masuk dan keluar menunjukkan arus dana tercatat.
+                                    Pilih rekening untuk melihat mutasi. Masuk dan keluar menunjukkan arus dana periode {monthLabel} (reset tiap bulan).
                                 </p>
                             </div>
 
@@ -869,7 +950,7 @@ export default function KasBank({
 
                                             <div className="finance-account-balance flex items-center justify-between text-[10px] text-slate-400 pt-0.5">
                                                 <span>Saldo Buku: <strong className={`font-semibold ${acc.balance < 0 ? 'text-rose-700' : 'text-slate-900'}`}>{formatRupiah(acc.balance)}</strong></span>
-                                                <span className="font-medium text-slate-500">{acc.txCount} Mutasi</span>
+                                                <span className="font-medium text-slate-500">{acc.txCount} Mutasi ({monthLabel})</span>
                                             </div>
                                         </div>
                                     </div>
@@ -883,12 +964,12 @@ export default function KasBank({
                         <div>
                             <h3 className="font-bold text-slate-900 text-sm flex items-center gap-2 border-b border-slate-100 pb-4">
                                 <PieChart className="w-4 h-4 text-emerald-600" />
-                                Perbandingan Arus Kas
+                                Perbandingan Arus Kas ({monthLabel})
                             </h3>
 
                             <div className="mt-5">
                                 <CashFlowChart incoming={kasBankSummary.totalMasuk} outgoing={kasBankSummary.totalKeluar} compact />
-                                <div className="mt-4 text-sm text-slate-600">Arus kas bersih
+                                <div className="mt-4 text-sm text-slate-600">Arus kas bersih ({monthLabel})
                                     <strong className={`block mt-1 text-lg ${kasBankSummary.netCashflow >= 0 ? 'text-emerald-700' : 'text-rose-700'}`}>{formatRupiah(kasBankSummary.netCashflow)}</strong>
                                 </div>
                             </div>
@@ -904,7 +985,7 @@ export default function KasBank({
                         <div>
                             <div className="flex items-center gap-2.5">
                                 <h3 className="font-bold text-slate-900 text-sm">
-                                    Buku Mutasi Kas & Bank (Transaksi Keluar / Masuk)
+                                    Buku Mutasi Kas & Bank ({monthLabel})
                                 </h3>
                                 <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-slate-100 text-slate-700">
                                     {filteredMutasiKasBank.length} Baris
@@ -912,8 +993,8 @@ export default function KasBank({
                             </div>
                             <p className="text-xs text-slate-400 mt-0.5">
                                 {selectedKasBankFilter === 'all'
-                                    ? 'Menampilkan riwayat transaksi seluruh rekening kas & bank.'
-                                    : `Menampilkan mutasi akun: ${kasBankAccounts.find(a => String(a.id) === String(selectedKasBankFilter))?.name || 'Rekening'}`
+                                    ? `Menampilkan riwayat transaksi seluruh rekening kas & bank periode ${monthLabel}.`
+                                    : `Menampilkan mutasi akun: ${kasBankAccounts.find(a => String(a.id) === String(selectedKasBankFilter))?.name || 'Rekening'} periode ${monthLabel}.`
                                 }
                             </p>
                         </div>

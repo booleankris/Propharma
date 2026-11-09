@@ -15,6 +15,7 @@ use App\Models\Creditor;
 use App\Models\Debtors;
 use App\Models\FinanceAccount;
 use App\Models\FinanceBalanceAdjustment;
+use App\Models\FinanceCashbond;
 use App\Models\FinancePayment;
 use App\Models\MedicineCart;
 use App\Models\MedicineTransactions;
@@ -36,6 +37,8 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\File;
+use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Maatwebsite\Excel\Facades\Excel;
@@ -109,7 +112,9 @@ class FinanceController extends Controller
             $rtStartDate,
             $rtEndDate,
             'monthly',
-            $periodLabel
+            $periodLabel,
+            $selectedYear,
+            $selectedMonth
         );
         $realtimeMetrics['month'] = $selectedMonth;
         $realtimeMetrics['year'] = $selectedYear;
@@ -514,10 +519,28 @@ class FinanceController extends Controller
             session(['ho_pharmacy_id' => (int) $request->pharmacy_id]);
         }
 
+        // Filter periode Bulan & Tahun untuk Mutasi Kas & Bank (default: bulan & tahun berjalan, reset otomatis tiap bulan)
+        $now = \Carbon\Carbon::now();
+        $selectedMonth = (int) $request->query('month', $now->month);
+        $selectedYear = (int) $request->query('year', $now->year);
+        if ($selectedMonth < 1 || $selectedMonth > 12) {
+            $selectedMonth = $now->month;
+        }
+        if ($selectedYear < 2020 || $selectedYear > 2100) {
+            $selectedYear = $now->year;
+        }
+
+        $periodDate = \Carbon\Carbon::createFromDate($selectedYear, $selectedMonth, 1);
+        $monthStart = $periodDate->copy()->startOfMonth()->toDateString();
+        $monthEnd = $periodDate->copy()->endOfMonth()->toDateString();
+        $previousMonthEnd = $periodDate->copy()->startOfMonth()->subDay()->toDateString();
+        $monthLabel = $periodDate->translatedFormat('F Y');
+
         // Hanya akun berkategori Kas & Bank untuk halaman Kas & Bank
         $accounts = $this->branchKasBankAccountsQuery()->orderBy('code')->get();
         $categories = ['Kas & Bank'];
-        $mutasiKasBank = $this->getMutasiData(500);
+        // Ambil mutasi yang terjadi khusus pada bulan yang dipilih
+        $mutasiKasBank = $this->getMutasiData(null, $monthStart, $monthEnd);
         $stats = $this->getStats(null, null, null);
         $openingBalances = FinancePayment::with('creator')
             ->where('payment_type', 'SALDO AWAL')
@@ -532,9 +555,7 @@ class FinanceController extends Controller
                 'notes' => $payment->notes,
                 'updated_by' => $payment->creator->name ?? 'Petugas',
             ]);
-        $monthStart = now()->startOfMonth()->toDateString();
-        $monthEnd = now()->endOfMonth()->toDateString();
-        $previousMonthEnd = now()->startOfMonth()->subDay()->toDateString();
+
         $monthlyOpeningBalances = [];
         foreach ($accounts as $account) {
             $opening = FinancePayment::where('payment_type', 'SALDO AWAL')->where('account_id', $account->id)->first();
@@ -557,6 +578,9 @@ class FinanceController extends Controller
             'openingBalances' => $openingBalances,
             'monthlyOpeningBalances' => $monthlyOpeningBalances,
             'adjustmentLogs' => $adjustmentLogs,
+            'selectedMonth' => $selectedMonth,
+            'selectedYear' => $selectedYear,
+            'monthLabel' => $monthLabel,
             'branchContext' => $this->getBranchContext(),
         ]);
     }
@@ -1475,6 +1499,290 @@ class FinanceController extends Controller
             'summary' => $summary,
             'branchContext' => $this->getBranchContext(),
         ]);
+    }
+
+    /**
+     * Halaman Fitur Cashbond (Talangan Sementara Apotek).
+     *
+     * Sebagai penanda internal pengeluaran mendadak yang menggunakan dana kas/bank apotek
+     * (misal keperluan pribadi Direktur) yang akan segera diganti/dikembalikan.
+     * Cashbond TIDAK mengurangi saldo akun kas & bank dan TIDAK masuk ke laporan keuangan apapun.
+     */
+    public function cashbond(Request $request)
+    {
+        if ($request->filled('pharmacy_id') && auth()->check() && (auth()->user()->hasRole('HO') || auth()->user()->hasRole('administrator') || auth()->user()->hasRole('General Manager'))) {
+            session(['ho_pharmacy_id' => (int) $request->pharmacy_id]);
+        }
+
+        $targetPharmacyIds = $this->getTargetPharmacyIds();
+        $baseQuery = FinanceCashbond::with(['account', 'creator', 'settler'])
+            ->where(function ($q) use ($targetPharmacyIds) {
+                $q->whereIn('pharmacy_id', $targetPharmacyIds);
+                if (in_array(1, $targetPharmacyIds, true)) {
+                    $q->orWhereNull('pharmacy_id');
+                }
+            });
+
+        // Search filter
+        if ($request->filled('search')) {
+            $search = trim($request->query('search'));
+            $baseQuery->where(function ($q) use ($search) {
+                $q->where('borrower_name', 'like', "%{$search}%")
+                  ->orWhere('purpose', 'like', "%{$search}%")
+                  ->orWhere('settlement_notes', 'like', "%{$search}%")
+                  ->orWhereHas('account', function ($sub) use ($search) {
+                      $sub->where('name', 'like', "%{$search}%")
+                          ->orWhere('code', 'like', "%{$search}%");
+                  });
+            });
+        }
+
+        // Status filter ('ALL', 'BELUM LUNAS', 'LUNAS')
+        if ($request->filled('status') && in_array(strtoupper($request->query('status')), ['BELUM LUNAS', 'LUNAS'], true)) {
+            $baseQuery->where('status', strtoupper($request->query('status')));
+        }
+
+        // Account filter
+        if ($request->filled('account_id')) {
+            $baseQuery->where('account_id', $request->query('account_id'));
+        }
+
+        // Date range filter
+        if ($request->filled('start_date')) {
+            $baseQuery->whereDate('transaction_date', '>=', $request->query('start_date'));
+        }
+        if ($request->filled('end_date')) {
+            $baseQuery->whereDate('transaction_date', '<=', $request->query('end_date'));
+        }
+
+        $cashbondList = $baseQuery->orderByDesc('transaction_date')
+            ->orderByDesc('id')
+            ->get()
+            ->map(function ($item) {
+                return [
+                    'id' => $item->id,
+                    'pharmacy_id' => $item->pharmacy_id,
+                    'account_id' => $item->account_id,
+                    'account_name' => $item->account?->name ?? 'Kas / Bank',
+                    'account_code' => $item->account?->code ?? '-',
+                    'borrower_name' => $item->borrower_name,
+                    'amount' => (float) $item->amount,
+                    'transaction_date' => $item->transaction_date ? $item->transaction_date->format('Y-m-d') : null,
+                    'purpose' => $item->purpose,
+                    'status' => $item->status,
+                    'settlement_date' => $item->settlement_date ? $item->settlement_date->format('Y-m-d') : null,
+                    'settlement_notes' => $item->settlement_notes,
+                    'proof_image' => $item->proof_image ? asset($item->proof_image) : null,
+                    'created_by_name' => $item->creator?->name ?? 'Petugas',
+                    'settled_by_name' => $item->settler?->name ?? '-',
+                    'created_at' => $item->created_at ? $item->created_at->format('Y-m-d H:i') : null,
+                ];
+            });
+
+        // Summary calculations
+        $summaryQuery = FinanceCashbond::where(function ($q) use ($targetPharmacyIds) {
+            $q->whereIn('pharmacy_id', $targetPharmacyIds);
+            if (in_array(1, $targetPharmacyIds, true)) {
+                $q->orWhereNull('pharmacy_id');
+            }
+        });
+
+        $totalActive = (float) (clone $summaryQuery)->where('status', 'BELUM LUNAS')->sum('amount');
+        $countActive = (int) (clone $summaryQuery)->where('status', 'BELUM LUNAS')->count();
+        $totalSettled = (float) (clone $summaryQuery)->where('status', 'LUNAS')->sum('amount');
+        $countSettled = (int) (clone $summaryQuery)->where('status', 'LUNAS')->count();
+        $totalAll = (float) (clone $summaryQuery)->sum('amount');
+        $countAll = (int) (clone $summaryQuery)->count();
+
+        // Akun Kas & Bank yang bisa dipilih sebagai sumber dana
+        $kasBankAccounts = $this->branchKasBankAccountsQuery()
+            ->where('is_active', true)
+            ->orderBy('code')
+            ->get(['id', 'code', 'name', 'balance', 'account_number']);
+
+        return Inertia::render('Finance/Cashbond', [
+            'cashbondList' => $cashbondList,
+            'kasBankAccounts' => $kasBankAccounts,
+            'summary' => [
+                'totalActive' => $totalActive,
+                'countActive' => $countActive,
+                'totalSettled' => $totalSettled,
+                'countSettled' => $countSettled,
+                'totalAll' => $totalAll,
+                'countAll' => $countAll,
+            ],
+            'stats' => $this->getStats(null, null, null),
+            'branchContext' => $this->getBranchContext(),
+            'filters' => [
+                'search' => $request->query('search', ''),
+                'status' => $request->query('status', 'ALL'),
+                'account_id' => $request->query('account_id', ''),
+                'start_date' => $request->query('start_date', ''),
+                'end_date' => $request->query('end_date', ''),
+            ],
+        ]);
+    }
+
+    /**
+     * Simpan catatan transaksi cashbond baru.
+     * Tidak mengubah saldo akun kas & bank (hanya sebagai penanda sumber dana).
+     */
+    public function storeCashbond(Request $request)
+    {
+        $validated = $request->validate([
+            'account_id' => 'required|exists:finance_accounts,id',
+            'borrower_name' => 'required|string|max:150',
+            'amount' => 'required|numeric|gt:0',
+            'transaction_date' => 'required|date',
+            'purpose' => 'nullable|string|max:1000',
+            'proof' => 'nullable|file|mimes:jpeg,png,jpg,pdf,webp|max:5120',
+        ]);
+
+        $account = $this->branchKasBankAccountsQuery()->findOrFail($validated['account_id']);
+        if ($account->category !== 'Kas & Bank') {
+            return back()->withErrors(['account_id' => 'Akun sumber dana harus berkategori Kas & Bank.']);
+        }
+
+        $proofPath = null;
+        if ($request->hasFile('proof')) {
+            $file = $request->file('proof');
+            $fileName = 'cashbond_' . time() . '_' . Str::random(6) . '.' . $file->extension();
+            $destination = public_path('uploads/cashbonds');
+            if (!File::isDirectory($destination)) {
+                File::makeDirectory($destination, 0755, true, true);
+            }
+            $file->move($destination, $fileName);
+            $proofPath = 'uploads/cashbonds/' . $fileName;
+        }
+
+        $activePharmacyId = getActivePharmacyId();
+
+        FinanceCashbond::create([
+            'pharmacy_id' => $activePharmacyId > 0 ? $activePharmacyId : null,
+            'account_id' => $account->id,
+            'borrower_name' => $validated['borrower_name'],
+            'amount' => $validated['amount'],
+            'transaction_date' => $validated['transaction_date'],
+            'purpose' => $validated['purpose'] ?? null,
+            'status' => 'BELUM LUNAS',
+            'proof_image' => $proofPath,
+            'created_by' => Auth::id(),
+        ]);
+
+        $this->clearStatsCache();
+
+        return back()->with('success', 'Catatan cashbond berhasil disimpan.');
+    }
+
+    /**
+     * Perbarui data transaksi cashbond.
+     */
+    public function updateCashbond(Request $request, $id)
+    {
+        $cashbond = FinanceCashbond::findOrFail($id);
+
+        $validated = $request->validate([
+            'account_id' => 'required|exists:finance_accounts,id',
+            'borrower_name' => 'required|string|max:150',
+            'amount' => 'required|numeric|gt:0',
+            'transaction_date' => 'required|date',
+            'purpose' => 'nullable|string|max:1000',
+            'proof' => 'nullable|file|mimes:jpeg,png,jpg,pdf,webp|max:5120',
+        ]);
+
+        $account = $this->branchKasBankAccountsQuery()->findOrFail($validated['account_id']);
+        if ($account->category !== 'Kas & Bank') {
+            return back()->withErrors(['account_id' => 'Akun sumber dana harus berkategori Kas & Bank.']);
+        }
+
+        $proofPath = $cashbond->proof_image;
+        if ($request->hasFile('proof')) {
+            if ($cashbond->proof_image && File::exists(public_path($cashbond->proof_image))) {
+                File::delete(public_path($cashbond->proof_image));
+            }
+            $file = $request->file('proof');
+            $fileName = 'cashbond_' . time() . '_' . Str::random(6) . '.' . $file->extension();
+            $destination = public_path('uploads/cashbonds');
+            if (!File::isDirectory($destination)) {
+                File::makeDirectory($destination, 0755, true, true);
+            }
+            $file->move($destination, $fileName);
+            $proofPath = 'uploads/cashbonds/' . $fileName;
+        }
+
+        $cashbond->update([
+            'account_id' => $account->id,
+            'borrower_name' => $validated['borrower_name'],
+            'amount' => $validated['amount'],
+            'transaction_date' => $validated['transaction_date'],
+            'purpose' => $validated['purpose'] ?? null,
+            'proof_image' => $proofPath,
+        ]);
+
+        $this->clearStatsCache();
+
+        return back()->with('success', 'Data cashbond berhasil diperbarui.');
+    }
+
+    /**
+     * Tandai cashbond sebagai lunas (uang telah dikembalikan/dibayar oleh Direktur).
+     */
+    public function settleCashbond(Request $request, $id)
+    {
+        $cashbond = FinanceCashbond::findOrFail($id);
+
+        $validated = $request->validate([
+            'settlement_date' => 'required|date',
+            'settlement_notes' => 'nullable|string|max:500',
+        ]);
+
+        $cashbond->update([
+            'status' => 'LUNAS',
+            'settlement_date' => $validated['settlement_date'],
+            'settlement_notes' => $validated['settlement_notes'] ?? 'Telah dikembalikan/dibayar oleh Direktur',
+            'settled_by' => Auth::id(),
+        ]);
+
+        $this->clearStatsCache();
+
+        return back()->with('success', 'Cashbond telah ditandai lunas (dana apotek telah kembali).');
+    }
+
+    /**
+     * Kembalikan status cashbond menjadi Belum Lunas.
+     */
+    public function reopenCashbond($id)
+    {
+        $cashbond = FinanceCashbond::findOrFail($id);
+
+        $cashbond->update([
+            'status' => 'BELUM LUNAS',
+            'settlement_date' => null,
+            'settlement_notes' => null,
+            'settled_by' => null,
+        ]);
+
+        $this->clearStatsCache();
+
+        return back()->with('success', 'Status cashbond berhasil dikembalikan menjadi Belum Lunas.');
+    }
+
+    /**
+     * Hapus catatan cashbond.
+     */
+    public function destroyCashbond($id)
+    {
+        $cashbond = FinanceCashbond::findOrFail($id);
+
+        if ($cashbond->proof_image && File::exists(public_path($cashbond->proof_image))) {
+            File::delete(public_path($cashbond->proof_image));
+        }
+
+        $cashbond->delete();
+
+        $this->clearStatsCache();
+
+        return back()->with('success', 'Catatan cashbond berhasil dihapus.');
     }
 
     /**
@@ -2489,11 +2797,11 @@ class FinanceController extends Controller
     /**
      * Helper: Ambil riwayat Mutasi Transaksi Kas & Bank.
      */
-    protected function getMutasiData($limit = 500)
+    protected function getMutasiData($limit = 500, $startDate = null, $endDate = null)
     {
         $targetPharmacyIds = $this->getTargetPharmacyIds();
 
-        return FinancePayment::with([
+        $query = FinancePayment::with([
             'account',
             'expenseAccount',
             'incomeAccount',
@@ -2532,11 +2840,20 @@ class FinanceController extends Controller
                         ->whereIn('pharmacy_id', $targetPharmacyIds);
                 })->orWhere('payment_type', 'SALDO AWAL')
                   ->orWhere('payment_type', 'PENYESUAIAN SALDO');
-            })
-            ->orderByDesc('payment_date')
-            ->orderByDesc('id')
-            ->take($limit)
-            ->get()
+            });
+
+        if ($startDate && $endDate) {
+            $query->whereBetween('payment_date', [$startDate, $endDate]);
+        }
+
+        $query->orderByDesc('payment_date')
+            ->orderByDesc('id');
+
+        if ($limit) {
+            $query->take($limit);
+        }
+
+        return $query->get()
             ->flatMap(function ($p) {
                 $isMasuk = in_array($p->payment_type, ['PIUTANG', 'PENDAPATAN', 'PENJUALAN TUNAI', 'PENJUALAN NON TUNAI'], true);
                 $isSaldoAwal = $p->payment_type === 'SALDO AWAL';
@@ -2993,14 +3310,23 @@ class FinanceController extends Controller
      * 3. Biaya: Data dari Finance > Biaya (payment_type = BIAYA)
      * 4. Pendapatan: Data dari Finance > Pendapatan Lain-lain (payment_type IN [PENDAPATAN, DISKON])
      * 5. Laba: Penjualan - Pembelian - Biaya + Pendapatan
+     * 6. HPP %: (Pembelian Netto / Penjualan) * 100
      */
     protected function buildRealtimeSummaryMetrics(
         array $pharmacyIds,
         string $startDate,
         string $endDate,
         string $preset,
-        string $periodLabel
+        string $periodLabel,
+        ?int $selectedYear = null,
+        ?int $selectedMonth = null
     ): array {
+        if ($selectedYear === null || $selectedMonth === null) {
+            $parsedDate = \Carbon\Carbon::parse($startDate);
+            $selectedYear = (int) $parsedDate->year;
+            $selectedMonth = (int) $parsedDate->month;
+        }
+
         $kinerjaService = new KinerjaOmzetService();
         $kinerja = $kinerjaService->build($pharmacyIds, $startDate, $endDate);
         $days = $kinerja['days'] ?? [];
@@ -3054,6 +3380,38 @@ class FinanceController extends Controller
             ? round(($labaTotal / $penjualanTotal) * 100, 1)
             : 0.0;
 
+        // Presentase HPP untuk periode yang dipilih
+        $hppPersen = $penjualanTotal > 0
+            ? round(($pembelianNetto / $penjualanTotal) * 100, 1)
+            : 0.0;
+
+        // Hitung Akumulasi (Year-To-Date dari awal tahun buku s/d periode yang dipilih)
+        $penjualanAkumulasi = $penjualanTotal;
+        $pembelianAkumulasi = $pembelianNetto;
+        $biayaAkumulasi = $biayaTotal;
+        $pendapatanAkumulasi = $pendapatanTotal;
+
+        if ($selectedMonth > 1) {
+            for ($m = 1; $m < $selectedMonth; $m++) {
+                $cacheKey = 'finance_monthly_sum_' . implode('_', $pharmacyIds) . "_{$selectedYear}_{$m}";
+                $pastTotals = Cache::remember($cacheKey, 86400, function () use ($pharmacyIds, $selectedYear, $m) {
+                    $mStart = sprintf('%04d-%02d-01', $selectedYear, $m);
+                    $mEnd = \Carbon\Carbon::createFromDate($selectedYear, $m, 1)->endOfMonth()->toDateString();
+                    return $this->computePeriodTotals($pharmacyIds, $mStart, $mEnd);
+                });
+
+                $penjualanAkumulasi += (float) ($pastTotals['penjualan'] ?? 0);
+                $pembelianAkumulasi += (float) ($pastTotals['pembelian'] ?? 0);
+                $biayaAkumulasi += (float) ($pastTotals['biaya'] ?? 0);
+                $pendapatanAkumulasi += (float) ($pastTotals['pendapatan'] ?? 0);
+            }
+        }
+
+        $labaAkumulasi = $penjualanAkumulasi - $pembelianAkumulasi - $biayaAkumulasi + $pendapatanAkumulasi;
+        $hppPersenAkumulasi = $penjualanAkumulasi > 0
+            ? round(($pembelianAkumulasi / $penjualanAkumulasi) * 100, 1)
+            : 0.0;
+
         return [
             'preset' => $preset,
             'startDate' => $startDate,
@@ -3063,6 +3421,7 @@ class FinanceController extends Controller
                 'total' => round($penjualanTotal, 2),
                 'tunaiBank' => round($penjualanTunaiBank, 2),
                 'kredit' => round($penjualanKredit, 2),
+                'akumulasi' => round($penjualanAkumulasi, 2),
             ],
             'pembelian' => [
                 'total' => round($pembelianNetto, 2),
@@ -3071,20 +3430,152 @@ class FinanceController extends Controller
                 'pbf' => round($pembelianPbf, 2),
                 'cash' => round($pembelianCash, 2),
                 'konsinyasi' => round($pembelianKonsinyasi, 2),
+                'akumulasi' => round($pembelianAkumulasi, 2),
             ],
             'biaya' => [
                 'total' => round($biayaTotal, 2),
+                'akumulasi' => round($biayaAkumulasi, 2),
             ],
             'pendapatan' => [
                 'total' => round($pendapatanTotal, 2),
                 'pendapatanLain' => round($pendapatanLainTotal, 2),
                 'diskonOff' => round($diskonOffTotal, 2),
+                'akumulasi' => round($pendapatanAkumulasi, 2),
             ],
             'laba' => [
                 'total' => round($labaTotal, 2),
                 'marginPersen' => $marginPersen,
+                'akumulasi' => round($labaAkumulasi, 2),
+            ],
+            'hpp' => [
+                'persen' => $hppPersen,
+                'total' => round($pembelianNetto, 2),
+                'persenAkumulasi' => $hppPersenAkumulasi,
+                'totalAkumulasi' => round($pembelianAkumulasi, 2),
             ],
         ];
+    }
+
+    /**
+     * Helper: Hitung total periode ringkasan keuangan untuk akumulasi tahun buku.
+     */
+    protected function computePeriodTotals(array $pharmacyIds, string $startDate, string $endDate): array
+    {
+        $kinerjaService = new KinerjaOmzetService();
+        $kinerja = $kinerjaService->build($pharmacyIds, $startDate, $endDate);
+        $days = $kinerja['days'] ?? [];
+
+        $penjualanTotal = 0.0;
+        $pembelianBruto = 0.0;
+        $pembelianRetur = 0.0;
+        $biayaTotal = 0.0;
+        $pendapatanLainTotal = 0.0;
+        $diskonOffTotal = 0.0;
+
+        foreach ($days as $day) {
+            $penjualanTotal += (float) ($day['sales']['total'] ?? 0);
+            $pbf = (float) ($day['purchases']['pbf'] ?? 0);
+            $cash = (float) ($day['purchases']['cash'] ?? 0);
+            $cons = (float) ($day['purchases']['consignment'] ?? 0);
+            $ret = (float) ($day['purchases']['return'] ?? 0);
+
+            $pembelianBruto += ($pbf + $cash + $cons);
+            $pembelianRetur += $ret;
+
+            $biayaTotal += (float) ($day['expense'] ?? 0);
+            $pendapatanLainTotal += (float) ($day['other_income'] ?? 0);
+            $diskonOffTotal += (float) ($day['purchases']['discountOff'] ?? 0);
+        }
+
+        $pembelianNetto = $pembelianBruto - $pembelianRetur;
+        $pendapatanTotal = $pendapatanLainTotal + $diskonOffTotal;
+        $labaTotal = $penjualanTotal - $pembelianNetto - $biayaTotal + $pendapatanTotal;
+
+        return [
+            'penjualan' => round($penjualanTotal, 2),
+            'pembelian' => round($pembelianNetto, 2),
+            'biaya' => round($biayaTotal, 2),
+            'pendapatan' => round($pendapatanTotal, 2),
+            'laba' => round($labaTotal, 2),
+        ];
+    }
+
+    /**
+     * Helper: Hitung nilai stok aktual.
+     * Cabang lain: stok etalase (medicine_transfer_items)
+     * PMI: stok etalase (medicine_transfer_items) + stok gudang (batches)
+     * Formula: Nilai stok = (raw_price * 1.11) * stok
+     */
+    protected function getStockValuation(): array
+    {
+        $activePharmacyId = (int) getActivePharmacyId();
+        $cacheKey = 'finance_stock_valuation_' . $activePharmacyId;
+
+        return Cache::remember($cacheKey, 60, function () use ($activePharmacyId) {
+            $isPmi = ($activePharmacyId <= 0 || $activePharmacyId === 1 || $activePharmacyId === 9);
+            $counterPharmacyId = $isPmi ? 1 : $activePharmacyId;
+            $warehouseId = function_exists('getWarehousePharmacyId') ? (int) getWarehousePharmacyId() : 9;
+
+            // 1. Nilai Stok Etalase (medicine_transfer_items)
+            $counterRow = DB::table('medicine_transfer_items as mti')
+                ->join('batches as b', 'b.id', '=', 'mti.batches_id')
+                ->join('medicines as m', 'm.id', '=', 'b.medicine_id')
+                ->where('b.pharmacy_id', $counterPharmacyId)
+                ->where('mti.status', 1)
+                ->where('mti.qty', '>', 0)
+                ->where(function ($q) {
+                    $q->whereNull('mti.source_type')->orWhere('mti.source_type', '!=', 'retur_gudang');
+                })
+                ->selectRaw('
+                    COALESCE(SUM(mti.qty * CAST(REPLACE(COALESCE(NULLIF(m.raw_price, ""), NULLIF(m.pharmacy_net_price, ""), "0"), ",", ".") AS DECIMAL(15, 4)) * 1.11), 0) as total_val,
+                    COALESCE(SUM(mti.qty), 0) as total_qty,
+                    COUNT(DISTINCT b.medicine_id) as total_items
+                ')
+                ->first();
+
+            $counterVal = (float) ($counterRow->total_val ?? 0);
+            $counterQty = (float) ($counterRow->total_qty ?? 0);
+            $counterItems = (int) ($counterRow->total_items ?? 0);
+
+            // 2. Nilai Stok Gudang (hanya jika PMI)
+            $storageVal = 0.0;
+            $storageQty = 0.0;
+            $storageItems = 0;
+
+            if ($isPmi) {
+                $storageRow = DB::table('batches as b')
+                    ->join('medicines as m', 'm.id', '=', 'b.medicine_id')
+                    ->where('b.pharmacy_id', $warehouseId)
+                    ->whereRaw('CAST(REPLACE(COALESCE(NULLIF(b.stock, ""), "0"), ",", ".") AS DECIMAL(15, 2)) > 0')
+                    ->selectRaw('
+                        COALESCE(SUM(CAST(REPLACE(COALESCE(NULLIF(b.stock, ""), "0"), ",", ".") AS DECIMAL(15, 2)) * CAST(REPLACE(COALESCE(NULLIF(m.raw_price, ""), NULLIF(m.pharmacy_net_price, ""), "0"), ",", ".") AS DECIMAL(15, 4)) * 1.11), 0) as total_val,
+                        COALESCE(SUM(CAST(REPLACE(COALESCE(NULLIF(b.stock, ""), "0"), ",", ".") AS DECIMAL(15, 2))), 0) as total_qty,
+                        COUNT(DISTINCT b.medicine_id) as total_items
+                    ')
+                    ->first();
+
+                $storageVal = (float) ($storageRow->total_val ?? 0);
+                $storageQty = (float) ($storageRow->total_qty ?? 0);
+                $storageItems = (int) ($storageRow->total_items ?? 0);
+            }
+
+            $totalVal = $counterVal + $storageVal;
+            $totalQty = $counterQty + $storageQty;
+            $totalItems = $isPmi ? ($counterItems + $storageItems) : $counterItems;
+
+            return [
+                'total' => round($totalVal, 2),
+                'totalQty' => $totalQty,
+                'totalItems' => $totalItems,
+                'isPmi' => $isPmi,
+                'etalase' => round($counterVal, 2),
+                'etalaseQty' => $counterQty,
+                'etalaseItems' => $counterItems,
+                'gudang' => round($storageVal, 2),
+                'gudangQty' => $storageQty,
+                'gudangItems' => $storageItems,
+            ];
+        });
     }
 
     /**
@@ -3099,7 +3590,7 @@ class FinanceController extends Controller
         $isFullData = ($hutang !== null && $cash !== null && $piutang !== null);
         if (!$isFullData) {
             $cached = Cache::get($cacheKey);
-            if ($cached) {
+            if ($cached && isset($cached['nilaiStok']) && isset($cached['countCashbondActive'])) {
                 return $cached;
             }
         }
@@ -3258,9 +3749,23 @@ class FinanceController extends Controller
             ])
             ->count();
 
+        $nilaiStok = $this->getStockValuation();
+
+        $cashbondQuery = FinanceCashbond::where('status', 'BELUM LUNAS')
+            ->where(function ($q) use ($targetPharmacyIds) {
+                $q->whereIn('pharmacy_id', $targetPharmacyIds);
+                if (in_array(1, $targetPharmacyIds, true)) {
+                    $q->orWhereNull('pharmacy_id');
+                }
+            });
+        $countCashbondActive = (int) (clone $cashbondQuery)->count();
+        $totalCashbondActive = (float) (clone $cashbondQuery)->sum('amount');
+
         $stats = [
             'totalSaldoKasBank' => $totalSaldoKasBank,
             'accountsCount' => $accountsCount,
+            'totalNilaiStok' => $nilaiStok['total'],
+            'nilaiStok' => $nilaiStok,
             'kasMasuk' => $kasMasuk,
             'kasKeluar' => $kasKeluar,
             'netCashflow' => $netCashflow,
@@ -3291,6 +3796,8 @@ class FinanceController extends Controller
             'countBiayaMonth' => $countBiayaMonth,
             'countDiskonTotal' => $countDiskonTotal,
             'countDiskonMonth' => $countDiskonMonth,
+            'countCashbondActive' => $countCashbondActive,
+            'totalCashbondActive' => $totalCashbondActive,
         ];
 
         Cache::put($cacheKey, $stats, 60);
@@ -3309,6 +3816,7 @@ class FinanceController extends Controller
         $branches = [1, 2, 3, 4, 5, 6, 9];
         foreach ($branches as $b) {
             Cache::forget('finance_stats_summary_' . $b);
+            Cache::forget('finance_stock_valuation_' . $b);
         }
         Cache::forget('finance_stats_summary_1_9');
     }

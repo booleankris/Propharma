@@ -214,10 +214,12 @@ class MedicineController extends Controller
         // Utuh stores the selected pack content; otherwise the medicine is priced per unit.
         $contentValue = $request->has('is_active') ? ($request->input('content') ?: null) : 1;
         $oldPrice = $medicine->pharmacy_net_price;
+        $oldHetPrice = $medicine->het_price;
         $priceMultiplier = $request->boolean('is_active') ? max((float) $request->input('content', 1), 1) : 1;
         $enteredHna = (float) $request->input('pharmacy_net_price', 0);
         $unitHna = $enteredHna / $priceMultiplier;
         $unitNetPrice = floor($unitHna * 1.11);
+        $newHetPrice = $request->het_price ?? 0;
 
         // Update the medicine record
         $medicine->update([
@@ -239,7 +241,7 @@ class MedicineController extends Controller
             'raw_price'            => $unitHna,
             'pharmacy_net_price'   => $unitHna,
             'net_price'            => $unitNetPrice,
-            'het_price'            => $request->het_price ?? 0,
+            'het_price'            => $newHetPrice,
             'minimal_stock'        => $request->minimal_stock ?? 0,
             'stock'                => $request->stock ?? 0,
             'psychotropic'         => $request->boolean('psychotropic') ? 1 : 0,
@@ -256,10 +258,12 @@ class MedicineController extends Controller
         // Add Medicine Price History
 
         $history = MedicinePriceHistory::create([
-            'user_id'      => auth()->user()->id,
-            'medicine_id'  => $id,
-            'old_price'    => $oldPrice,
-            'new_price'    => $unitHna
+            'user_id'       => auth()->user()->id,
+            'medicine_id'   => $id,
+            'old_price'     => $oldPrice,
+            'old_het_price' => $oldHetPrice,
+            'new_price'     => $unitHna,
+            'new_het_price' => $newHetPrice
         ]);
 
         // Sync creditors (if applicable)

@@ -20,6 +20,7 @@ import {
     Undo2,
     BookOpenCheck,
     Percent,
+    WalletCards,
 } from 'lucide-react';
 
 export default function FinanceLayout({ title, subtitle, children, stats = {} }) {
@@ -112,6 +113,16 @@ export default function FinanceLayout({ title, subtitle, children, stats = {} })
             icon: Landmark,
             active: currentUrl.startsWith('/finance/kas-bank'),
             badge: null,
+        },
+        {
+            name: 'Cashbond',
+            href: '/finance/cashbond',
+            icon: WalletCards,
+            active: currentUrl.startsWith('/finance/cashbond'),
+            badge: (stats.countCashbondActive || 0) > 0 ? {
+                text: stats.countCashbondActive,
+                color: 'bg-amber-100 text-amber-800 font-semibold',
+            } : null,
         },
         {
             name: 'Piutang',
