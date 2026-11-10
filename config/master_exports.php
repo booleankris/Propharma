@@ -220,4 +220,16 @@ return [
             'Diubah' => 'etalases.updated_at',
         ],
     ],
+
+    'doctor-services' => [
+        'filename' => 'master-jasa',
+        'table' => 'doctor_services',
+        'columns' => [
+            'ID' => 'doctor_services.id',
+            'Nama Jasa' => 'doctor_services.name',
+            'Harga' => 'doctor_services.price',
+            'Dibuat' => 'doctor_services.created_at',
+            'Diubah' => 'doctor_services.updated_at',
+        ],
+    ],
 ];

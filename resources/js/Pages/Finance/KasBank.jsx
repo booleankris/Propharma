@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { Head, Link, router } from '@inertiajs/react';
 import TransactionCategory from './Components/TransactionCategory';
 import CashFlowChart from './Components/CashFlowChart';
@@ -29,6 +29,9 @@ import {
     UserCheck,
     AlertCircle,
     Calendar,
+    ChevronLeft,
+    ChevronRight,
+    FileSpreadsheet,
 } from 'lucide-react';
 
 const MONTH_OPTIONS = [
@@ -65,6 +68,8 @@ export default function KasBank({
     accounts = [],
     categories = [],
     mutasiKasBank = [],
+    kasBankSummary: serverKasBankSummary = null,
+    filters = {},
     stats = {},
     openingBalances = {},
     monthlyOpeningBalances = {},
@@ -82,25 +87,118 @@ export default function KasBank({
 
     const monthLabel = propMonthLabel || `${MONTH_OPTIONS[selectedMonth - 1]?.label || ''} ${selectedYear}`;
 
-    const handlePeriodChange = (nextMonth, nextYear) => {
-        setIsFilteringPeriod(true);
+    // State Filter & Search Mutasi (Didukung Server-Side Pagination)
+    const [selectedKasBankFilter, setSelectedKasBankFilter] = useState(filters?.account_id || 'all'); // 'all' | account_id
+    const [mutasiTypeFilter, setMutasiTypeFilter] = useState(filters?.direction || 'all'); // 'all' | 'IN' | 'OUT'
+    const [mutasiSearchQuery, setMutasiSearchQuery] = useState(filters?.search || '');
+    const [mutasiCurrentPage, setMutasiCurrentPage] = useState(1);
+    const [mutasiPerPage, setMutasiPerPage] = useState(filters?.per_page || 25);
+    const [startDate, setStartDate] = useState(filters?.start_date || '');
+    const [endDate, setEndDate] = useState(filters?.end_date || '');
+    const mutasiItemsPerPage = mutasiPerPage;
+
+    const isServerPaginated = Boolean(mutasiKasBank && !Array.isArray(mutasiKasBank) && Array.isArray(mutasiKasBank.data));
+
+    // URL Export Excel dengan filter aktif
+    const exportUrl = useMemo(() => {
+        const params = new URLSearchParams();
+        if (startDate && endDate) {
+            params.append('start_date', startDate);
+            params.append('end_date', endDate);
+        } else {
+            params.append('month', String(selectedMonth));
+            params.append('year', String(selectedYear));
+        }
+        if (selectedKasBankFilter && selectedKasBankFilter !== 'all') {
+            params.append('account_id', selectedKasBankFilter);
+        }
+        if (mutasiTypeFilter && mutasiTypeFilter !== 'all') {
+            params.append('direction', mutasiTypeFilter);
+        }
+        if (mutasiSearchQuery.trim()) {
+            params.append('search', mutasiSearchQuery.trim());
+        }
+        const qs = params.toString();
+        return `/finance/export/kas-bank${qs ? `?${qs}` : ''}`;
+    }, [startDate, endDate, selectedMonth, selectedYear, selectedKasBankFilter, mutasiTypeFilter, mutasiSearchQuery]);
+
+    // Navigasi Filter Server-Side via Inertia
+    const applyFilters = (updated = {}) => {
+        const nextAccount = updated.account_id !== undefined ? updated.account_id : selectedKasBankFilter;
+        const nextDirection = updated.direction !== undefined ? updated.direction : mutasiTypeFilter;
+        const nextSearch = updated.search !== undefined ? updated.search : mutasiSearchQuery;
+        const nextPerPage = updated.per_page !== undefined ? updated.per_page : mutasiPerPage;
+        const nextPage = updated.page !== undefined ? updated.page : 1;
+        const nextMonth = updated.month !== undefined ? updated.month : selectedMonth;
+        const nextYear = updated.year !== undefined ? updated.year : selectedYear;
+        const nextStartDate = updated.start_date !== undefined ? updated.start_date : startDate;
+        const nextEndDate = updated.end_date !== undefined ? updated.end_date : endDate;
+
+        const params = {
+            account_id: nextAccount,
+            direction: nextDirection,
+            search: nextSearch,
+            per_page: nextPerPage,
+            page: nextPage,
+        };
+
+        if (nextStartDate && nextEndDate) {
+            params.start_date = nextStartDate;
+            params.end_date = nextEndDate;
+        } else {
+            params.month = nextMonth;
+            params.year = nextYear;
+        }
+
         router.get(
             '/finance/kas-bank',
-            { month: nextMonth, year: nextYear },
+            params,
             {
                 preserveState: true,
                 preserveScroll: true,
+                replace: true,
                 onFinish: () => setIsFilteringPeriod(false),
             }
         );
     };
 
-    // State Filter & Search Mutasi
-    const [selectedKasBankFilter, setSelectedKasBankFilter] = useState('all'); // 'all' | account_id
-    const [mutasiTypeFilter, setMutasiTypeFilter] = useState('all'); // 'all' | 'IN' | 'OUT'
-    const [mutasiSearchQuery, setMutasiSearchQuery] = useState('');
-    const [mutasiCurrentPage, setMutasiCurrentPage] = useState(1);
-    const mutasiItemsPerPage = 15;
+    const handlePeriodChange = (nextMonth, nextYear) => {
+        setIsFilteringPeriod(true);
+        applyFilters({ month: nextMonth, year: nextYear, page: 1 });
+    };
+
+    const handlePrevMonth = () => {
+        let nextMonth = selectedMonth - 1;
+        let nextYear = selectedYear;
+        if (nextMonth < 1) {
+            nextMonth = 12;
+            nextYear -= 1;
+        }
+        handlePeriodChange(nextMonth, nextYear);
+    };
+
+    const handleNextMonth = () => {
+        let nextMonth = selectedMonth + 1;
+        let nextYear = selectedYear;
+        if (nextMonth > 12) {
+            nextMonth = 1;
+            nextYear += 1;
+        }
+        handlePeriodChange(nextMonth, nextYear);
+    };
+
+    // Debounce search input agar tidak membebani server pada setiap ketikan
+    const isFirstSearchRender = useRef(true);
+    useEffect(() => {
+        if (isFirstSearchRender.current) {
+            isFirstSearchRender.current = false;
+            return;
+        }
+        const timer = setTimeout(() => {
+            applyFilters({ search: mutasiSearchQuery, page: 1 });
+        }, 450);
+        return () => clearTimeout(timer);
+    }, [mutasiSearchQuery]);
 
     // State Account Modal (Khusus Kas & Bank)
     const [isAccountModalOpen, setIsAccountModalOpen] = useState(false);
@@ -475,12 +573,17 @@ export default function KasBank({
         return accounts.filter((acc) => acc.category === 'Kas & Bank' && acc.is_active);
     }, [accounts]);
 
-    // Ringkasan Arus Kas & Saldo
+    // Ringkasan Arus Kas & Saldo (Gunakan data agregasi server jika tersedia)
     const kasBankSummary = useMemo(() => {
+        if (serverKasBankSummary) {
+            return serverKasBankSummary;
+        }
+
         let totalSaldo = 0;
         let totalMasuk = 0;
         let totalKeluar = 0;
 
+        const rawList = Array.isArray(mutasiKasBank) ? mutasiKasBank : (mutasiKasBank?.data || []);
         const accountStats = {};
         kasBankAccounts.forEach((acc) => {
             totalSaldo += Number(acc.balance || 0);
@@ -493,7 +596,7 @@ export default function KasBank({
             };
         });
 
-        (mutasiKasBank || []).forEach((m) => {
+        (rawList || []).forEach((m) => {
             const amt = Number(m.amount || 0);
             if (m.direction === 'IN') {
                 totalMasuk += amt;
@@ -531,10 +634,13 @@ export default function KasBank({
             totalFlowVolume,
             accountStats: statsList,
         };
-    }, [kasBankAccounts, mutasiKasBank]);
+    }, [kasBankAccounts, mutasiKasBank, serverKasBankSummary]);
 
-    // Filter Mutasi Transaksi Kas & Bank
+    // Filter Mutasi Transaksi Kas & Bank (Client-side fallback jika bukan server-paginated)
     const filteredMutasiKasBank = useMemo(() => {
+        if (isServerPaginated) {
+            return mutasiKasBank?.data || [];
+        }
         return (mutasiKasBank || []).filter((item) => {
             if (selectedKasBankFilter !== 'all' && String(item.account_id) !== String(selectedKasBankFilter)) {
                 return false;
@@ -561,14 +667,31 @@ export default function KasBank({
             }
             return true;
         });
-    }, [mutasiKasBank, selectedKasBankFilter, mutasiTypeFilter, mutasiSearchQuery]);
+    }, [mutasiKasBank, isServerPaginated, selectedKasBankFilter, mutasiTypeFilter, mutasiSearchQuery]);
 
-    // Pagination Mutasi
-    const totalMutasiPages = Math.ceil(filteredMutasiKasBank.length / mutasiItemsPerPage) || 1;
+    // Data Mutasi untuk Ditampilkan di Tabel
     const paginatedMutasi = useMemo(() => {
+        if (isServerPaginated) {
+            return mutasiKasBank?.data || [];
+        }
         const start = (mutasiCurrentPage - 1) * mutasiItemsPerPage;
         return filteredMutasiKasBank.slice(start, start + mutasiItemsPerPage);
-    }, [filteredMutasiKasBank, mutasiCurrentPage, mutasiItemsPerPage]);
+    }, [isServerPaginated, mutasiKasBank, filteredMutasiKasBank, mutasiCurrentPage, mutasiItemsPerPage]);
+
+    // Metadata Paginasi
+    const totalMutasiCount = isServerPaginated ? (mutasiKasBank?.total || 0) : filteredMutasiKasBank.length;
+    const currentMutasiPage = isServerPaginated ? (mutasiKasBank?.current_page || 1) : mutasiCurrentPage;
+    const totalMutasiPages = isServerPaginated ? (mutasiKasBank?.last_page || 1) : (Math.ceil(filteredMutasiKasBank.length / mutasiItemsPerPage) || 1);
+    const mutasiFrom = isServerPaginated ? (mutasiKasBank?.from || 0) : (filteredMutasiKasBank.length > 0 ? (mutasiCurrentPage - 1) * mutasiItemsPerPage + 1 : 0);
+    const mutasiTo = isServerPaginated ? (mutasiKasBank?.to || 0) : Math.min(mutasiCurrentPage * mutasiItemsPerPage, filteredMutasiKasBank.length);
+
+    const handlePageChange = (newPage) => {
+        if (isServerPaginated) {
+            applyFilters({ page: newPage });
+        } else {
+            setMutasiCurrentPage(newPage);
+        }
+    };
 
     return (
         <FinanceLayout
@@ -597,8 +720,16 @@ export default function KasBank({
 
                     <div className="flex flex-wrap items-center gap-2">
                         {/* Filter Periode Bulan & Tahun (Otomatis Reset Tiap Awal Bulan) */}
-                        <div className="flex items-center gap-1.5 bg-slate-50 p-1 rounded-xl border border-slate-200">
-                            <Calendar className="w-3.5 h-3.5 text-slate-400 ml-1.5" />
+                        <div className="flex items-center gap-1 bg-slate-50 p-1 rounded-xl border border-slate-200">
+                            <button
+                                type="button"
+                                onClick={handlePrevMonth}
+                                className="p-1.5 rounded-lg text-slate-500 hover:text-slate-800 hover:bg-white transition"
+                                title="Bulan Sebelumnya"
+                            >
+                                <ChevronLeft className="w-3.5 h-3.5" />
+                            </button>
+                            <Calendar className="w-3.5 h-3.5 text-slate-400" />
                             <select
                                 value={selectedMonth}
                                 onChange={(e) => handlePeriodChange(Number(e.target.value), selectedYear)}
@@ -624,6 +755,15 @@ export default function KasBank({
                                     </option>
                                 ))}
                             </select>
+
+                            <button
+                                type="button"
+                                onClick={handleNextMonth}
+                                className="p-1.5 rounded-lg text-slate-500 hover:text-slate-800 hover:bg-white transition"
+                                title="Bulan Berikutnya"
+                            >
+                                <ChevronRight className="w-3.5 h-3.5" />
+                            </button>
                         </div>
 
                         <button
@@ -770,7 +910,7 @@ export default function KasBank({
                                 {kasBankSummary.netCashflow >= 0 ? '+ ' : ''}{formatRupiah(kasBankSummary.netCashflow)}
                             </div>
                             <div className="text-[11px] text-slate-400 mt-1">
-                                Total {(mutasiKasBank || []).length} transaksi mutasi {monthLabel}
+                                Total {totalMutasiCount} transaksi mutasi {monthLabel}
                             </div>
                         </div>
                     </div>
@@ -817,6 +957,7 @@ export default function KasBank({
                                     onClick={() => {
                                         setSelectedKasBankFilter('all');
                                         setMutasiCurrentPage(1);
+                                        applyFilters({ account_id: 'all', page: 1 });
                                     }}
                                     className={`px-3 py-1.5 text-xs font-semibold rounded-xl border transition ${selectedKasBankFilter === 'all'
                                         ? 'bg-blue-600 text-white border-blue-600 shadow-xs'
@@ -836,6 +977,13 @@ export default function KasBank({
                                 const inPercent = flowVolume > 0 ? Math.round((acc.inflow / flowVolume) * 100) : 0;
                                 const outPercent = flowVolume > 0 ? 100 - inPercent : 0;
 
+                                const handleSelectThisAccount = () => {
+                                    const next = isSelected ? 'all' : String(acc.id);
+                                    setSelectedKasBankFilter(next);
+                                    setMutasiCurrentPage(1);
+                                    applyFilters({ account_id: next, page: 1 });
+                                };
+
                                 return (
                                     <div
                                         key={acc.id}
@@ -847,14 +995,10 @@ export default function KasBank({
                                             if (event.target !== event.currentTarget) return;
                                             if (event.key === 'Enter' || event.key === ' ') {
                                                 event.preventDefault();
-                                                setSelectedKasBankFilter(isSelected ? 'all' : String(acc.id));
-                                                setMutasiCurrentPage(1);
+                                                handleSelectThisAccount();
                                             }
                                         }}
-                                        onClick={() => {
-                                            setSelectedKasBankFilter(isSelected ? 'all' : String(acc.id));
-                                            setMutasiCurrentPage(1);
-                                        }}
+                                        onClick={handleSelectThisAccount}
                                         className={`finance-account-card p-4 rounded-xl border-2 transition cursor-pointer relative group ${isSelected
                                             ? 'bg-blue-50/40 border-blue-500 shadow-sm'
                                             : 'bg-slate-50/60 border-slate-200/80 hover:border-blue-300 hover:bg-white'
@@ -983,18 +1127,40 @@ export default function KasBank({
                 <div className="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden space-y-4">
                     <div className="p-5 border-b border-slate-100 flex flex-col lg:flex-row lg:items-center justify-between gap-4">
                         <div>
-                            <div className="flex items-center gap-2.5">
+                            <div className="flex items-center gap-2.5 flex-wrap">
                                 <h3 className="font-bold text-slate-900 text-sm">
-                                    Buku Mutasi Kas & Bank ({monthLabel})
+                                    Buku Mutasi Kas & Bank
                                 </h3>
+                                {/* Quick Month Switcher Pill */}
+                                <div className="inline-flex items-center bg-slate-100 p-0.5 rounded-xl border border-slate-200">
+                                    <button
+                                        type="button"
+                                        onClick={handlePrevMonth}
+                                        className="p-1 rounded-lg text-slate-500 hover:text-slate-800 hover:bg-white transition"
+                                        title="Bulan Sebelumnya"
+                                    >
+                                        <ChevronLeft className="w-3.5 h-3.5" />
+                                    </button>
+                                    <span className="px-2 text-xs font-bold text-blue-900">
+                                        {monthLabel}
+                                    </span>
+                                    <button
+                                        type="button"
+                                        onClick={handleNextMonth}
+                                        className="p-1 rounded-lg text-slate-500 hover:text-slate-800 hover:bg-white transition"
+                                        title="Bulan Berikutnya"
+                                    >
+                                        <ChevronRight className="w-3.5 h-3.5" />
+                                    </button>
+                                </div>
                                 <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-slate-100 text-slate-700">
-                                    {filteredMutasiKasBank.length} Baris
+                                    {totalMutasiCount} Baris
                                 </span>
                             </div>
                             <p className="text-xs text-slate-400 mt-0.5">
                                 {selectedKasBankFilter === 'all'
-                                    ? `Menampilkan riwayat transaksi seluruh rekening kas & bank periode ${monthLabel}.`
-                                    : `Menampilkan mutasi akun: ${kasBankAccounts.find(a => String(a.id) === String(selectedKasBankFilter))?.name || 'Rekening'} periode ${monthLabel}.`
+                                    ? `Menampilkan riwayat transaksi seluruh rekening kas & bank ${startDate && endDate ? `rentang ${startDate.split('-').reverse().join('/')} s/d ${endDate.split('-').reverse().join('/')}` : `periode ${monthLabel}`}.`
+                                    : `Menampilkan mutasi akun: ${kasBankAccounts.find(a => String(a.id) === String(selectedKasBankFilter))?.name || 'Rekening'} ${startDate && endDate ? `rentang ${startDate.split('-').reverse().join('/')} s/d ${endDate.split('-').reverse().join('/')}` : `periode ${monthLabel}`}.`
                                 }
                             </p>
                         </div>
@@ -1004,14 +1170,22 @@ export default function KasBank({
                             <div className="flex items-center bg-slate-100 p-1 rounded-xl text-xs font-semibold text-slate-600">
                                 <button
                                     type="button"
-                                    onClick={() => { setMutasiTypeFilter('all'); setMutasiCurrentPage(1); }}
+                                    onClick={() => {
+                                        setMutasiTypeFilter('all');
+                                        setMutasiCurrentPage(1);
+                                        applyFilters({ direction: 'all', page: 1 });
+                                    }}
                                     className={`px-3 py-1.5 rounded-lg transition ${mutasiTypeFilter === 'all' ? 'bg-white text-slate-900 shadow-xs' : 'hover:text-slate-900'}`}
                                 >
                                     Semua
                                 </button>
                                 <button
                                     type="button"
-                                    onClick={() => { setMutasiTypeFilter('IN'); setMutasiCurrentPage(1); }}
+                                    onClick={() => {
+                                        setMutasiTypeFilter('IN');
+                                        setMutasiCurrentPage(1);
+                                        applyFilters({ direction: 'IN', page: 1 });
+                                    }}
                                     className={`px-3 py-1.5 rounded-lg transition flex items-center gap-1 ${mutasiTypeFilter === 'IN' ? 'bg-emerald-600 text-white shadow-xs' : 'hover:text-emerald-700 text-emerald-700'}`}
                                 >
                                     <ArrowDownLeft className="w-3.5 h-3.5" />
@@ -1019,12 +1193,62 @@ export default function KasBank({
                                 </button>
                                 <button
                                     type="button"
-                                    onClick={() => { setMutasiTypeFilter('OUT'); setMutasiCurrentPage(1); }}
+                                    onClick={() => {
+                                        setMutasiTypeFilter('OUT');
+                                        setMutasiCurrentPage(1);
+                                        applyFilters({ direction: 'OUT', page: 1 });
+                                    }}
                                     className={`px-3 py-1.5 rounded-lg transition flex items-center gap-1 ${mutasiTypeFilter === 'OUT' ? 'bg-rose-600 text-white shadow-xs' : 'hover:text-rose-700 text-rose-700'}`}
                                 >
                                     <ArrowUpRight className="w-3.5 h-3.5" />
                                     Keluar (Kredit)
                                 </button>
+                            </div>
+
+                            {/* Filter Rentang Tanggal Spesifik */}
+                            <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1 text-xs">
+                                <Calendar className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                                <input
+                                    type="date"
+                                    value={startDate}
+                                    onChange={(e) => {
+                                        const newStart = e.target.value;
+                                        setStartDate(newStart);
+                                        if (newStart && endDate) {
+                                            applyFilters({ start_date: newStart, end_date: endDate, page: 1 });
+                                        }
+                                    }}
+                                    className="px-1 py-0.5 text-xs bg-transparent border-0 text-slate-700 font-medium focus:outline-none focus:ring-0 cursor-pointer"
+                                    title="Tanggal Mulai"
+                                />
+                                <span className="text-slate-400 font-medium text-[11px]">s/d</span>
+                                <input
+                                    type="date"
+                                    value={endDate}
+                                    onChange={(e) => {
+                                        const newEnd = e.target.value;
+                                        setEndDate(newEnd);
+                                        if (startDate && newEnd) {
+                                            applyFilters({ start_date: startDate, end_date: newEnd, page: 1 });
+                                        }
+                                    }}
+                                    className="px-1 py-0.5 text-xs bg-transparent border-0 text-slate-700 font-medium focus:outline-none focus:ring-0 cursor-pointer"
+                                    title="Tanggal Akhir"
+                                />
+                                {(startDate || endDate) && (
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setStartDate('');
+                                            setEndDate('');
+                                            applyFilters({ start_date: '', end_date: '', page: 1 });
+                                        }}
+                                        className="text-slate-400 hover:text-red-500 transition p-0.5"
+                                        title="Hapus Filter Tanggal"
+                                    >
+                                        <X className="w-3.5 h-3.5" />
+                                    </button>
+                                )}
                             </div>
 
                             {/* Search Box Mutasi */}
@@ -1033,21 +1257,50 @@ export default function KasBank({
                                 <input
                                     type="text"
                                     value={mutasiSearchQuery}
-                                    onChange={(e) => { setMutasiSearchQuery(e.target.value); setMutasiCurrentPage(1); }}
+                                    onChange={(e) => {
+                                        setMutasiSearchQuery(e.target.value);
+                                        setMutasiCurrentPage(1);
+                                    }}
                                     placeholder="Cari no. bukti, pihak, catatan..."
-                                    className="pl-8 pr-3 py-1.5 text-xs rounded-xl border border-slate-200 focus:outline-hidden focus:ring-2 focus:ring-blue-500 w-56"
+                                    className="pl-8 pr-8 py-1.5 text-xs rounded-xl border border-slate-200 focus:outline-hidden focus:ring-2 focus:ring-blue-500 w-52 bg-slate-50 focus:bg-white"
                                 />
+                                {mutasiSearchQuery && (
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setMutasiSearchQuery('');
+                                            setMutasiCurrentPage(1);
+                                            applyFilters({ search: '', page: 1 });
+                                        }}
+                                        className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                                    >
+                                        <X className="w-3.5 h-3.5" />
+                                    </button>
+                                )}
                             </div>
 
+                            {/* Tombol Export Excel */}
+                            <a
+                                href={exportUrl}
+                                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 rounded-xl text-xs font-semibold transition shadow-2xs cursor-pointer"
+                                title="Export data Buku Mutasi Kas & Bank ke Excel (.xlsx)"
+                            >
+                                <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600" />
+                                <span>Export Excel</span>
+                            </a>
+
                             {/* Reset Filter Button */}
-                            {(selectedKasBankFilter !== 'all' || mutasiTypeFilter !== 'all' || mutasiSearchQuery) && (
+                            {(selectedKasBankFilter !== 'all' || mutasiTypeFilter !== 'all' || mutasiSearchQuery || startDate || endDate) && (
                                 <button
                                     type="button"
                                     onClick={() => {
                                         setSelectedKasBankFilter('all');
                                         setMutasiTypeFilter('all');
                                         setMutasiSearchQuery('');
+                                        setStartDate('');
+                                        setEndDate('');
                                         setMutasiCurrentPage(1);
+                                        applyFilters({ account_id: 'all', direction: 'all', search: '', start_date: '', end_date: '', page: 1 });
                                     }}
                                     className="px-2.5 py-1.5 text-xs text-slate-500 hover:text-red-600 hover:bg-red-50 rounded-xl transition"
                                     title="Reset Semua Filter"
@@ -1155,31 +1408,75 @@ export default function KasBank({
                     </div>
 
                     {/* Pagination Mutasi */}
-                    {totalMutasiPages > 1 && (
-                        <div className="p-4 border-t border-slate-100 flex items-center justify-between text-xs">
-                            <span className="text-slate-500">
-                                Halaman <strong>{mutasiCurrentPage}</strong> dari <strong>{totalMutasiPages}</strong> ({filteredMutasiKasBank.length} Transaksi)
+                    <div className="p-4 border-t border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs">
+                        <div className="flex items-center gap-3 text-slate-500">
+                            <span>
+                                Menampilkan <strong>{mutasiFrom}</strong> - <strong>{mutasiTo}</strong> dari <strong>{totalMutasiCount}</strong> Transaksi
                             </span>
+                            <span className="hidden sm:inline text-slate-300">|</span>
+                            <div className="flex items-center gap-1.5">
+                                <span>Per hal:</span>
+                                <select
+                                    value={mutasiPerPage}
+                                    onChange={(e) => {
+                                        const pp = Number(e.target.value);
+                                        setMutasiPerPage(pp);
+                                        applyFilters({ per_page: pp, page: 1 });
+                                    }}
+                                    className="px-2 py-1 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-700 font-medium focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                >
+                                    <option value="25">25 baris</option>
+                                    <option value="50">50 baris</option>
+                                    <option value="100">100 baris</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        {totalMutasiPages > 1 && (
                             <div className="flex items-center gap-1">
                                 <button
                                     type="button"
-                                    onClick={() => setMutasiCurrentPage(prev => Math.max(prev - 1, 1))}
-                                    disabled={mutasiCurrentPage <= 1}
-                                    className="px-3 py-1.5 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-30 disabled:cursor-not-allowed"
+                                    onClick={() => handlePageChange(Math.max(currentMutasiPage - 1, 1))}
+                                    disabled={currentMutasiPage <= 1}
+                                    className="px-3 py-1.5 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-30 disabled:cursor-not-allowed transition"
                                 >
                                     Sebelumnya
                                 </button>
+                                {isServerPaginated && mutasiKasBank?.links && mutasiKasBank.links.length > 3 ? (
+                                    mutasiKasBank.links.slice(1, -1).map((link, i) => {
+                                        const isPageNumber = !isNaN(Number(link.label));
+                                        if (!isPageNumber && link.label !== '...') return null;
+                                        return (
+                                            <button
+                                                key={i}
+                                                disabled={!link.url || link.active}
+                                                onClick={() => link.url && router.get(link.url, {}, { preserveState: true, preserveScroll: true })}
+                                                className={`min-w-8 h-8 px-2 rounded-lg font-medium transition text-xs flex items-center justify-center ${link.active
+                                                    ? 'bg-blue-600 text-white font-bold shadow-xs'
+                                                    : link.url
+                                                        ? 'border border-slate-200 text-slate-700 hover:bg-slate-50'
+                                                        : 'text-slate-400 cursor-default'
+                                                    }`}
+                                                dangerouslySetInnerHTML={{ __html: link.label }}
+                                            />
+                                        );
+                                    })
+                                ) : (
+                                    <span className="px-3 py-1 font-semibold text-slate-700">
+                                        {currentMutasiPage} / {totalMutasiPages}
+                                    </span>
+                                )}
                                 <button
                                     type="button"
-                                    onClick={() => setMutasiCurrentPage(prev => Math.min(prev + 1, totalMutasiPages))}
-                                    disabled={mutasiCurrentPage >= totalMutasiPages}
-                                    className="px-3 py-1.5 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-30 disabled:cursor-not-allowed"
+                                    onClick={() => handlePageChange(Math.min(currentMutasiPage + 1, totalMutasiPages))}
+                                    disabled={currentMutasiPage >= totalMutasiPages}
+                                    className="px-3 py-1.5 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-30 disabled:cursor-not-allowed transition"
                                 >
                                     Selanjutnya
                                 </button>
                             </div>
-                        </div>
-                    )}
+                        )}
+                    </div>
                 </div>
 
             </div>

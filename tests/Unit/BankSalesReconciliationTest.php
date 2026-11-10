@@ -236,9 +236,12 @@ class BankSalesReconciliationTest extends TestCase
         // Header: row 0
         // Data: row 1 (CASH), row 2 (KREDIT), row 3 (TRANSFER BCA), row 4 (QRIS MANDIRI), row 5 (DEBIT BRI), row 6 (BELUM BAYAR)
         // Summary row 1: row 7 (TOTAL KAS)
-        // Summary row 2: row 8 (TOTAL BANK)
-        // Summary row 3: row 9 (TOTAL KESELURUHAN)
-        $this->assertCount(10, $rows);
+        // Summary row 2: row 8 (TOTAL MANDIRI)
+        // Summary row 3: row 9 (TOTAL BCA)
+        // Summary row 4: row 10 (TOTAL BRI)
+        // Summary row 5: row 11 (TOTAL BANK)
+        // Summary row 6: row 12 (TOTAL KESELURUHAN)
+        $this->assertCount(13, $rows);
 
         $totalKasRow = $rows[7];
         $this->assertSame('', $totalKasRow[0]);
@@ -252,7 +255,42 @@ class BankSalesReconciliationTest extends TestCase
         $this->assertSame($allBanksData['CASH']['struk_count'], $totalKasRow[2]);
         $this->assertSame($allBanksData['CASH']['net_sum'], $totalKasRow[6]);
 
-        $totalBankRow = $rows[8];
+        // Total per jenis bank (QRIS MANDIRI)
+        $totalMandiriRow = $rows[8];
+        $this->assertSame('', $totalMandiriRow[0]);
+        $this->assertSame('TOTAL MANDIRI', $totalMandiriRow[1]);
+        $this->assertSame($allBanksData['QRIS MANDIRI']['struk_count'], $totalMandiriRow[2]);
+        $this->assertEquals($allBanksData['QRIS MANDIRI']['qty_sum'], $totalMandiriRow[3]);
+        $this->assertSame($allBanksData['QRIS MANDIRI']['gross_sum'], $totalMandiriRow[4]);
+        $this->assertSame($allBanksData['QRIS MANDIRI']['discount_sum'], $totalMandiriRow[5]);
+        $this->assertSame($allBanksData['QRIS MANDIRI']['net_sum'], $totalMandiriRow[6]);
+
+        // Total per jenis bank (TRANSFER BCA)
+        $totalBcaRow = $rows[9];
+        $this->assertSame('TOTAL BCA', $totalBcaRow[1]);
+        $this->assertSame($allBanksData['TRANSFER BCA']['struk_count'], $totalBcaRow[2]);
+        $this->assertSame($allBanksData['TRANSFER BCA']['gross_sum'], $totalBcaRow[4]);
+        $this->assertSame($allBanksData['TRANSFER BCA']['net_sum'], $totalBcaRow[6]);
+
+        // Total per jenis bank (DEBIT BRI)
+        $totalBriRow = $rows[10];
+        $this->assertSame('TOTAL BRI', $totalBriRow[1]);
+        $this->assertSame($allBanksData['DEBIT BRI']['struk_count'], $totalBriRow[2]);
+        $this->assertSame($allBanksData['DEBIT BRI']['gross_sum'], $totalBriRow[4]);
+        $this->assertSame($allBanksData['DEBIT BRI']['net_sum'], $totalBriRow[6]);
+
+        // Urutan baris total & jenis bank tanpa transaksi (BNI, BTN) tidak ditampilkan
+        $summaryLabels = array_map(fn ($row) => $row[1], array_slice($rows, 7));
+        $this->assertSame([
+            'TOTAL KAS',
+            'TOTAL MANDIRI',
+            'TOTAL BCA',
+            'TOTAL BRI',
+            'TOTAL BANK',
+            'TOTAL KESELURUHAN',
+        ], $summaryLabels);
+
+        $totalBankRow = $rows[11];
         $this->assertSame('', $totalBankRow[0]);
         $this->assertSame('TOTAL BANK', $totalBankRow[1]);
         // Bank = TRANSFER BCA (5) + QRIS MANDIRI (8) + DEBIT BRI (2) = 15 struk
@@ -262,7 +300,17 @@ class BankSalesReconciliationTest extends TestCase
         $this->assertSame(15000, $totalBankRow[5]); // Discount: 10k + 5k + 0
         $this->assertSame(635000, $totalBankRow[6]); // Net: 340k + 195k + 100k
 
-        $totalKeseluruhanRow = $rows[9];
+        // Total Bank wajib sama dengan penjumlahan seluruh Total per jenis bank
+        $bankRows = [$totalMandiriRow, $totalBcaRow, $totalBriRow];
+        for ($col = 2; $col <= 6; $col++) {
+            $this->assertSame(
+                $totalBankRow[$col],
+                array_sum(array_column($bankRows, $col)),
+                "Kolom {$col}: Total per jenis bank harus sama dengan TOTAL BANK"
+            );
+        }
+
+        $totalKeseluruhanRow = $rows[12];
         $this->assertSame('', $totalKeseluruhanRow[0]);
         $this->assertSame('TOTAL KESELURUHAN', $totalKeseluruhanRow[1]);
         // Total Kas + Total Bank = Total Keseluruhan
@@ -272,6 +320,110 @@ class BankSalesReconciliationTest extends TestCase
         $this->assertSame($totalKasRow[5] + $totalBankRow[5], $totalKeseluruhanRow[5]);
         $this->assertSame($totalKasRow[6] + $totalBankRow[6], $totalKeseluruhanRow[6]);
         $this->assertSame(2085000, $totalKeseluruhanRow[6]); // 1,450,000 + 635,000
+    }
+
+    public function test_recap_bank_totals_group_all_payment_methods_of_the_same_bank(): void
+    {
+        $allBanksData = [
+            'CASH' => [
+                'struk_count' => 4, 'qty_sum' => 10, 'gross_sum' => 400000, 'discount_sum' => 0, 'net_sum' => 400000,
+            ],
+            'KREDIT' => [
+                'struk_count' => 3, 'qty_sum' => 9, 'gross_sum' => 300000, 'discount_sum' => 0, 'net_sum' => 300000,
+            ],
+            'BELUM BAYAR' => [
+                'struk_count' => 1, 'qty_sum' => 2, 'gross_sum' => 25000, 'discount_sum' => 0, 'net_sum' => 25000,
+            ],
+            'TRANSFER MANDIRI' => [
+                'struk_count' => 2, 'qty_sum' => 4, 'gross_sum' => 100000, 'discount_sum' => 1000, 'net_sum' => 99000,
+            ],
+            'DEBIT MANDIRI' => [
+                'struk_count' => 3, 'qty_sum' => 6, 'gross_sum' => 150000, 'discount_sum' => 2000, 'net_sum' => 148000,
+            ],
+            'QRIS MANDIRI' => [
+                'struk_count' => 5, 'qty_sum' => 10, 'gross_sum' => 250000, 'discount_sum' => 3000, 'net_sum' => 247000,
+            ],
+            'TRANSFER BNI' => [
+                'struk_count' => 0, 'qty_sum' => 0, 'gross_sum' => 0, 'discount_sum' => 0, 'net_sum' => 0,
+            ],
+            'QRIS BTN' => [
+                'struk_count' => 1, 'qty_sum' => 2, 'gross_sum' => 50000, 'discount_sum' => 0, 'net_sum' => 50000,
+            ],
+        ];
+
+        $sheet = new BankSalesSheetExport(
+            1,
+            '2026-10-16',
+            '2026-10-16',
+            'SAHABAT PMI',
+            '',
+            null,
+            'semua',
+            null,
+            true, // isRecap
+            $allBanksData,
+            []
+        );
+
+        $buildMethod = new \ReflectionMethod(BankSalesSheetExport::class, 'buildRecapRows');
+        $buildMethod->setAccessible(true);
+        $rows = $buildMethod->invoke($sheet);
+
+        // MANDIRI digabung dari TRANSFER + DEBIT + QRIS, BNI tanpa transaksi tidak ditampilkan.
+        $summaryLabels = array_map(fn ($row) => $row[1], array_slice($rows, 9));
+        $this->assertSame([
+            'TOTAL KAS',
+            'TOTAL MANDIRI',
+            'TOTAL BTN',
+            'TOTAL BANK',
+            'TOTAL KESELURUHAN',
+        ], $summaryLabels);
+
+        $totalKasRow = $rows[9];
+        $this->assertSame('TOTAL KAS', $totalKasRow[1]);
+        $this->assertSame(4, $totalKasRow[2]);
+
+        $totalMandiriRow = $rows[10];
+        $this->assertSame(10, $totalMandiriRow[2]); // 2 + 3 + 5 struk
+        $this->assertEquals(20, $totalMandiriRow[3]); // 4 + 6 + 10 qty
+        $this->assertSame(500000, $totalMandiriRow[4]); // 100k + 150k + 250k
+        $this->assertSame(6000, $totalMandiriRow[5]); // 1k + 2k + 3k
+        $this->assertSame(494000, $totalMandiriRow[6]); // 99k + 148k + 247k
+
+        $totalBtnRow = $rows[11];
+        $this->assertSame(1, $totalBtnRow[2]);
+        $this->assertEquals(2, $totalBtnRow[3]);
+        $this->assertSame(50000, $totalBtnRow[4]);
+        $this->assertSame(0, $totalBtnRow[5]);
+        $this->assertSame(50000, $totalBtnRow[6]);
+
+        // Total Bank = TOTAL MANDIRI + TOTAL BTN (KREDIT & BELUM BAYAR tidak ikut)
+        $totalBankRow = $rows[12];
+        $this->assertSame('TOTAL BANK', $totalBankRow[1]);
+        $this->assertSame($totalMandiriRow[2] + $totalBtnRow[2], $totalBankRow[2]);
+        $this->assertEquals($totalMandiriRow[3] + $totalBtnRow[3], $totalBankRow[3]);
+        $this->assertSame($totalMandiriRow[4] + $totalBtnRow[4], $totalBankRow[4]);
+        $this->assertSame($totalMandiriRow[5] + $totalBtnRow[5], $totalBankRow[5]);
+        $this->assertSame($totalMandiriRow[6] + $totalBtnRow[6], $totalBankRow[6]);
+        $this->assertSame(544000, $totalBankRow[6]);
+
+        // Total keseluruhan = kas + bank
+        $totalKeseluruhanRow = $rows[13];
+        $this->assertSame(944000, $totalKeseluruhanRow[6]); // 400k + 544k
+    }
+
+    public function test_resolve_bank_bucket_maps_payment_label_to_bank_name(): void
+    {
+        $this->assertSame('MANDIRI', BankSalesSheetExport::resolveBankBucket('TRANSFER MANDIRI'));
+        $this->assertSame('MANDIRI', BankSalesSheetExport::resolveBankBucket('DEBIT MANDIRI'));
+        $this->assertSame('MANDIRI', BankSalesSheetExport::resolveBankBucket('QRIS MANDIRI'));
+        $this->assertSame('MANDIRI', BankSalesSheetExport::resolveBankBucket('METODE TIDAK TERCATAT MANDIRI'));
+        $this->assertSame('BCA', BankSalesSheetExport::resolveBankBucket('qris bca'));
+        $this->assertSame('BNI', BankSalesSheetExport::resolveBankBucket('TRANSFER BNI'));
+        $this->assertSame('BRI', BankSalesSheetExport::resolveBankBucket('DEBIT BRI'));
+        $this->assertSame('BTN', BankSalesSheetExport::resolveBankBucket('TRANSFER BTN'));
+        $this->assertSame('LAINNYA', BankSalesSheetExport::resolveBankBucket('TRANSFER LAINNYA'));
+        $this->assertSame('LAINNYA', BankSalesSheetExport::resolveBankBucket('TRANSFER'));
     }
 
     public function test_kinerja_omzet_calculation_matches_bank_sales_export_cash_and_bank(): void

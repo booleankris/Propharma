@@ -23,6 +23,7 @@ use App\Http\Controllers\Master\CompositionsController;
 use App\Http\Controllers\Master\CreditorsController;
 use App\Http\Controllers\Master\DebtorsController;
 use App\Http\Controllers\Master\DoctorsController;
+use App\Http\Controllers\Master\DoctorServicesController;
 use App\Http\Controllers\Master\FactoriesController;
 use App\Http\Controllers\Master\ItemsController;
 use App\Http\Controllers\Master\LocationsController;
@@ -194,6 +195,14 @@ Route::middleware(['auth', 'role:General Manager|Kasir|Gudang PMI|HO|administrat
     Route::post('removecart', [SalesController::class, 'removeItem'])->name('transaction.removeItem');
 
     Route::post('/transaction/heartbeat', [SalesController::class, 'heartbeat'])->name('transaction.heartbeat');
+
+    // Jasa (transaksi tipe JASA). Route GET harus didefinisikan sebelum
+    // '/transaction/{type}/{id?}' agar tidak tertangkap sebagai tipe transaksi.
+    Route::get('/transaction/service/search', [SalesController::class, 'searchServices'])->name('transaction.service.search');
+    Route::post('/transaction/service', [SalesController::class, 'saveService'])->name('transaction.service.save');
+    Route::post('/transaction/service/invoice-type', [SalesController::class, 'updateServiceInvoiceType'])->name('transaction.service.invoiceType');
+    Route::delete('/transaction/service', [SalesController::class, 'deleteService'])->name('transaction.service.delete');
+
     Route::get('/transaction/{type}/{id?}', [SalesController::class, 'index'])->name('transaction');
     Route::post('/transaction/checkout', [SalesController::class, 'checkout'])->name('transaction.checkout');
     Route::post('/transaction/mark-visitor', [SalesController::class, 'markVisitor'])->name('transaction.markVisitor');
@@ -254,6 +263,9 @@ Route::middleware(['auth', 'role:General Manager|Kasir|Gudang PMI|HO|administrat
         Route::get('doctors/duplicates', [DoctorsController::class, 'getDuplicates'])->name('doctors.duplicates');
         Route::post('doctors/merge-duplicates', [DoctorsController::class, 'mergeDuplicates'])->name('doctors.mergeDuplicates');
         Route::resource('doctors', DoctorsController::class)->except(['show']);
+
+        // Master Jasa & Ongkir (jasa/tindakan dokter & ongkir)
+        Route::resource('doctor-services', DoctorServicesController::class)->except(['show', 'create']);
         Route::resource('compositions', CompositionsController::class)->except(['show']);
         Route::resource('factories', FactoriesController::class)->except(['show']);
         Route::resource('categories', CategoriesController::class)->except(['show']);
@@ -625,6 +637,7 @@ Route::middleware(['auth', 'role:General Manager|Kasir|Gudang PMI|HO|administrat
         Route::put('/biaya/{id}', [\App\Http\Controllers\FinanceController::class, 'updateBiaya'])->name('biaya.update');
         Route::delete('/biaya/{id}', [\App\Http\Controllers\FinanceController::class, 'destroyBiaya'])->name('biaya.destroy');
         Route::get('/export/biaya', [\App\Http\Controllers\FinanceController::class, 'exportBiaya'])->name('export.biaya');
+        Route::get('/export/kas-bank', [\App\Http\Controllers\FinanceController::class, 'exportKasBank'])->name('export.kasBank');
         Route::post('/diskon', [\App\Http\Controllers\FinanceController::class, 'storeDiskon'])->name('diskon.store');
         Route::put('/diskon/{id}', [\App\Http\Controllers\FinanceController::class, 'updateDiskon'])->name('diskon.update');
         Route::delete('/diskon/{id}', [\App\Http\Controllers\FinanceController::class, 'destroyDiskon'])->name('diskon.destroy');

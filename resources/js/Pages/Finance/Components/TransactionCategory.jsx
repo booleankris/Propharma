@@ -13,6 +13,7 @@ const categories = {
     'TARIK TUNAI': { label: 'Tarik Tunai ke Kas', color: 'bg-amber-50 text-amber-700 border-amber-200' },
     'SALDO AWAL': { label: 'Saldo Awal', color: 'bg-indigo-50 text-indigo-700 border-indigo-200' },
     'PENYESUAIAN SALDO': { label: 'Opname / Penyesuaian', color: 'bg-purple-50 text-purple-700 border-purple-200' },
+    'RETUR PENJUALAN': { label: 'Retur Jual (Refund)', color: 'bg-rose-50 text-rose-700 border-rose-200' },
 };
 
 export default function TransactionCategory({ type }) {

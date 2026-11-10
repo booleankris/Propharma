@@ -47,6 +47,10 @@ class BankSalesExport implements WithMultipleSheets
 
     public static function calculateTransactionAmount(object $trx): float
     {
+        // Nilai jasa (transaksi tipe JASA) ikut dihitung sebagai bagian transaksi.
+        // Untuk transaksi lain nilainya 0 sehingga rumus lama tidak berubah.
+        $serviceAmount = (float) ($trx->service->price ?? 0);
+
         $items = $trx->transactions ?? collect();
         $originalMap = LiphExport::TYPE_MAP[$trx->transaction_type] ?? null;
         $originalLabel = $originalMap[1] ?? '';
@@ -67,6 +71,8 @@ class BankSalesExport implements WithMultipleSheets
                 });
             }
             $signedSubtotal = $isReturnTrx ? -abs($subtotal) : $subtotal;
+            // Catatan: untuk transaksi tanpa item, kolom `subtotal` di database
+            // sudah mencakup nilai jasa, jadi jasa tidak ditambahkan lagi di sini.
             return (float) ($signedSubtotal - $trxDiscount);
         }
 
@@ -87,7 +93,7 @@ class BankSalesExport implements WithMultipleSheets
         }
 
         $roundedGross = (int) $trxGross;
-        return (float) ($roundedGross - $trxDiscount);
+        return (float) ($roundedGross - $trxDiscount + $serviceAmount);
     }
 
     public function sheets(): array
@@ -133,9 +139,12 @@ class BankSalesExport implements WithMultipleSheets
                 'shift_logs' => function ($q) {
                     $q->select('id', 'shift_id');
                 },
+                'service' => function ($q) {
+                    $q->select('id', 'medicine_transaction_id', 'service_name', 'price');
+                },
             ])
             ->where('pharmacy_id', $this->pharmacyId)
-            ->whereIn('transaction_type', array_keys(LiphExport::TYPE_MAP));
+            ->whereIn('transaction_type', array_merge(array_keys(LiphExport::TYPE_MAP), ['JASA']));
 
         LiphTransactionScope::applySalesStatus($query);
         LiphTransactionScope::applyPeriod(
@@ -163,6 +172,7 @@ class BankSalesExport implements WithMultipleSheets
         // 3. Prepare master bank list
         $activeCategories = array_keys($grouped);
         $banksList = array_values(array_unique(array_merge(self::STANDARD_BANKS, $activeCategories)));
+
         // 4. Build one flat recap from cash and payment methods only.
         $allBanksData = [];
         $activeBanksWithData = [];
@@ -221,6 +231,8 @@ class BankSalesExport implements WithMultipleSheets
 
         foreach ($transactions as $trx) {
             $items = $trx->transactions;
+            // Nilai jasa (transaksi tipe JASA) ikut menambah total pembayaran.
+            $serviceAmount = (float) ($trx->service->price ?? 0);
             $originalMap = LiphExport::TYPE_MAP[$trx->transaction_type] ?? null;
             $originalLabel = $originalMap[1] ?? '';
             $isReturnTrx = in_array($originalLabel, ['Retur Tunai', 'Retur Kredit'], true)
@@ -241,9 +253,11 @@ class BankSalesExport implements WithMultipleSheets
                     });
                 }
                 $signedSubtotal = $isReturnTrx ? -abs($subtotal) : $subtotal;
+                // `subtotal` transaksi tanpa item sudah mencakup nilai jasa.
                 $summary['gross_sum'] += $signedSubtotal;
                 $summary['net_sum'] += $signedSubtotal - $trxDiscount;
-                $summary['qty_sum'] += ($isReturnTrx ? -max(1, (float) $items->sum('quantity')) : 1);
+                // Jasa bukan qty obat: transaksi jasa tanpa obat tidak menambah qty.
+                $summary['qty_sum'] += ($isReturnTrx ? -max(1, (float) $items->sum('quantity')) : ($serviceAmount > 0 ? 0 : 1));
                 continue;
             }
 
@@ -267,8 +281,8 @@ class BankSalesExport implements WithMultipleSheets
             }
 
             $roundedGross = (int) $trxGross;
-            $summary['gross_sum'] += $roundedGross;
-            $summary['net_sum'] += ($roundedGross - $trxDiscount);
+            $summary['gross_sum'] += (int) round($roundedGross + $serviceAmount);
+            $summary['net_sum'] += (int) round($roundedGross - $trxDiscount + $serviceAmount);
         }
 
         return $summary;

@@ -171,9 +171,19 @@
         </table>
     @endforeach
 
+    @if (!empty($service))
+        <table class="table-struk">
+            <tr>
+                <td class="col-name">{{ $service->service_name }}</td>
+                <td class="col-qty">1</td>
+                <td class="col-total">{{ number_format((float) $service->price) }}</td>
+            </tr>
+        </table>
+    @endif
+
     <br>
 
-    Sub Total <span style="float:right">{{ number_format($totalPrice + $totalEmbalase) }}</span><br>
+    Sub Total <span style="float:right">{{ number_format($totalPrice + $totalEmbalase + ($serviceAmount ?? 0)) }}</span><br>
 
     Discount <span style="float:right">-{{ number_format($totaldiscount) }}</span><br>
     <strong>Jumlah <span style="float:right">{{ number_format($totalFinalPrice) }}</span></strong><br>

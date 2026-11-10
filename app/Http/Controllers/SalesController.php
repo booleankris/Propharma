@@ -16,11 +16,13 @@ use App\Models\MedicineCart;
 use App\Models\Medicines;
 use App\Models\ReceivingItems;
 use App\Models\MedicineTransactions;
+use App\Models\DoctorService;
 use App\Models\Patients;
 use App\Models\PaymentParameters;
 use App\Models\Sales;
 use App\Models\TicketPayment;
 use App\Models\TicketTransaction;
+use App\Models\TransactionService;
 use App\Models\MedicineTransfers;
 use App\Models\MedicineTransferItems;
 use App\Services\MedicineTransactionCodeGenerator;
@@ -37,6 +39,21 @@ use Illuminate\Support\Facades\URL;
 
 class SalesController extends Controller
 {
+    /**
+     * Jenis faktur obat yang boleh dipilih pada transaksi tipe JASA.
+     * Harga obat tetap mengikuti parameter penjualan masing-masing jenis.
+     */
+    public const SERVICE_INVOICE_TYPES = ['UPDS', 'HV/OTC', 'RESEP TUNAI'];
+
+    /**
+     * Pemetaan jenis faktur obat JASA → kolom parameter harga di payment_parameters.
+     */
+    private const SERVICE_INVOICE_PARAM_MAP = [
+        'UPDS' => 'pdu',
+        'HV/OTC' => 'otc',
+        'RESEP TUNAI' => 'receipt',
+    ];
+
     public function index($type, $id = null)
     {
         $pharmacy_id = (int) (getActivePharmacyId() ?: Auth::user()->pharmacy_id);
@@ -48,6 +65,7 @@ class SalesController extends Controller
             'kredit' => ['db' => 'KREDIT', 'param_key' => null, 'code' => '4'],
             'upds' => ['db' => 'UPDS', 'param_key' => 'pdu', 'code' => '2'],
             'hv' => ['db' => 'HV/OTC', 'param_key' => 'otc', 'code' => '3'],
+            'jasa' => ['db' => 'JASA', 'param_key' => 'pdu', 'code' => '5'],
         ];
 
         abort_if(!array_key_exists($type, $typeMap), 404, 'Invalid transaction type.');
@@ -133,17 +151,31 @@ class SalesController extends Controller
                     ->first();
 
                 if ($lockedTx && $lockedTx->transaction_type !== $dbType) {
+                    $previousType = strtoupper((string) $lockedTx->transaction_type);
+
                     $lockedTx->update([
                         'transaction_type' => $dbType,
                         'transaction_code' => null,
                         'subtotal' => null,
                         'discount' => null,
+                        // Transaksi JASA membutuhkan penanda jenis faktur obat.
+                        'service_invoice_type' => $dbType === 'JASA'
+                            ? ($lockedTx->service_invoice_type ?: 'UPDS')
+                            : null,
                     ]);
                     MedicineCart::where('transaction_id', $lockedTx->id)
                         ->where('status', 0)
                         ->delete();
+
+                    // Keluar dari tipe JASA → jasa pada transaksi ikut dihapus
+                    // agar tidak ada data jasa menggantung.
+                    if ($previousType === 'JASA' && $dbType !== 'JASA') {
+                        TransactionService::where('medicine_transaction_id', $lockedTx->id)->delete();
+                    }
+
                     $transaction->transaction_type = $dbType;
                     $transaction->transaction_code = null;
+                    $transaction->service_invoice_type = $lockedTx->service_invoice_type;
                 }
             }, 3);
 
@@ -151,6 +183,24 @@ class SalesController extends Controller
         }
 
         $trx_id = $transaction->id;
+
+        // ── Transaksi tipe JASA ──────────────────────────────────────────────
+        // Blok ini hanya aktif untuk tipe JASA sehingga rumus transaksi lain
+        // (UPDS/HV/Resep/Kredit) tidak berubah sama sekali.
+        $isServiceTransaction = $dbType === 'JASA';
+        $serviceInvoiceType = $isServiceTransaction
+            ? $this->normalizeServiceInvoiceType($transaction->service_invoice_type)
+            : null;
+        $transactionService = null;
+        $serviceAmount = 0.0;
+
+        if ($isServiceTransaction) {
+            // Harga obat mengikuti jenis faktur obat yang dipilih kasir.
+            $parameters = $paymentParams->{self::SERVICE_INVOICE_PARAM_MAP[$serviceInvoiceType]};
+
+            $transactionService = TransactionService::where('medicine_transaction_id', $transaction->id)->first();
+            $serviceAmount = round((float) ($transactionService->price ?? 0), 2);
+        }
 
         if ($dbType === 'KREDIT' && $transaction->debtor_id) {
             $transaction->load('debtors.parameters');
@@ -174,7 +224,7 @@ class SalesController extends Controller
             ->get();
 
         $activeCart = $itemInCart;
-        $totaltransaction = (float) $activeCart->sum('final_price');
+        $totaltransaction = (float) $activeCart->sum('final_price') + $serviceAmount;
 
         $total_price = (object)[
             'total_price' => (float) $activeCart->sum('total_price'),
@@ -193,6 +243,15 @@ class SalesController extends Controller
             ->count();
 
         $availableBanks = FinanceAccount::getBranchBankOptions($pharmacy_id);
+
+        // Tampilan transaksi JASA mengikuti jenis faktur obatnya agar seluruh
+        // perilaku UI lama (racikan, dokter, embalase, cart_type) otomatis sama
+        // dengan transaksi biasa. Nilai asli di database tetap 'JASA'.
+        if ($isServiceTransaction) {
+            $transaction = clone $transaction;
+            $transaction->transaction_type = $serviceInvoiceType;
+            $transaction->setRelation('service', $transactionService);
+        }
 
         return response()
             ->view('kasir.transaction', compact(
@@ -216,7 +275,11 @@ class SalesController extends Controller
                 'parameterUP',
                 'service',
                 'ChangeFakturRounding',
-                'availableBanks'
+                'availableBanks',
+                'isServiceTransaction',
+                'serviceInvoiceType',
+                'transactionService',
+                'serviceAmount'
             ))
             ->header('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0')
             ->header('Pragma', 'no-cache')
@@ -232,9 +295,21 @@ class SalesController extends Controller
             ->orderBy('id', 'asc')
             ->get();
 
-        $totalTransaction = (float) $items->sum('final_price');
+        // Jasa (khusus tipe JASA): nilainya menambah total yang harus dibayar,
+        // tanpa mengubah perhitungan obat. Untuk tipe lain nilainya selalu 0.
+        $service = null;
+        $serviceAmount = 0.0;
+        $parentType = strtoupper((string) MedicineTransactions::where('id', $transactionId)->value('transaction_type'));
+
+        if ($parentType === 'JASA') {
+            $service = TransactionService::where('medicine_transaction_id', $transactionId)->first();
+            $serviceAmount = round((float) ($service->price ?? 0), 2);
+        }
+
+        $totalTransaction = (float) $items->sum('final_price') + $serviceAmount;
         $totalDiscount = (float) $items->sum('discount');
         $totalBought = (float) $items->sum('total_price') + (float) $items->sum('embalase');
+        $medicineSubtotal = (float) $items->sum('final_price');
 
         $cartItems = $items->map(function (MedicineCart $row) {
             return [
@@ -258,7 +333,10 @@ class SalesController extends Controller
         $itemFingerprints = $items->map(function (MedicineCart $r) {
             return "{$r->id}:{$r->medicine_id}:{$r->quantity}:{$r->discount}:{$r->total_price}:{$r->embalase}:{$r->final_price}:{$r->cart_type}:{$r->recipe_status}:{$r->recipe_number}";
         })->implode('|');
-        $cartSignature = sha1($items->count() . '|' . $totalTransaction . '|' . $totalDiscount . '|' . $totalBought . '|' . $itemFingerprints);
+        $serviceFingerprint = $service
+            ? "{$service->id}:{$service->doctor_service_id}:{$service->service_name}:{$service->price}"
+            : 'none';
+        $cartSignature = sha1($items->count() . '|' . $totalTransaction . '|' . $totalDiscount . '|' . $totalBought . '|' . $itemFingerprints . '|' . $serviceFingerprint);
 
         return [
             'total_transaction' => $totalTransaction,
@@ -268,6 +346,14 @@ class SalesController extends Controller
             'cart_count' => count($cartItems),
             'cart_signature' => $cartSignature,
             'cart_items' => $cartItems,
+            'medicine_subtotal' => $medicineSubtotal,
+            'service_amount' => $serviceAmount,
+            'service' => $service ? [
+                'id' => $service->id,
+                'doctor_service_id' => $service->doctor_service_id,
+                'name' => $service->service_name,
+                'price' => $serviceAmount,
+            ] : null,
         ];
     }
 
@@ -359,6 +445,7 @@ class SalesController extends Controller
             'KREDIT' => 'kredit',
             'UPDS' => 'upds',
             'HV/OTC' => 'hv',
+            'JASA' => 'jasa',
             default => 'resep',
         };
     }
@@ -659,6 +746,8 @@ class SalesController extends Controller
             $typenew = "UPDS";
         } else if ($request->get('type') == 'hv') {
             $typenew = "HV/OTC";
+        } else if ($request->get('type') == 'jasa') {
+            $typenew = "JASA";
         }
 
         try {
@@ -1187,6 +1276,7 @@ class SalesController extends Controller
                 'KREDIT' => ['db' => 'KREDIT', 'param_key' => null, 'code' => '4'],
                 'UPDS' => ['db' => 'UPDS', 'param_key' => 'pdu', 'code' => '2'],
                 'HV/OTC' => ['db' => 'HV/OTC', 'param_key' => 'otc', 'code' => '3'],
+                'JASA' => ['db' => 'JASA', 'param_key' => 'pdu', 'code' => '5'],
             ];
 
 
@@ -1211,7 +1301,24 @@ class SalesController extends Controller
 
             // ── Cart Integrity & Desync Guard ────────────────────────
             $cartSync = $this->buildCartSyncPayload((int) $transaction->id);
-            if ($cartSync['cart_count'] === 0) {
+
+            // Tipe JASA: jasa wajib dipilih, tetapi obat boleh kosong.
+            // Untuk tipe lain blok ini tidak berjalan (perilaku lama tidak berubah).
+            $checkoutService = null;
+            if (strtoupper((string) $transaction->transaction_type) === 'JASA') {
+                $checkoutService = TransactionService::where('medicine_transaction_id', $transaction->id)->first();
+
+                if (! $checkoutService) {
+                    DB::rollBack();
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'Silakan pilih jasa terlebih dahulu sebelum pembayaran.',
+                        'cart_sync' => $cartSync,
+                    ], 422);
+                }
+            }
+
+            if ($cartSync['cart_count'] === 0 && ! $checkoutService) {
                 DB::rollBack();
                 return response()->json([
                     'success' => false,
@@ -1772,6 +1879,186 @@ class SalesController extends Controller
                 'item' => $cart,
             ], $syncPayload));
         }, 3);
+    }
+
+    // =====================================================================
+    //  JASA (transaksi tipe JASA) — endpoint khusus, tidak mengubah alur
+    //  transaksi UPDS/HV/Resep/Kredit.
+    // =====================================================================
+
+    /**
+     * Cari jasa pada master data (dipakai kolom pencarian jasa di kasir).
+     */
+    public function searchServices(Request $request)
+    {
+        $q = trim((string) $request->get('q', ''));
+
+        $items = DoctorService::select('id', 'name', 'price')
+            ->when($q !== '', function ($query) use ($q) {
+                $query->where('name', 'like', '%' . $q . '%');
+            })
+            ->orderBy('name')
+            ->limit(20)
+            ->get()
+            ->map(function (DoctorService $service) {
+                return [
+                    'id' => $service->id,
+                    'name' => $service->name,
+                    'price' => (float) $service->price,
+                    'price_label' => 'Rp ' . number_format((float) $service->price, 0, ',', '.'),
+                ];
+            })
+            ->values();
+
+        return response()->json($items);
+    }
+
+    /**
+     * Pilih / ganti jasa pada transaksi tipe JASA.
+     * Harga diambil dari master (qty selalu 1) dan disimpan sebagai snapshot.
+     */
+    public function saveService(Request $request)
+    {
+        $validated = $request->validate([
+            'transaction_id' => 'required|integer',
+            'doctor_service_id' => 'required|integer|exists:doctor_services,id',
+            'invoice_type' => 'nullable|string|in:' . implode(',', self::SERVICE_INVOICE_TYPES),
+        ]);
+
+        $transaction = $this->findServiceTransactionOrFail((int) $validated['transaction_id']);
+        if (! $transaction instanceof MedicineTransactions) {
+            return $transaction;
+        }
+
+        $service = DoctorService::findOrFail($validated['doctor_service_id']);
+
+        DB::transaction(function () use ($transaction, $service, $validated) {
+            $invoiceType = $this->normalizeServiceInvoiceType(
+                $validated['invoice_type'] ?? $transaction->service_invoice_type
+            );
+            $invoiceChanged = $transaction->service_invoice_type !== null
+                && strtoupper((string) $transaction->service_invoice_type) !== $invoiceType;
+
+            $transaction->update(['service_invoice_type' => $invoiceType]);
+
+            TransactionService::updateOrCreate(
+                ['medicine_transaction_id' => $transaction->id],
+                [
+                    'doctor_service_id' => $service->id,
+                    'service_name' => $service->name,
+                    'price' => round((float) $service->price, 2),
+                ]
+            );
+
+            // Ganti jenis faktur obat = harga obat berubah → kosongkan keranjang,
+            // sama seperti perilaku ganti tipe transaksi yang sudah ada.
+            if ($invoiceChanged) {
+                MedicineCart::where('transaction_id', $transaction->id)
+                    ->where('status', 0)
+                    ->delete();
+            }
+        }, 3);
+
+        return response()->json(array_merge([
+            'success' => true,
+            'message' => 'Jasa berhasil dipilih.',
+        ], $this->buildCartSyncPayload((int) $transaction->id)));
+    }
+
+    /**
+     * Ubah jenis faktur obat (UPDS / HV / Resep Tunai) pada transaksi JASA.
+     * Keranjang obat dikosongkan karena harga per jenis berbeda.
+     */
+    public function updateServiceInvoiceType(Request $request)
+    {
+        $validated = $request->validate([
+            'transaction_id' => 'required|integer',
+            'invoice_type' => 'required|string|in:' . implode(',', self::SERVICE_INVOICE_TYPES),
+        ]);
+
+        $transaction = $this->findServiceTransactionOrFail((int) $validated['transaction_id']);
+        if (! $transaction instanceof MedicineTransactions) {
+            return $transaction;
+        }
+
+        $invoiceType = $this->normalizeServiceInvoiceType($validated['invoice_type']);
+        $invoiceChanged = strtoupper((string) $transaction->service_invoice_type) !== $invoiceType;
+
+        DB::transaction(function () use ($transaction, $invoiceType, $invoiceChanged) {
+            $transaction->update(['service_invoice_type' => $invoiceType]);
+
+            if ($invoiceChanged) {
+                MedicineCart::where('transaction_id', $transaction->id)
+                    ->where('status', 0)
+                    ->delete();
+            }
+        }, 3);
+
+        return response()->json(array_merge([
+            'success' => true,
+            'message' => 'Jenis faktur obat diubah ke ' . $invoiceType . '.',
+        ], $this->buildCartSyncPayload((int) $transaction->id)));
+    }
+
+    /**
+     * Lepas jasa dari transaksi (opsional, sebelum pembayaran).
+     */
+    public function deleteService(Request $request)
+    {
+        $validated = $request->validate([
+            'transaction_id' => 'required|integer',
+        ]);
+
+        $transaction = $this->findServiceTransactionOrFail((int) $validated['transaction_id']);
+        if (! $transaction instanceof MedicineTransactions) {
+            return $transaction;
+        }
+
+        TransactionService::where('medicine_transaction_id', $transaction->id)->delete();
+
+        return response()->json(array_merge([
+            'success' => true,
+            'message' => 'Jasa dihapus.',
+        ], $this->buildCartSyncPayload((int) $transaction->id)));
+    }
+
+    /**
+     * Guard: endpoint jasa hanya untuk transaksi pending bertipe JASA milik cabang aktif.
+     */
+    private function findServiceTransactionOrFail(int $transactionId)
+    {
+        $pharmacyId = (int) (getActivePharmacyId() ?: Auth::user()->pharmacy_id);
+
+        $transaction = MedicineTransactions::where('id', $transactionId)
+            ->where('pharmacy_id', $pharmacyId)
+            ->where('status', 0)
+            ->first();
+
+        if (! $transaction) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Transaksi tidak ditemukan atau sudah selesai.',
+            ], 404);
+        }
+
+        if (strtoupper((string) $transaction->transaction_type) !== 'JASA') {
+            return response()->json([
+                'success' => false,
+                'message' => 'Jasa hanya dapat dipilih pada transaksi tipe Jasa.',
+            ], 422);
+        }
+
+        return $transaction;
+    }
+
+    /**
+     * Normalisasi jenis faktur obat untuk transaksi JASA (default UPDS).
+     */
+    private function normalizeServiceInvoiceType($type): string
+    {
+        $type = strtoupper(trim((string) $type));
+
+        return in_array($type, self::SERVICE_INVOICE_TYPES, true) ? $type : 'UPDS';
     }
 
 

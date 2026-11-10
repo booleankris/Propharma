@@ -7,6 +7,7 @@ use App\Exports\Finance\CashExport;
 use App\Exports\Finance\CashflowExport;
 use App\Exports\Finance\CashflowTradeExport;
 use App\Exports\Finance\HutangExport;
+use App\Exports\Finance\KasBankExport;
 use App\Exports\Finance\KinerjaOmzetExport;
 use App\Exports\Finance\MonitoringPenjualanExport;
 use App\Exports\Finance\NeracaExport;
@@ -536,11 +537,26 @@ class FinanceController extends Controller
         $previousMonthEnd = $periodDate->copy()->startOfMonth()->subDay()->toDateString();
         $monthLabel = $periodDate->translatedFormat('F Y');
 
+        $startDate = $request->query('start_date');
+        $endDate = $request->query('end_date');
+        $isCustomRange = !empty($startDate) && !empty($endDate);
+
+        $filterStart = $isCustomRange ? $startDate : $monthStart;
+        $filterEnd = $isCustomRange ? $endDate : $monthEnd;
+        if ($isCustomRange) {
+            $monthLabel = \Carbon\Carbon::parse($filterStart)->format('d/m/Y') . ' - ' . \Carbon\Carbon::parse($filterEnd)->format('d/m/Y');
+        }
+
         // Hanya akun berkategori Kas & Bank untuk halaman Kas & Bank
         $accounts = $this->branchKasBankAccountsQuery()->orderBy('code')->get();
         $categories = ['Kas & Bank'];
-        // Ambil mutasi yang terjadi khusus pada bulan yang dipilih
-        $mutasiKasBank = $this->getMutasiData(null, $monthStart, $monthEnd);
+        $targetPharmacyIds = $this->getTargetPharmacyIds();
+
+        // Ringkasan statistik bulanan via agregasi SQL (cepat, tanpa memuat ribuan objek ke RAM)
+        $kasBankSummary = $this->getMonthlyKasBankSummary($accounts, $filterStart, $filterEnd, $targetPharmacyIds);
+
+        // Ambil mutasi transaksi dengan server-side pagination
+        $mutasiKasBank = $this->getPaginatedMutasiData($request, $filterStart, $filterEnd, $targetPharmacyIds);
         $stats = $this->getStats(null, null, null);
         $openingBalances = FinancePayment::with('creator')
             ->where('payment_type', 'SALDO AWAL')
@@ -561,7 +577,7 @@ class FinanceController extends Controller
             $opening = FinancePayment::where('payment_type', 'SALDO AWAL')->where('account_id', $account->id)->first();
             if (!$opening) {
                 $monthlyOpeningBalances[$account->id] = 0;
-            } elseif ($opening->payment_date?->format('Y-m-d') >= $monthStart && $opening->payment_date?->format('Y-m-d') <= $monthEnd) {
+            } elseif ($opening->payment_date?->format('Y-m-d') >= $filterStart && $opening->payment_date?->format('Y-m-d') <= $filterEnd) {
                 $monthlyOpeningBalances[$account->id] = (float) $opening->amount;
             } else {
                 $monthlyOpeningBalances[$account->id] = $this->calculateBalanceFromOpening($account->id, $opening, $previousMonthEnd);
@@ -574,6 +590,15 @@ class FinanceController extends Controller
             'accounts' => $accounts,
             'categories' => $categories,
             'mutasiKasBank' => $mutasiKasBank,
+            'kasBankSummary' => $kasBankSummary,
+            'filters' => [
+                'account_id' => $request->query('account_id', 'all'),
+                'direction' => $request->query('direction', 'all'),
+                'search' => $request->query('search', ''),
+                'per_page' => (int) $request->query('per_page', 25),
+                'start_date' => $startDate ?: '',
+                'end_date' => $endDate ?: '',
+            ],
             'stats' => $stats,
             'openingBalances' => $openingBalances,
             'monthlyOpeningBalances' => $monthlyOpeningBalances,
@@ -1244,7 +1269,7 @@ class FinanceController extends Controller
         foreach ($payments as $payment) {
             if (in_array($payment->payment_type, ['PIUTANG', 'PENDAPATAN', 'PENJUALAN TUNAI', 'PENJUALAN NON TUNAI'], true))
                 $balance += (float) $payment->amount;
-            elseif (in_array($payment->payment_type, ['KREDIT', 'CASH', 'KONSINYASI', 'BIAYA', 'SETOR', 'TARIK TUNAI'], true))
+            elseif (in_array($payment->payment_type, ['KREDIT', 'CASH', 'KONSINYASI', 'BIAYA', 'SETOR', 'TARIK TUNAI', 'RETUR PENJUALAN'], true))
                 $balance -= (float) $payment->amount;
             elseif ($payment->payment_type === 'PENYESUAIAN SALDO') {
                 if ($payment->reference_number === 'OPNAME-OUT') {
@@ -2836,7 +2861,7 @@ class FinanceController extends Controller
                 })->orWhere(function ($q) use ($targetPharmacyIds) {
                     $q->where('payment_type', 'TARIK TUNAI')->whereIn('pharmacy_id', $targetPharmacyIds);
                 })->orWhere(function ($q) use ($targetPharmacyIds) {
-                    $q->whereIn('payment_type', ['PENJUALAN TUNAI', 'PENJUALAN NON TUNAI'])
+                    $q->whereIn('payment_type', ['PENJUALAN TUNAI', 'PENJUALAN NON TUNAI', 'RETUR PENJUALAN'])
                         ->whereIn('pharmacy_id', $targetPharmacyIds);
                 })->orWhere('payment_type', 'SALDO AWAL')
                   ->orWhere('payment_type', 'PENYESUAIAN SALDO');
@@ -2855,139 +2880,469 @@ class FinanceController extends Controller
 
         return $query->get()
             ->flatMap(function ($p) {
-                $isMasuk = in_array($p->payment_type, ['PIUTANG', 'PENDAPATAN', 'PENJUALAN TUNAI', 'PENJUALAN NON TUNAI'], true);
-                $isSaldoAwal = $p->payment_type === 'SALDO AWAL';
                 $isSetor = $p->payment_type === 'SETOR';
                 $isTarikTunai = $p->payment_type === 'TARIK TUNAI';
-                $isPenyesuaian = $p->payment_type === 'PENYESUAIAN SALDO';
-                $isOpnameOut = $isPenyesuaian && $p->reference_number === 'OPNAME-OUT';
-                $tipeLabel = $isSaldoAwal
-                    ? 'Saldo Awal'
-                    : ($isSetor
-                        ? 'Setor Kas'
-                        : ($isTarikTunai
-                            ? 'Tarik Tunai'
-                            : ($isPenyesuaian
-                                ? ($isOpnameOut ? 'Opname Keluar (-)' : 'Opname Masuk (+)')
-                                : ($isMasuk ? 'Masuk (Debit)' : 'Keluar (Kredit)'))));
-
-                $pihakTerkait = '-';
-                $noDokumen = $p->reference_number ?: ('MUT-' . str_pad($p->id, 5, '0', STR_PAD_LEFT));
-                $deskripsi = $p->notes;
-
-                if ($p->payment_type === 'PENJUALAN TUNAI') {
-                    $pihakTerkait = $p->transaction->debtors->name ?? ($p->transaction->patients->name ?? 'Pelanggan Umum');
-                    $doc = $p->transaction->transaction_code ?? $p->reference_number;
-                    if ($doc)
-                        $noDokumen = $doc;
-                    if (!$deskripsi)
-                        $deskripsi = 'Penerimaan penjualan tunai';
-                } elseif ($p->payment_type === 'PENJUALAN NON TUNAI') {
-                    $pihakTerkait = $p->transaction->debtors->name ?? ($p->transaction->patients->name ?? 'Pelanggan Umum');
-                    $doc = $p->transaction->transaction_code ?? $p->reference_number;
-                    if ($doc)
-                        $noDokumen = $doc;
-                    if (!$deskripsi) {
-                        $method = $p->transaction->payment_method ?? 'NON-TUNAI';
-                        $bank = $p->transaction->transfer_bank_name ?? ($p->account->name ?? 'Bank');
-                        $deskripsi = "Penerimaan penjualan {$method} melalui {$bank}";
-                    }
-                } elseif ($p->payment_type === 'PIUTANG') {
-                    $pihakTerkait = $p->transaction->debtors->name ?? ($p->transaction->patients->name ?? 'Pelanggan Umum');
-                    $doc = $p->transaction->invoice_number ?? $p->reference_number;
-                    if ($doc)
-                        $noDokumen = $doc;
-                    if (!$deskripsi) {
-                        $deskripsi = "Penerimaan piutang penjualan dari {$pihakTerkait}";
-                    }
-                } elseif ($p->payment_type === 'KREDIT') {
-                    $pihakTerkait = $p->receivingDetail->creditor->name ?? ($p->receivingDetail->creditor_code ?? 'PBF / Vendor');
-                    $doc = $p->receivingDetail->invoice_number ?? $p->reference_number;
-                    if ($doc)
-                        $noDokumen = $doc;
-                    if (!$deskripsi) {
-                        $deskripsi = "Pelunasan hutang pembelian ke {$pihakTerkait}";
-                    }
-                } elseif ($p->payment_type === 'CASH') {
-                    $pihakTerkait = $p->receivingDetail->creditor->name ?? ($p->receivingDetail->creditor_code ?? 'PBF / Vendor');
-                    $doc = $p->receivingDetail->invoice_number ?? $p->reference_number;
-                    if ($doc)
-                        $noDokumen = $doc;
-                    if (!$deskripsi) {
-                        $deskripsi = "Pembelian tunai (cash) ke {$pihakTerkait}";
-                    }
-                } elseif ($p->payment_type === 'KONSINYASI') {
-                    $pihakTerkait = $p->receivingDetail->creditor->name ?? ($p->receivingDetail->creditor_code ?? 'PBF / Vendor');
-                    $doc = $p->receivingDetail->invoice_number ?? $p->reference_number;
-                    if ($doc)
-                        $noDokumen = $doc;
-                    if (!$deskripsi) {
-                        $deskripsi = "Pembayaran barang konsinyasi terjual ke {$pihakTerkait}";
-                    }
-                } elseif ($p->payment_type === 'BIAYA') {
-                    $pihakTerkait = $p->recipient ?: ($p->expenseAccount->name ?? 'Biaya Operasional');
-                    $doc = $p->reference_number ?: ('BY-' . str_pad($p->id, 5, '0', STR_PAD_LEFT));
-                    if ($doc)
-                        $noDokumen = $doc;
-                    if (!$deskripsi) {
-                        $deskripsi = 'Pengeluaran biaya: ' . ($p->expenseAccount->name ?? 'Operasional');
-                    }
-                } elseif ($p->payment_type === 'PENDAPATAN') {
-                    $pihakTerkait = $p->recipient ?: ($p->incomeAccount->name ?? 'Pendapatan Lain-lain');
-                    if (!$p->reference_number)
-                        $noDokumen = 'PL-' . str_pad($p->id, 5, '0', STR_PAD_LEFT);
-                    if (!$deskripsi)
-                        $deskripsi = 'Pendapatan lain-lain: ' . ($p->incomeAccount->name ?? 'Pendapatan');
-                } elseif ($isSaldoAwal) {
-                    $pihakTerkait = $p->account->name ?? 'Kas / Bank';
-                    $noDokumen = 'SA-' . str_pad($p->id, 5, '0', STR_PAD_LEFT);
-                    $deskripsi = $p->notes ?: 'Saldo awal akun Kas & Bank';
-                } elseif ($isSetor) {
-                    $pihakTerkait = $p->transferAccount->name ?? 'Rekening tujuan';
-                    $deskripsi = $p->notes ?: 'Setoran kas ke rekening';
-                } elseif ($isTarikTunai) {
-                    $pihakTerkait = $p->transferAccount->name ?? 'Kas Apotek / Drawer';
-                    if (!$p->reference_number)
-                        $noDokumen = 'TRK-' . str_pad($p->id, 5, '0', STR_PAD_LEFT);
-                    $deskripsi = $p->notes ?: 'Tarik tunai dari rekening bank ke kas';
-                } elseif ($isPenyesuaian) {
-                    $pihakTerkait = $p->account->name ?? 'Kas / Bank';
-                    $noDokumen = 'OPN-' . str_pad($p->id, 5, '0', STR_PAD_LEFT);
-                    $deskripsi = $p->notes ?: 'Penyesuaian Saldo Riil (Opname)';
-                }
-
-                $row = [
-                    'id' => $p->id,
-                    'account_id' => $p->account_id,
-                    'account_name' => $p->account->name ?? 'Akun Kas',
-                    'account_code' => $p->account->code ?? '-',
-                    'account_number' => $p->account->account_number ?? '-',
-                    'date' => \Carbon\Carbon::parse($p->payment_date)->format('d/m/Y'),
-                    'raw_date' => \Carbon\Carbon::parse($p->payment_date)->format('Y-m-d'),
-                    'amount' => (float) $p->amount,
-                    'direction' => $isSaldoAwal ? 'OPENING' : ($isPenyesuaian ? ($isOpnameOut ? 'OUT' : 'IN') : ($isMasuk ? 'IN' : 'OUT')),
-                    'type_label' => $tipeLabel,
-                    'category_type' => $p->payment_type,  // PIUTANG, KREDIT, CASH, SETOR, TARIK TUNAI
-                    'document_no' => $noDokumen,
-                    'party' => $pihakTerkait,
-                    'description' => $deskripsi ?: 'Transaksi Keuangan',
-                    'user' => $p->creator->name ?? 'Admin',
-                ];
-                if (!$isSetor && !$isTarikTunai)
+                $row = $this->formatMutasiRow($p);
+                if (!$isSetor && !$isTarikTunai) {
                     return [$row];
-
-                $destinationRow = $row;
-                $destinationRow['id'] = $p->id . '-in';
-                $destinationRow['account_id'] = $p->transfer_account_id;
-                $destinationRow['account_name'] = $p->transferAccount->name ?? ($isTarikTunai ? 'Kas Apotek / Drawer' : 'Rekening tujuan');
-                $destinationRow['account_code'] = $p->transferAccount->code ?? '-';
-                $destinationRow['account_number'] = $p->transferAccount->account_number ?? '-';
-                $destinationRow['direction'] = 'IN';
-                $destinationRow['type_label'] = $isTarikTunai ? 'Tarik Masuk (Kas)' : 'Setor Masuk';
-                $destinationRow['party'] = $p->account->name ?? ($isTarikTunai ? 'Rekening Bank' : 'Kas Apotek / Drawer');
-                $destinationRow['description'] = $isTarikTunai ? ($p->notes ?: 'Penerimaan tarik tunai dari rekening bank ke kas') : $deskripsi;
-                return [$row, $destinationRow];
+                }
+                $destRow = $this->formatMutasiRow($p, $p->transfer_account_id);
+                return [$row, $destRow];
             });
+    }
+
+    /**
+     * Helper: Format satu baris transaksi mutasi kas & bank.
+     */
+    protected function formatMutasiRow($p, $forcedAccountId = null): array
+    {
+        $isMasuk = in_array($p->payment_type, ['PIUTANG', 'PENDAPATAN', 'PENJUALAN TUNAI', 'PENJUALAN NON TUNAI'], true);
+        $isSaldoAwal = $p->payment_type === 'SALDO AWAL';
+        $isSetor = $p->payment_type === 'SETOR';
+        $isTarikTunai = $p->payment_type === 'TARIK TUNAI';
+        $isPenyesuaian = $p->payment_type === 'PENYESUAIAN SALDO';
+        $isOpnameOut = $isPenyesuaian && $p->reference_number === 'OPNAME-OUT';
+
+        if ($isSaldoAwal) {
+            $direction = 'OPENING';
+            $tipeLabel = 'Saldo Awal';
+        } elseif ($isPenyesuaian) {
+            $direction = $isOpnameOut ? 'OUT' : 'IN';
+            $tipeLabel = $isOpnameOut ? 'Opname Keluar (-)' : 'Opname Masuk (+)';
+        } elseif ($isSetor) {
+            if ($forcedAccountId && $p->transfer_account_id == $forcedAccountId) {
+                $direction = 'IN';
+                $tipeLabel = 'Setor Masuk';
+            } else {
+                $direction = 'OUT';
+                $tipeLabel = 'Setor Kas';
+            }
+        } elseif ($isTarikTunai) {
+            if ($forcedAccountId && $p->transfer_account_id == $forcedAccountId) {
+                $direction = 'IN';
+                $tipeLabel = 'Tarik Masuk (Kas)';
+            } else {
+                $direction = 'OUT';
+                $tipeLabel = 'Tarik Tunai';
+            }
+        } elseif ($p->payment_type === 'RETUR PENJUALAN') {
+            $direction = 'OUT';
+            $tipeLabel = 'Retur Jual (Refund)';
+        } else {
+            $direction = $isMasuk ? 'IN' : 'OUT';
+            $tipeLabel = $isMasuk ? 'Masuk (Debit)' : 'Keluar (Kredit)';
+        }
+
+        $pihakTerkait = '-';
+        $noDokumen = $p->reference_number ?: ('MUT-' . str_pad($p->id, 5, '0', STR_PAD_LEFT));
+        $deskripsi = $p->notes;
+
+        if ($p->payment_type === 'PENJUALAN TUNAI') {
+            $pihakTerkait = $p->transaction->debtors->name ?? ($p->transaction->patients->name ?? 'Pelanggan Umum');
+            $doc = $p->transaction->transaction_code ?? $p->reference_number;
+            if ($doc) $noDokumen = $doc;
+            if (!$deskripsi) $deskripsi = 'Penerimaan penjualan tunai kasir';
+        } elseif ($p->payment_type === 'PENJUALAN NON TUNAI') {
+            $pihakTerkait = $p->transaction->debtors->name ?? ($p->transaction->patients->name ?? 'Pelanggan Umum');
+            $doc = $p->transaction->transaction_code ?? $p->reference_number;
+            if ($doc) $noDokumen = $doc;
+            if (!$deskripsi) {
+                $method = $p->transaction->payment_method ?? 'NON-TUNAI';
+                $bank = $p->transaction->transfer_bank_name ?? ($p->account->name ?? 'Bank');
+                $deskripsi = "Penerimaan penjualan {$method} melalui {$bank}";
+            }
+        } elseif ($p->payment_type === 'PIUTANG') {
+            $pihakTerkait = $p->transaction->debtors->name ?? ($p->transaction->patients->name ?? 'Pelanggan Umum');
+            $doc = $p->transaction->invoice_number ?? $p->reference_number;
+            if ($doc) $noDokumen = $doc;
+            if (!$deskripsi) $deskripsi = "Penerimaan piutang penjualan dari {$pihakTerkait}";
+        } elseif ($p->payment_type === 'KREDIT') {
+            $pihakTerkait = $p->receivingDetail->creditor->name ?? ($p->receivingDetail->creditor_code ?? 'PBF / Vendor');
+            $doc = $p->receivingDetail->invoice_number ?? $p->reference_number;
+            if ($doc) $noDokumen = $doc;
+            if (!$deskripsi) $deskripsi = "Pelunasan hutang pembelian ke {$pihakTerkait}";
+        } elseif ($p->payment_type === 'CASH') {
+            $pihakTerkait = $p->receivingDetail->creditor->name ?? ($p->receivingDetail->creditor_code ?? 'PBF / Vendor');
+            $doc = $p->receivingDetail->invoice_number ?? $p->reference_number;
+            if ($doc) $noDokumen = $doc;
+            if (!$deskripsi) $deskripsi = "Pembelian tunai (cash) ke {$pihakTerkait}";
+        } elseif ($p->payment_type === 'KONSINYASI') {
+            $pihakTerkait = $p->receivingDetail->creditor->name ?? ($p->receivingDetail->creditor_code ?? 'PBF / Vendor');
+            $doc = $p->receivingDetail->invoice_number ?? $p->reference_number;
+            if ($doc) $noDokumen = $doc;
+            if (!$deskripsi) $deskripsi = "Pembayaran barang konsinyasi terjual ke {$pihakTerkait}";
+        } elseif ($p->payment_type === 'BIAYA') {
+            $pihakTerkait = $p->recipient ?: ($p->expenseAccount->name ?? 'Biaya Operasional');
+            $doc = $p->reference_number ?: ('BY-' . str_pad($p->id, 5, '0', STR_PAD_LEFT));
+            if ($doc) $noDokumen = $doc;
+            if (!$deskripsi) $deskripsi = 'Pengeluaran biaya: ' . ($p->expenseAccount->name ?? 'Operasional');
+        } elseif ($p->payment_type === 'PENDAPATAN') {
+            $pihakTerkait = $p->recipient ?: ($p->incomeAccount->name ?? 'Pendapatan Lain-lain');
+            if (!$p->reference_number) $noDokumen = 'PL-' . str_pad($p->id, 5, '0', STR_PAD_LEFT);
+            if (!$deskripsi) $deskripsi = 'Pendapatan lain-lain: ' . ($p->incomeAccount->name ?? 'Pendapatan');
+        } elseif ($p->payment_type === 'RETUR PENJUALAN') {
+            $pihakTerkait = $p->transaction->patients->name ?? ($p->transaction->debtors->name ?? 'Pelanggan Umum');
+            $doc = $p->reference_number ?: ('RT-' . $p->id);
+            if ($doc) $noDokumen = $doc;
+            if (!$deskripsi) $deskripsi = 'Pengembalian dana retur penjualan tunai kasir';
+        } elseif ($isSaldoAwal) {
+            $pihakTerkait = $p->account->name ?? 'Kas / Bank';
+            $noDokumen = 'SA-' . str_pad($p->id, 5, '0', STR_PAD_LEFT);
+            $deskripsi = $p->notes ?: 'Saldo awal akun Kas & Bank';
+        } elseif ($isSetor) {
+            if ($forcedAccountId && $p->transfer_account_id == $forcedAccountId) {
+                $pihakTerkait = $p->account->name ?? 'Kas Apotek / Drawer';
+                $deskripsi = $p->notes ?: 'Setoran masuk dari kas';
+            } else {
+                $pihakTerkait = $p->transferAccount->name ?? 'Rekening tujuan';
+                $deskripsi = $p->notes ?: 'Setoran kas ke rekening';
+            }
+        } elseif ($isTarikTunai) {
+            if ($forcedAccountId && $p->transfer_account_id == $forcedAccountId) {
+                $pihakTerkait = $p->account->name ?? 'Rekening Bank';
+                $deskripsi = $p->notes ?: 'Penerimaan tarik tunai dari rekening bank ke kas';
+            } else {
+                $pihakTerkait = $p->transferAccount->name ?? 'Kas Apotek / Drawer';
+                $deskripsi = $p->notes ?: 'Tarik tunai dari rekening bank ke kas';
+            }
+        } elseif ($isPenyesuaian) {
+            $pihakTerkait = $p->account->name ?? 'Kas / Bank';
+            $noDokumen = 'OPN-' . str_pad($p->id, 5, '0', STR_PAD_LEFT);
+            $deskripsi = $p->notes ?: 'Penyesuaian Saldo Riil (Opname)';
+        }
+
+        $accountToShow = ($forcedAccountId && $p->transfer_account_id == $forcedAccountId)
+            ? $p->transferAccount
+            : $p->account;
+
+        return [
+            'id' => $p->id . ($forcedAccountId && $p->transfer_account_id == $forcedAccountId ? '-in' : ''),
+            'account_id' => $accountToShow?->id ?? $p->account_id,
+            'account_name' => $accountToShow?->name ?? 'Akun Kas',
+            'account_code' => $accountToShow?->code ?? '-',
+            'account_number' => $accountToShow?->account_number ?? '-',
+            'date' => \Carbon\Carbon::parse($p->payment_date)->format('d/m/Y'),
+            'raw_date' => \Carbon\Carbon::parse($p->payment_date)->format('Y-m-d'),
+            'amount' => (float) $p->amount,
+            'direction' => $direction,
+            'type_label' => $tipeLabel,
+            'category_type' => $p->payment_type,
+            'document_no' => $noDokumen,
+            'party' => $pihakTerkait,
+            'description' => $deskripsi ?: 'Transaksi Keuangan',
+            'user' => $p->creator->name ?? 'Admin',
+        ];
+    }
+
+    /**
+     * Helper: Hitung ringkasan bulanan Kas & Bank via SQL agregasi (sangat cepat, hemat RAM).
+     */
+    protected function getMonthlyKasBankSummary($accounts, $monthStart, $monthEnd, array $targetPharmacyIds): array
+    {
+        $accountIds = $accounts->pluck('id')->all();
+        $totalSaldo = (float) $accounts->sum('balance');
+
+        $accountStats = [];
+        foreach ($accounts as $acc) {
+            $accountStats[$acc->id] = [
+                'id' => $acc->id,
+                'name' => $acc->name,
+                'code' => $acc->code,
+                'category' => $acc->category,
+                'balance' => (float) $acc->balance,
+                'account_number' => $acc->account_number,
+                'inflow' => 0.0,
+                'outflow' => 0.0,
+                'net' => 0.0,
+                'txCount' => 0,
+                'sharePercent' => 0,
+            ];
+        }
+
+        if (empty($accountIds)) {
+            return [
+                'totalSaldo' => 0,
+                'totalMasuk' => 0,
+                'totalKeluar' => 0,
+                'netCashflow' => 0,
+                'totalFlowVolume' => 0,
+                'accountStats' => [],
+            ];
+        }
+
+        // 1. Inflows: PIUTANG, PENDAPATAN, PENJUALAN TUNAI, PENJUALAN NON TUNAI
+        $regularInflows = DB::table('finance_payments')
+            ->select('account_id', DB::raw('SUM(amount) as total_amount'), DB::raw('COUNT(*) as total_count'))
+            ->whereIn('account_id', $accountIds)
+            ->whereIn('payment_type', ['PIUTANG', 'PENDAPATAN', 'PENJUALAN TUNAI', 'PENJUALAN NON TUNAI'])
+            ->whereBetween('payment_date', [$monthStart, $monthEnd])
+            ->groupBy('account_id')
+            ->get();
+
+        foreach ($regularInflows as $row) {
+            if (isset($accountStats[$row->account_id])) {
+                $accountStats[$row->account_id]['inflow'] += (float) $row->total_amount;
+                $accountStats[$row->account_id]['txCount'] += (int) $row->total_count;
+            }
+        }
+
+        // 2. Outflows: KREDIT, CASH, KONSINYASI, BIAYA, RETUR PENJUALAN
+        $regularOutflows = DB::table('finance_payments')
+            ->select('account_id', DB::raw('SUM(amount) as total_amount'), DB::raw('COUNT(*) as total_count'))
+            ->whereIn('account_id', $accountIds)
+            ->whereIn('payment_type', ['KREDIT', 'CASH', 'KONSINYASI', 'BIAYA', 'RETUR PENJUALAN'])
+            ->whereBetween('payment_date', [$monthStart, $monthEnd])
+            ->groupBy('account_id')
+            ->get();
+
+        foreach ($regularOutflows as $row) {
+            if (isset($accountStats[$row->account_id])) {
+                $accountStats[$row->account_id]['outflow'] += (float) $row->total_amount;
+                $accountStats[$row->account_id]['txCount'] += (int) $row->total_count;
+            }
+        }
+
+        // 3. Penyesuaian Saldo (Opname in / out)
+        $adjustments = DB::table('finance_payments')
+            ->select('account_id', 'reference_number', DB::raw('SUM(amount) as total_amount'), DB::raw('COUNT(*) as total_count'))
+            ->whereIn('account_id', $accountIds)
+            ->where('payment_type', 'PENYESUAIAN SALDO')
+            ->whereBetween('payment_date', [$monthStart, $monthEnd])
+            ->groupBy('account_id', 'reference_number')
+            ->get();
+
+        foreach ($adjustments as $row) {
+            if (isset($accountStats[$row->account_id])) {
+                if ($row->reference_number === 'OPNAME-OUT') {
+                    $accountStats[$row->account_id]['outflow'] += (float) $row->total_amount;
+                } else {
+                    $accountStats[$row->account_id]['inflow'] += (float) $row->total_amount;
+                }
+                $accountStats[$row->account_id]['txCount'] += (int) $row->total_count;
+            }
+        }
+
+        // 4. Saldo Awal count
+        $openingCounts = DB::table('finance_payments')
+            ->select('account_id', DB::raw('COUNT(*) as total_count'))
+            ->whereIn('account_id', $accountIds)
+            ->where('payment_type', 'SALDO AWAL')
+            ->whereBetween('payment_date', [$monthStart, $monthEnd])
+            ->groupBy('account_id')
+            ->get();
+
+        foreach ($openingCounts as $row) {
+            if (isset($accountStats[$row->account_id])) {
+                $accountStats[$row->account_id]['txCount'] += (int) $row->total_count;
+            }
+        }
+
+        // 5. Transfers: SETOR & TARIK TUNAI
+        $transfersOut = DB::table('finance_payments')
+            ->select('account_id', DB::raw('SUM(amount) as total_amount'), DB::raw('COUNT(*) as total_count'))
+            ->whereIn('account_id', $accountIds)
+            ->whereIn('payment_type', ['SETOR', 'TARIK TUNAI'])
+            ->whereBetween('payment_date', [$monthStart, $monthEnd])
+            ->groupBy('account_id')
+            ->get();
+
+        foreach ($transfersOut as $row) {
+            if (isset($accountStats[$row->account_id])) {
+                $accountStats[$row->account_id]['outflow'] += (float) $row->total_amount;
+                $accountStats[$row->account_id]['txCount'] += (int) $row->total_count;
+            }
+        }
+
+        $transfersIn = DB::table('finance_payments')
+            ->select('transfer_account_id as account_id', DB::raw('SUM(amount) as total_amount'), DB::raw('COUNT(*) as total_count'))
+            ->whereIn('transfer_account_id', $accountIds)
+            ->whereIn('payment_type', ['SETOR', 'TARIK TUNAI'])
+            ->whereBetween('payment_date', [$monthStart, $monthEnd])
+            ->groupBy('transfer_account_id')
+            ->get();
+
+        foreach ($transfersIn as $row) {
+            if (isset($accountStats[$row->account_id])) {
+                $accountStats[$row->account_id]['inflow'] += (float) $row->total_amount;
+                $accountStats[$row->account_id]['txCount'] += (int) $row->total_count;
+            }
+        }
+
+        $totalMasuk = 0.0;
+        $totalKeluar = 0.0;
+        $statsList = array_values($accountStats);
+
+        foreach ($statsList as &$st) {
+            $st['net'] = $st['inflow'] - $st['outflow'];
+            $totalMasuk += $st['inflow'];
+            $totalKeluar += $st['outflow'];
+        }
+        unset($st);
+
+        $totalFlowVolume = $totalMasuk + $totalKeluar;
+        foreach ($statsList as &$st) {
+            $accVolume = $st['inflow'] + $st['outflow'];
+            $st['sharePercent'] = $totalFlowVolume > 0 ? (int) round(($accVolume / $totalFlowVolume) * 100) : 0;
+        }
+        unset($st);
+
+        return [
+            'totalSaldo' => $totalSaldo,
+            'totalMasuk' => $totalMasuk,
+            'totalKeluar' => $totalKeluar,
+            'netCashflow' => $totalMasuk - $totalKeluar,
+            'totalFlowVolume' => $totalFlowVolume,
+            'accountStats' => $statsList,
+        ];
+    }
+
+    /**
+     * Helper: Ambil data mutasi Kas & Bank dengan Paginasi Server-Side.
+     */
+    protected function getPaginatedMutasiData(Request $request, $monthStart, $monthEnd, array $targetPharmacyIds)
+    {
+        $perPage = (int) $request->query('per_page', 25);
+        if ($perPage < 5 || $perPage > 200) {
+            $perPage = 25;
+        }
+
+        $filterAccountId = $request->query('account_id');
+        if ($filterAccountId === 'all' || empty($filterAccountId)) {
+            $filterAccountId = null;
+        }
+
+        $filterDirection = strtoupper(trim((string) $request->query('direction', 'all')));
+        if (!in_array($filterDirection, ['ALL', 'IN', 'OUT'], true)) {
+            $filterDirection = 'ALL';
+        }
+
+        $search = trim((string) $request->query('search', ''));
+
+        $query = FinancePayment::with([
+            'account',
+            'expenseAccount',
+            'incomeAccount',
+            'transferAccount',
+            'creator',
+            'pharmacy',
+            'receivingDetail.creditor',
+            'transaction.debtors',
+            'transaction.patients',
+        ])
+            ->whereHas('account', function ($q) {
+                $q->where('category', 'Kas & Bank');
+                $q->where('pharmacy_id', getActivePharmacyId());
+            })
+            ->where(function ($q) use ($targetPharmacyIds) {
+                $q->whereHas('receiving', function ($sub) use ($targetPharmacyIds) {
+                    $sub->whereIn('pharmacy_id', $targetPharmacyIds);
+                })->orWhereHas('transaction', function ($sub) use ($targetPharmacyIds) {
+                    $sub->whereIn('pharmacy_id', $targetPharmacyIds);
+                })->orWhere(function ($sub) use ($targetPharmacyIds) {
+                    $sub
+                        ->where('payment_type', 'BIAYA')
+                        ->where(function ($sub2) use ($targetPharmacyIds) {
+                            $sub2
+                                ->whereIn('pharmacy_id', $targetPharmacyIds)
+                                ->orWhereNull('pharmacy_id');
+                        });
+                })->orWhere(function ($sub) use ($targetPharmacyIds) {
+                    $sub->where('payment_type', 'PENDAPATAN')->whereIn('pharmacy_id', $targetPharmacyIds);
+                })->orWhere(function ($sub) use ($targetPharmacyIds) {
+                    $sub->where('payment_type', 'SETOR')->whereIn('pharmacy_id', $targetPharmacyIds);
+                })->orWhere(function ($sub) use ($targetPharmacyIds) {
+                    $sub->where('payment_type', 'TARIK TUNAI')->whereIn('pharmacy_id', $targetPharmacyIds);
+                })->orWhere(function ($sub) use ($targetPharmacyIds) {
+                    $sub->whereIn('payment_type', ['PENJUALAN TUNAI', 'PENJUALAN NON TUNAI', 'RETUR PENJUALAN'])
+                        ->whereIn('pharmacy_id', $targetPharmacyIds);
+                })->orWhere('payment_type', 'SALDO AWAL')
+                  ->orWhere('payment_type', 'PENYESUAIAN SALDO');
+            });
+
+        // Date range
+        $startDate = $request->query('start_date');
+        $endDate = $request->query('end_date');
+        $rangeStart = (!empty($startDate) && !empty($endDate)) ? $startDate : $monthStart;
+        $rangeEnd = (!empty($startDate) && !empty($endDate)) ? $endDate : $monthEnd;
+
+        if ($rangeStart && $rangeEnd) {
+            $query->whereBetween('payment_date', [$rangeStart, $rangeEnd]);
+        }
+
+        // Account filter
+        if ($filterAccountId) {
+            $query->where(function ($q) use ($filterAccountId) {
+                $q->where('account_id', $filterAccountId)
+                  ->orWhere(function ($sub) use ($filterAccountId) {
+                      $sub->where('transfer_account_id', $filterAccountId)
+                          ->whereIn('payment_type', ['SETOR', 'TARIK TUNAI']);
+                  });
+            });
+        }
+
+        // Direction filter
+        if ($filterDirection === 'IN') {
+            $query->where(function ($q) use ($filterAccountId) {
+                $q->whereIn('payment_type', ['PIUTANG', 'PENDAPATAN', 'PENJUALAN TUNAI', 'PENJUALAN NON TUNAI'])
+                  ->orWhere(function ($sub) {
+                      $sub->where('payment_type', 'PENYESUAIAN SALDO')
+                          ->where('reference_number', '!=', 'OPNAME-OUT');
+                  });
+                if ($filterAccountId) {
+                    $q->orWhere(function ($sub) use ($filterAccountId) {
+                        $sub->where('transfer_account_id', $filterAccountId)
+                            ->whereIn('payment_type', ['SETOR', 'TARIK TUNAI']);
+                    });
+                }
+            });
+        } elseif ($filterDirection === 'OUT') {
+            $query->where(function ($q) use ($filterAccountId) {
+                $q->whereIn('payment_type', ['KREDIT', 'CASH', 'KONSINYASI', 'BIAYA', 'RETUR PENJUALAN'])
+                  ->orWhere(function ($sub) {
+                      $sub->where('payment_type', 'PENYESUAIAN SALDO')
+                          ->where('reference_number', '=', 'OPNAME-OUT');
+                  });
+                if ($filterAccountId) {
+                    $q->orWhere(function ($sub) use ($filterAccountId) {
+                        $sub->where('account_id', $filterAccountId)
+                            ->whereIn('payment_type', ['SETOR', 'TARIK TUNAI']);
+                    });
+                }
+            });
+        }
+
+        // Search query
+        if (!empty($search)) {
+            $query->where(function ($q) use ($search) {
+                $q->where('reference_number', 'like', "%{$search}%")
+                  ->orWhere('notes', 'like', "%{$search}%")
+                  ->orWhere('recipient', 'like', "%{$search}%")
+                  ->orWhereHas('transaction', function ($sub) use ($search) {
+                      $sub->where('transaction_code', 'like', "%{$search}%")
+                          ->orWhere('invoice_number', 'like', "%{$search}%")
+                          ->orWhereHas('debtors', fn($d) => $d->where('name', 'like', "%{$search}%"))
+                          ->orWhereHas('patients', fn($p) => $p->where('name', 'like', "%{$search}%"));
+                  })
+                  ->orWhereHas('receivingDetail', function ($sub) use ($search) {
+                      $sub->where('invoice_number', 'like', "%{$search}%")
+                          ->orWhereHas('creditor', fn($c) => $c->where('name', 'like', "%{$search}%"));
+                  })
+                  ->orWhereHas('account', function ($sub) use ($search) {
+                      $sub->where('name', 'like', "%{$search}%")
+                          ->orWhere('code', 'like', "%{$search}%");
+                  });
+            });
+        }
+
+        $query->orderByDesc('payment_date')->orderByDesc('id');
+
+        $paginator = $query->paginate($perPage)->withQueryString();
+
+        $paginator->getCollection()->transform(function ($payment) use ($filterAccountId) {
+            return $this->formatMutasiRow($payment, $filterAccountId);
+        });
+
+        return $paginator;
     }
 
     /**
@@ -3638,7 +3993,11 @@ class FinanceController extends Controller
             })
             ->sum('amount');
 
-        $kasKeluar = $kasKeluarHutangCash + $kasKeluarBiaya;
+        $kasKeluarReturJual = (float) FinancePayment::where('payment_type', 'RETUR PENJUALAN')
+            ->whereIn('pharmacy_id', $targetPharmacyIds)
+            ->sum('amount');
+
+        $kasKeluar = $kasKeluarHutangCash + $kasKeluarBiaya + $kasKeluarReturJual;
 
         $netCashflow = $kasMasuk - $kasKeluar;
 
@@ -5227,6 +5586,46 @@ class FinanceController extends Controller
         ];
 
         return Excel::download(new BiayaExport($targetPharmacyIds, $filters, $activePharmacy), $filename);
+    }
+
+    /**
+     * Export data Buku Mutasi Kas & Bank ke format Excel (.xlsx) lengkap, rapi, dan mudah dibaca orang awam.
+     */
+    public function exportKasBank(Request $request)
+    {
+        if ($request->filled('pharmacy_id') && auth()->check() && (auth()->user()->hasRole('HO') || auth()->user()->hasRole('administrator') || auth()->user()->hasRole('General Manager'))) {
+            session(['ho_pharmacy_id' => (int) $request->pharmacy_id]);
+        }
+
+        $targetPharmacyIds = $this->getTargetPharmacyIds();
+        $activePharmacy = Pharmacies::find(getActivePharmacyId()) ?? Pharmacies::find(1);
+        $branchName = $activePharmacy ? preg_replace('/[^A-Za-z0-9_]/', '_', $activePharmacy->name) : 'Apotek';
+        $filename = "Buku_Mutasi_Kas_Bank_{$branchName}_" . date('Ymd_His') . '.xlsx';
+
+        // Date range resolution: prioritaskan custom date range jika ada, atau fallback ke bulan/tahun
+        $startDate = $request->query('start_date');
+        $endDate = $request->query('end_date');
+        if (empty($startDate) || empty($endDate)) {
+            $year = (int) $request->query('year', \Carbon\Carbon::now()->year);
+            $month = (int) $request->query('month', \Carbon\Carbon::now()->month);
+            if ($month < 1 || $month > 12) $month = \Carbon\Carbon::now()->month;
+            if ($year < 2020 || $year > 2100) $year = \Carbon\Carbon::now()->year;
+
+            $periodDate = \Carbon\Carbon::createFromDate($year, $month, 1)->startOfMonth();
+            $startDate = $periodDate->copy()->startOfMonth()->toDateString();
+            $endDate = $periodDate->copy()->endOfMonth()->toDateString();
+        }
+
+        $filters = [
+            'search' => $request->query('search', ''),
+            'account_id' => $request->query('account_id', 'all'),
+            'direction' => $request->query('direction', 'all'),
+            'start_date' => $startDate,
+            'end_date' => $endDate,
+            'pharmacy_id' => $request->query('pharmacy_id', ''),
+        ];
+
+        return Excel::download(new KasBankExport($targetPharmacyIds, $filters, $activePharmacy), $filename);
     }
 
     // --- Submit Logic (Pengajuan) ---

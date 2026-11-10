@@ -30,6 +30,7 @@ class MedicineTransactions extends Model
         'doctor_shipping_payment_method',
         'doctor_shipping_bank_name',
         'is_submitted',
+        'service_invoice_type',
     ];
 
     protected $casts = [
@@ -40,6 +41,14 @@ class MedicineTransactions extends Model
     public function transactions()
     {
         return $this->hasMany(MedicineCart::class, 'transaction_id');
+    }
+
+    /**
+     * Jasa yang dipilih pada transaksi tipe JASA (1 transaksi = 1 jasa).
+     */
+    public function service()
+    {
+        return $this->hasOne(TransactionService::class, 'medicine_transaction_id');
     }
     public function patients()
     {

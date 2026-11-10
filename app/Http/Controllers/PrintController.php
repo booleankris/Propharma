@@ -20,8 +20,12 @@ class PrintController extends Controller
 
         $transaction = MedicineTransactions::with(['patients', 'doctors'])->findOrFail($id);
 
+        // Jasa (khusus transaksi tipe JASA): tampil di struk & menambah total.
+        $service = \App\Models\TransactionService::where('medicine_transaction_id', $transaction->id)->first();
+        $serviceAmount = (float) ($service->price ?? 0);
+
         $totalEmbalase = $items->sum('embalase');
-        $totalFinalPrice = $items->sum('final_price') - ($transaction->discount ?? 0);
+        $totalFinalPrice = $items->sum('final_price') - ($transaction->discount ?? 0) + $serviceAmount;
         $totalPrice = $items->sum('total_price');
         $discount = $items->sum('discount');
         $operator = $transaction->user->name;
@@ -43,7 +47,9 @@ class PrintController extends Controller
             'operator',
             'pharmacy_phone',
             'pharmacy_name',
-            'pharmacy_address'
+            'pharmacy_address',
+            'service',
+            'serviceAmount'
         ));
     }
 
@@ -58,8 +64,12 @@ class PrintController extends Controller
 
         $transaction = MedicineTransactions::with(['patients', 'doctors'])->findOrFail($id);
 
+        // Jasa (khusus transaksi tipe JASA): tampil di struk & menambah total.
+        $service = \App\Models\TransactionService::where('medicine_transaction_id', $transaction->id)->first();
+        $serviceAmount = (float) ($service->price ?? 0);
+
         $totalEmbalase = $items->sum('embalase');
-        $totalFinalPrice = $items->sum('final_price') - ($transaction->discount ?? 0);
+        $totalFinalPrice = $items->sum('final_price') - ($transaction->discount ?? 0) + $serviceAmount;
         $totalPrice = $items->sum('total_price');
         $discount = $items->sum('discount');
         $operator = $transaction->user->name;
@@ -81,7 +91,9 @@ class PrintController extends Controller
             'operator',
             'pharmacy_phone',
             'pharmacy_name',
-            'pharmacy_address'
+            'pharmacy_address',
+            'service',
+            'serviceAmount'
         ));
     }
 

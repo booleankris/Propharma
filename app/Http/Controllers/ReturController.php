@@ -10,12 +10,15 @@ use App\Models\Medicines;
 use App\Models\MedicineTransfers;
 use App\Models\MedicineTransferItems;
 use App\Models\MedicineTransactions;
+use App\Models\FinanceAccount;
+use App\Models\FinancePayment;
 use App\Models\Receiving;
 use App\Models\ReceivingItems;
 use App\Models\ReceivingDetails;
 use App\Models\Retur;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 
 class ReturController extends Controller
@@ -415,6 +418,34 @@ class ReturController extends Controller
 
             // Get & Increase stock
             $medicine->increment('stock', $request->qty_retur);
+
+            // Pencatatan otomatis ke Buku Mutasi Kas & Bank jika Retur Penjualan Tunai
+            if ($transaction->transaction_type === 'RETUR JUAL') {
+                $returPharmacyId = (int) $getTransactiondata->pharmacy_id;
+                $cashAccount = FinanceAccount::resolveBranchCashAccount($returPharmacyId, true);
+                if ($cashAccount) {
+                    $patientName = $findcode->patients->name ?? ($findcode->debtors->name ?? 'Pelanggan Umum');
+                    $medName = $medicine->name ?? 'Obat';
+                    $origCode = $findcode->transaction_code ?? '-';
+
+                    FinancePayment::create([
+                        'pharmacy_id' => $returPharmacyId,
+                        'medicine_transaction_id' => $transaction->id,
+                        'account_id' => $cashAccount->id,
+                        'payment_type' => 'RETUR PENJUALAN',
+                        'payment_date' => Carbon::now()->toDateString(),
+                        'amount' => (float) $request->total_retur,
+                        'reference_number' => $returCode,
+                        'notes' => 'Pengembalian dana retur penjualan tunai: ' . $medName . ' (' . $patientName . ' - Struk: ' . $origCode . ')',
+                        'created_by' => auth()->id(),
+                    ]);
+
+                    $cashAccount->decrement('balance', (float) $request->total_retur);
+
+                    Cache::forget('finance_stats_summary_branch_' . $returPharmacyId . '_' . $returPharmacyId);
+                    Cache::forget('finance_stats_summary');
+                }
+            }
 
             DB::commit();
 

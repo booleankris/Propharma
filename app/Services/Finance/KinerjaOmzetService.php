@@ -98,9 +98,10 @@ class KinerjaOmzetService
             ->with([
                 'transactions' => fn($query) => $query->where('status', 1),
                 'debtors',
+                'service',
             ])
             ->whereIn('pharmacy_id', $pharmacyIds)
-            ->whereIn('transaction_type', array_keys(LiphExport::TYPE_MAP))
+            ->whereIn('transaction_type', array_merge(array_keys(LiphExport::TYPE_MAP), ['JASA']))
             ->tap(fn($q) => LiphTransactionScope::applySalesStatus($q))
             ->tap(fn($q) => LiphTransactionScope::applyPeriod($q, Carbon::parse($startDate), Carbon::parse($endDate)))
             ->orderBy('created_at')

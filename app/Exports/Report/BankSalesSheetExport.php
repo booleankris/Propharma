@@ -28,6 +28,11 @@ class BankSalesSheetExport implements FromArray, WithStyles, WithColumnWidths, W
     protected $transactions;
     protected $hasTrxDiscount = false;
 
+    /**
+     * Urutan tampil baris "TOTAL <BANK>" pada sheet rekapitulasi pembayaran.
+     */
+    public const BANK_NAME_ORDER = ['MANDIRI', 'BCA', 'BNI', 'BRI', 'BTN'];
+
     public function __construct(
         $pharmacyId,
         $startDate,
@@ -87,6 +92,30 @@ class BankSalesSheetExport implements FromArray, WithStyles, WithColumnWidths, W
     }
 
     /**
+     * Ambil nama jenis bank dari label kategori pembayaran.
+     * Contoh: "TRANSFER MANDIRI", "DEBIT MANDIRI", "QRIS MANDIRI" => "MANDIRI".
+     */
+    public static function resolveBankBucket(string $paymentLabel): string
+    {
+        $label = strtoupper(trim($paymentLabel));
+
+        // Buang prefix metode bayar agar nama bank dapat diambil dari sisa label.
+        $stripped = trim((string) preg_replace('/^(TRANSFER|DEBIT|QRIS|VA|E-?WALLET|EWALLET)\b\s*/i', '', $label));
+
+        if ($stripped === '') {
+            return 'LAINNYA';
+        }
+
+        foreach (self::BANK_NAME_ORDER as $bankName) {
+            if ($stripped === $bankName || str_contains($stripped, $bankName)) {
+                return $bankName;
+            }
+        }
+
+        return $stripped;
+    }
+
+    /**
      * Build rows for the Recap Summary Sheet
      */
     private function buildRecapRows(): array
@@ -111,11 +140,8 @@ class BankSalesSheetExport implements FromArray, WithStyles, WithColumnWidths, W
         $totalKasDiscount = 0;
         $totalKasNet = 0;
 
-        $totalBankStruk = 0;
-        $totalBankQty = 0;
-        $totalBankGross = 0;
-        $totalBankDiscount = 0;
-        $totalBankNet = 0;
+        // Akumulasi per jenis bank (MANDIRI, BCA, BNI, BRI, BTN, ...)
+        $bankTotals = [];
 
         foreach ($this->allBanksData as $paymentMethod => $data) {
             $strukCount = $data['struk_count'] ?? 0;
@@ -142,13 +168,46 @@ class BankSalesSheetExport implements FromArray, WithStyles, WithColumnWidths, W
                 $totalKasDiscount += $discSum;
                 $totalKasNet      += $netSum;
             } elseif (!in_array($methodUpper, ['KREDIT', 'BELUM BAYAR'], true)) {
-                $totalBankStruk    += $strukCount;
-                $totalBankQty      += $qtySum;
-                $totalBankGross    += $grossSum;
-                $totalBankDiscount += $discSum;
-                $totalBankNet      += $netSum;
+                $bankKey = self::resolveBankBucket((string) $paymentMethod);
+                if (! isset($bankTotals[$bankKey])) {
+                    $bankTotals[$bankKey] = ['struk' => 0, 'qty' => 0, 'gross' => 0, 'discount' => 0, 'net' => 0];
+                }
+
+                $bankTotals[$bankKey]['struk']    += $strukCount;
+                $bankTotals[$bankKey]['qty']      += $qtySum;
+                $bankTotals[$bankKey]['gross']    += $grossSum;
+                $bankTotals[$bankKey]['discount'] += $discSum;
+                $bankTotals[$bankKey]['net']      += $netSum;
             }
         }
+
+        // Sembunyikan jenis bank yang tidak memiliki transaksi pada periode ini (semua nilai nol).
+        $bankTotals = array_filter($bankTotals, static function (array $total): bool {
+            return (float) $total['struk'] != 0.0
+                || (float) $total['qty'] != 0.0
+                || (float) $total['gross'] != 0.0
+                || (float) $total['discount'] != 0.0
+                || (float) $total['net'] != 0.0;
+        });
+
+        // Urutkan jenis bank: Mandiri, BCA, BNI, BRI, BTN lebih dulu, sisanya alfabetis.
+        $orderedBankTotals = [];
+        foreach (self::BANK_NAME_ORDER as $bankName) {
+            if (isset($bankTotals[$bankName])) {
+                $orderedBankTotals[$bankName] = $bankTotals[$bankName];
+            }
+        }
+
+        $otherBankTotals = array_diff_key($bankTotals, $orderedBankTotals);
+        ksort($otherBankTotals);
+        $orderedBankTotals += $otherBankTotals;
+
+        // Total Bank dihitung langsung dari akumulasi per jenis bank agar nominalnya selalu sama.
+        $totalBankStruk    = (int) array_sum(array_column($orderedBankTotals, 'struk'));
+        $totalBankQty      = array_sum(array_column($orderedBankTotals, 'qty'));
+        $totalBankGross    = (int) array_sum(array_column($orderedBankTotals, 'gross'));
+        $totalBankDiscount = (int) array_sum(array_column($orderedBankTotals, 'discount'));
+        $totalBankNet      = (int) array_sum(array_column($orderedBankTotals, 'net'));
 
         if (count($this->allBanksData) === 0) {
             $rows[] = ['-', 'Tidak ada transaksi pembayaran pada periode ini', 0, 0, 0, 0, 0];
@@ -170,6 +229,20 @@ class BankSalesSheetExport implements FromArray, WithStyles, WithColumnWidths, W
             $totalKasDiscount,
             $totalKasNet,
         ];
+
+        // Total per jenis bank (Total Mandiri, Total BCA, dst)
+        // Dihitung dari akumulasi yang sama dengan Total Bank sehingga jumlahnya selalu sama.
+        foreach ($orderedBankTotals as $bankName => $bankTotal) {
+            $rows[] = [
+                '',
+                'TOTAL ' . strtoupper($bankName),
+                (int) $bankTotal['struk'],
+                $bankTotal['qty'],
+                (int) $bankTotal['gross'],
+                (int) $bankTotal['discount'],
+                (int) $bankTotal['net'],
+            ];
+        }
 
         // Total Bank Row (akumulasi dari semua transaksi non-cash seperti QRIS, Transfer, dan Debit)
         $rows[] = [
@@ -227,6 +300,7 @@ class BankSalesSheetExport implements FromArray, WithStyles, WithColumnWidths, W
                 'doctors',
                 'user',
                 'shift_logs',
+                'service',
             ])
                 ->where('pharmacy_id', $this->pharmacyId);
 
@@ -275,7 +349,8 @@ class BankSalesSheetExport implements FromArray, WithStyles, WithColumnWidths, W
                 // If no cart items found, still show transaction total
                 $subtotal = is_numeric($trx->subtotal) ? (int) round((float) $trx->subtotal) : 0;
                 $signedSubtotal = $isReturnTrx ? -abs($subtotal) : $subtotal;
-                $qty = $isReturnTrx ? -1 : 1;
+                // Jasa bukan qty obat → transaksi jasa tanpa obat tidak menambah qty.
+                $qty = $isReturnTrx ? -1 : (((float) ($trx->service->price ?? 0)) > 0 ? 0 : 1);
 
                 $totalQty += $qty;
                 $totalItemAmount += $signedSubtotal;
@@ -360,6 +435,31 @@ class BankSalesSheetExport implements FromArray, WithStyles, WithColumnWidths, W
                     $unitPrice,
                     $itemDiscount,
                     $final,
+                    $pasien,
+                    $dokter,
+                    $kasir,
+                    $shift,
+                ];
+            }
+
+            // Baris jasa (transaksi tipe JASA): bukan qty obat, hanya nominal.
+            $serviceRow = $trx->service ?? null;
+            $serviceRowPrice = $serviceRow ? (int) round((float) $serviceRow->price) : 0;
+
+            if ($serviceRow && $serviceRowPrice > 0) {
+                $totalItemAmount += $serviceRowPrice;
+
+                $rows[] = [
+                    $no++,
+                    $tgl,
+                    $code,
+                    $type,
+                    '-',
+                    '[JASA] ' . $serviceRow->service_name,
+                    0,
+                    $serviceRowPrice,
+                    0,
+                    $serviceRowPrice,
                     $pasien,
                     $dokter,
                     $kasir,
@@ -534,6 +634,26 @@ class BankSalesSheetExport implements FromArray, WithStyles, WithColumnWidths, W
                     } elseif ($label === 'TOTAL BANK') {
                         $sheet->getStyle("A{$row}:G{$row}")->applyFromArray([
                             'font' => ['bold' => true],
+                            'borders' => [
+                                'top' => ['borderStyle' => Border::BORDER_THIN, 'color' => ['rgb' => 'CBD5E1']],
+                            ],
+                        ]);
+                    } elseif ($label === 'TOTAL KESELURUHAN') {
+                        $sheet->getStyle("A{$row}:G{$row}")->applyFromArray([
+                            'font' => ['bold' => true],
+                            'fill' => [
+                                'fillType'   => \PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID,
+                                'startColor' => ['rgb' => 'F1F5F9'],
+                            ],
+                            'borders' => [
+                                'top' => ['borderStyle' => Border::BORDER_THIN, 'color' => ['rgb' => '94A3B8']],
+                                'bottom' => ['borderStyle' => Border::BORDER_DOUBLE, 'color' => ['rgb' => '64748B']],
+                            ],
+                        ]);
+                    } elseif (str_starts_with($label, 'TOTAL ')) {
+                        // Baris total per jenis bank: TOTAL MANDIRI, TOTAL BCA, dst.
+                        $sheet->getStyle("A{$row}:G{$row}")->applyFromArray([
+                            'font' => ['bold' => true, 'italic' => true],
                         ]);
                     }
                 }

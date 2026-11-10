@@ -56,6 +56,98 @@
             box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.2) !important;
         }
 
+        /* Jasa: pemilih jenis faktur obat */
+        .service-invoice-card {
+            transition: all 0.15s ease-in-out;
+        }
+
+        input[name="service_invoice_type"]:checked + .service-invoice-card {
+            border-color: #2563eb !important;
+            background-color: #eff6ff !important;
+            color: #1d4ed8 !important;
+            font-weight: 700 !important;
+            box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.2) !important;
+        }
+
+        /* Ringkasan pembayaran: Sub Total / Total / Discount */
+        .pay-summary {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 14px;
+            width: 100%;
+        }
+
+        .pay-summary--two {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+
+        .pay-summary-field {
+            min-width: 0;
+        }
+
+        .pay-summary-field > label {
+            display: block;
+            margin-bottom: 6px;
+            font-size: 12px;
+            font-weight: 600;
+            color: #475569;
+            letter-spacing: 0.01em;
+        }
+
+        .pay-summary-field > input {
+            width: 100%;
+            height: 44px;
+            border-radius: 12px;
+            border: 1px solid #d1d5db;
+            background: #f8fafc;
+            padding: 0 14px;
+            font-size: 15px;
+            font-weight: 700;
+            color: #0f172a;
+            font-variant-numeric: tabular-nums;
+            transition: border-color 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
+        }
+
+        .pay-summary-field > input:focus {
+            outline: none;
+            border-color: #93c5fd;
+            background: #ffffff;
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
+        }
+
+        .pay-service-note {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            width: 100%;
+            margin-top: 12px;
+            padding: 10px 14px;
+            border: 1px dashed #a7f3d0;
+            border-radius: 12px;
+            background: #f0fdf4;
+        }
+
+        .pay-service-note-label {
+            font-size: 12px;
+            font-weight: 600;
+            color: #047857;
+        }
+
+        .pay-service-note-value {
+            font-size: 14px;
+            font-weight: 700;
+            color: #065f46;
+            font-variant-numeric: tabular-nums;
+        }
+
+        @media (max-width: 640px) {
+            .pay-summary {
+                grid-template-columns: minmax(0, 1fr);
+                gap: 10px;
+            }
+        }
+
         .swal-on-top {
             z-index: 99999999 !important;
         }
@@ -213,6 +305,19 @@
                     <span class="text-[9px] opacity-70 ml-1 font-mono font-normal"></span>
                 </a>
 
+                {{-- Jasa (penjualan jasa/tindakan dokter) --}}
+                <a href="{{ url('transaction/jasa/' . ($trx_id != 0 ? $trx_id : 0)) }}" id="trx-type-jasa"
+                    class="trx-chip @if ($type == 'jasa') active @endif" title="Penjualan Jasa">
+                    <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round"
+                        stroke-linejoin="round">
+                        <path d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2" />
+                        <path d="M12 8V6M12 16v2" />
+                        <circle cx="12" cy="12" r="9" />
+                    </svg>
+                    <span class="trx-chip-lbl">Jasa</span>
+                    <span class="text-[9px] opacity-70 ml-1 font-mono font-normal"></span>
+                </a>
+
             </div>
 
             <form method="post" action="{{ route('transaction.createnew') }}" target="_blank">
@@ -250,6 +355,68 @@
                 </div>
             </form>
         </div>
+
+        @if (($isServiceTransaction ?? false) && $check_transaction != 0)
+            {{-- Panel Jasa (khusus transaksi tipe JASA) --}}
+            <div class="card p-4 mb-3 bg-white dashboard-panel" id="servicePanel">
+                <div class="flex items-center justify-between gap-2 mb-2">
+                    <div class="flex items-center gap-2">
+                        <span class="text-[13px] font-poppins font-semibold text-gray-800">Jasa</span>
+                        <span class="text-[10px] text-gray-400">Harga otomatis dari Master Jasa</span>
+                    </div>
+                    <span id="serviceSelectedBadge"
+                        class="hidden text-[10px] font-semibold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 uppercase">Terpilih</span>
+                </div>
+
+                {{-- Pencarian jasa --}}
+                <div id="servicePickerWrap" class="relative">
+                    <input id="serviceSearch" type="text" placeholder="Ketik nama jasa…" autocomplete="off"
+                        class="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-[11px] font-poppins focus:outline-none focus:ring-2 focus:ring-gray-300">
+                    <div id="serviceResults"
+                        class="absolute z-50 mt-1 w-full rounded-xl border border-gray-200 bg-white shadow-lg hidden">
+                        <ul id="serviceList" role="listbox" class="max-h-64 overflow-auto py-1"></ul>
+                    </div>
+                </div>
+
+                {{-- Jasa terpilih --}}
+                <div id="serviceSelectedWrap"
+                    class="hidden mt-2 flex items-center justify-between gap-2 rounded-xl border border-emerald-200 bg-emerald-50/60 px-3 py-2">
+                    <div>
+                        <div id="serviceSelectedName" class="text-[12px] font-semibold text-gray-800"></div>
+                        <div id="serviceSelectedPrice" class="text-[11px] text-gray-600"></div>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <button type="button" id="serviceChangeBtn"
+                            class="text-[11px] font-medium text-blue-600 hover:underline">Ganti</button>
+                        <span class="text-gray-300">|</span>
+                        <button type="button" id="serviceClearBtn"
+                            class="text-[11px] font-medium text-red-500 hover:underline">Hapus</button>
+                    </div>
+                </div>
+
+                {{-- Jenis faktur obat --}}
+                <div class="mt-3">
+                    <label class="block text-[11px] font-semibold text-gray-600 mb-1">Jenis Faktur Obat</label>
+                    <div class="grid grid-cols-3 gap-1.5">
+                        @foreach (['UPDS' => 'UPDS', 'HV/OTC' => 'HV', 'RESEP TUNAI' => 'Resep Tunai'] as $invValue => $invLabel)
+                            <label class="cursor-pointer">
+                                <input type="radio" name="service_invoice_type" value="{{ $invValue }}"
+                                    class="sr-only" onchange="setServiceInvoiceType('{{ $invValue }}')"
+                                    @checked(($serviceInvoiceType ?? 'UPDS') === $invValue)>
+                                <div
+                                    class="service-invoice-card flex items-center justify-center py-2 rounded-xl border border-gray-200 bg-white text-[11px] font-medium text-gray-600 text-center">
+                                    {{ $invLabel }}
+                                </div>
+                            </label>
+                        @endforeach
+                    </div>
+                    <p class="text-[10px] text-gray-400 mt-1">
+                        Mengubah jenis faktur obat akan mengosongkan keranjang obat (harga obat berbeda per jenis).
+                    </p>
+                </div>
+            </div>
+        @endif
+
         @if ($check_transaction != 0)
             <div class="card p-6  flex flex-wrap items-center bg-white dashboard-panel">
 
@@ -1223,46 +1390,50 @@
                 @endif
             </div>
 
-            <div class="mr-2 w-[100%] mt-3 flex gap-2">
+            {{-- Ringkasan pembayaran --}}
+            <div class="w-full mt-4">
                 @if ($check_transaction != 0)
                     @if ($transaction->transaction_type == 'KREDIT')
-                        <div class="w-[40%] hidden">
-                            <label class="text-[13px] font-poppins font-semibold pb-1">Embalase</label>
-                            <input id="embalase" tabindex="-1" readonly type="text" name="embalase"
-                                placeholder="Embalase"
-                                class="w-full rounded-xl my-1 readonly border border-gray-300 bg-white px-3 py-2 focus:outline-none focus:ring-2 focus:ring-gray-300"
-                                autocomplete="off" />
+                        <div class="w-full hidden">
+                            <div class="pay-summary-field">
+                                <label for="embalase">Embalase</label>
+                                <input id="embalase" tabindex="-1" readonly type="text" name="embalase"
+                                    placeholder="Embalase" autocomplete="off" />
+                            </div>
                         </div>
                     @endif
-                @endif
-                @if ($check_transaction != 0)
-                    <div class="w-full gap-2 @if ($transaction->transaction_type == 'KREDIT') hidden @else flex @endif ">
+
+                    <div class="pay-summary @if ($transaction->transaction_type == 'KREDIT') hidden @endif">
                         @if ($transaction->transaction_type != 'KREDIT')
-                            <div class="w-full">
-                                <label class="text-[13px] font-poppins font-semibold pb-1">Sub Total</label>
+                            <div class="pay-summary-field">
+                                <label for="subtotal">Sub Total</label>
                                 <input id="subtotal" tabindex="-1" readonly type="text" name="subtotal"
-                                    placeholder="Subtotal obat"
-                                    class="w-full rounded-xl my-1 readonly border border-gray-300 bg-white px-3 py-2 focus:outline-none focus:ring-2 focus:ring-gray-300"
-                                    autocomplete="off" />
+                                    placeholder="Subtotal obat" autocomplete="off" />
                             </div>
                         @endif
-                        <div class="w-full">
-                            <label class="text-[13px] font-poppins font-semibold pb-1">Total</label>
+
+                        <div class="pay-summary-field">
+                            <label for="carttotal">Total</label>
                             <input id="carttotal" tabindex="-1" readonly type="text" name="carttotal"
-                                placeholder="Total obat"
-                                class="w-full rounded-xl my-1 readonly border border-gray-300 bg-white px-3 py-2 focus:outline-none focus:ring-2 focus:ring-gray-300"
-                                autocomplete="off" />
+                                placeholder="Total obat" autocomplete="off" />
                         </div>
 
-                        <div class="w-full">
-                            <label class="text-[13px] font-poppins font-semibold pb-1">Discount</label>
+                        <div class="pay-summary-field">
+                            <label for="discounsubtotal">Discount</label>
                             <input @if ($transaction->transaction_type == 'KREDIT') value="0" @endif
                                 onkeyup="countSubtotalDiscount(this.value)" id="discounsubtotal" tabindex="-1"
-                                type="number" name="discounsubtotal" placeholder="Discount"
-                                class="w-full rounded-xl my-1 border border-gray-300 bg-white px-3 py-2 focus:outline-none focus:ring-2 focus:ring-gray-300"
-                                autocomplete="off" />
+                                type="number" name="discounsubtotal" placeholder="0" autocomplete="off" />
                         </div>
                     </div>
+
+                    @if (($isServiceTransaction ?? false) && $transaction->transaction_type != 'KREDIT')
+                        <div class="pay-service-note">
+                            <span class="pay-service-note-label">Jasa dokter (tidak terkena diskon)</span>
+                            <span id="serviceAmountLabel" class="pay-service-note-value">
+                                Rp {{ number_format($serviceAmount ?? 0, 0, ',', '.') }}
+                            </span>
+                        </div>
+                    @endif
                 @endif
             </div>
             @if ($transaction->transaction_type != 'KREDIT')
@@ -1404,151 +1575,21 @@
                 @endif
             @endif
             @if ($check_transaction != 0)
-                <div
-                    class="mr-2 flex gap-2 w-[100%] mt-3 @if ($transaction->transaction_type == 'KREDIT') hidden @else flex @endif">
-                    <div class="w-full">
-                        <label class="text-[13px] font-poppins font-semibold pb-1">Bayar</label>
+                <div class="pay-summary pay-summary--two mt-4 @if ($transaction->transaction_type == 'KREDIT') hidden @endif">
+                    <div class="pay-summary-field">
+                        <label for="pay">Bayar</label>
                         <input id="pay" onkeyup="pay(this.value)"
                             @if ($transaction->transaction_type == 'KREDIT') value="0" @endif type="text" required
-                            name="pay" placeholder="Bayar obat"
-                            class="w-full rounded-xl border my-1 border-gray-300 bg-white px-3 py-2 focus:outline-none focus:ring-2 focus:ring-gray-300"
-                            autocomplete="off" />
+                            name="pay" placeholder="Bayar obat" autocomplete="off" />
                     </div>
-                    <div class="w-full">
-                        <label class="text-[13px] font-poppins font-semibold pb-1">Kembalian</label>
+                    <div class="pay-summary-field">
+                        <label for="trchange">Kembalian</label>
                         <input id="trchange" tabindex="-1" @if ($transaction->transaction_type == 'KREDIT') value="0" @endif
-                            readonly type="text" name="change" placeholder="Bayar obat"
-                            class="w-full rounded-xl border my-1 readonly border-gray-300 bg-white px-3 py-2 focus:outline-none focus:ring-2 focus:ring-gray-300"
-                            autocomplete="off" />
+                            readonly type="text" name="change" placeholder="Kembalian" autocomplete="off" />
                     </div>
                 </div>
             @endif
 
-            {{-- Checkbox & Form Jasa Dokter & Ongkir (Talangan) --}}
-            <div class="mt-3.5 pt-3 border-t border-slate-100">
-                <label
-                    class="flex items-center justify-between p-2.5 px-3 rounded-xl border border-slate-200 bg-slate-50/70 hover:bg-slate-100/70 transition cursor-pointer select-none">
-                    <div class="flex items-center gap-2.5">
-                        <input type="checkbox" id="toggleDoctorShipping"
-                            onchange="handleDoctorShippingToggle(this.checked)"
-                            class="w-4 h-4 rounded text-blue-600 focus:ring-blue-500 border-gray-300 transition cursor-pointer">
-                        <div>
-                            <span class="text-xs font-bold text-slate-800">Jasa Dokter & Ongkir</span>
-                            <span class="block text-[10px] text-slate-500 font-normal">Talangan sementara (tidak
-                                menambah total transaksi)</span>
-                        </div>
-                    </div>
-                    <span id="shippingBadgeStatus"
-                        class="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-slate-200 text-slate-600 uppercase">Nonaktif</span>
-                </label>
-
-                {{-- Collapsible Container --}}
-                <div id="doctorShippingContainer"
-                    class="hidden mt-2 p-3 bg-blue-50/40 border border-blue-200/70 rounded-2xl space-y-2.5 transition-all duration-200">
-                    <div>
-                        <label class="block text-[11px] font-bold text-slate-700 mb-1">
-                            Biaya Jasa Dokter & Ongkir (Rp)
-                        </label>
-                        <input type="text" id="doctor_shipping_fee_input"
-                            oninput="formatDoctorShippingFee(this)" onfocus="this.select()" placeholder="Rp 0"
-                            class="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-sm transition"
-                            autocomplete="off" />
-                    </div>
-
-                    {{-- Metode Pembayaran Ongkir --}}
-                    <div>
-                        <div class="flex items-center justify-between mb-1">
-                            <label class="text-[11px] font-bold text-slate-700">Metode Masuk Ongkir / Jasa</label>
-                            <button type="button" id="btnSyncShippingPayment"
-                                onclick="resetShippingPaymentSync()"
-                                class="text-[10px] font-medium text-blue-600 hover:text-blue-700 hover:underline flex items-center gap-1">
-                                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                        d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                                </svg>
-                                <span>Samakan dg Pembayaran Utama</span>
-                            </button>
-                        </div>
-
-                        <div class="grid grid-cols-4 gap-1.5" id="shippingPaymentTypeGroup">
-                            {{-- Cash --}}
-                            <label class="cursor-pointer">
-                                <input type="radio" name="shipping_payment_type" value="CASH"
-                                    onchange="onShippingPaymentTypeChange(this.value, true)" class="sr-only">
-                                <div
-                                    class="shipping-pay-card flex items-center justify-center py-2 px-1 rounded-xl border border-slate-200 bg-white text-xs font-medium text-slate-700 text-center transition hover:border-blue-400">
-                                    Cash
-                                </div>
-                            </label>
-                            {{-- QRIS --}}
-                            <label class="cursor-pointer">
-                                <input type="radio" name="shipping_payment_type" value="QRIS"
-                                    onchange="onShippingPaymentTypeChange(this.value, true)" class="sr-only">
-                                <div
-                                    class="shipping-pay-card flex items-center justify-center py-2 px-1 rounded-xl border border-slate-200 bg-white text-xs font-medium text-slate-700 text-center transition hover:border-blue-400">
-                                    QRIS
-                                </div>
-                            </label>
-                            {{-- Debit --}}
-                            <label class="cursor-pointer">
-                                <input type="radio" name="shipping_payment_type" value="DEBIT"
-                                    onchange="onShippingPaymentTypeChange(this.value, true)" class="sr-only">
-                                <div
-                                    class="shipping-pay-card flex items-center justify-center py-2 px-1 rounded-xl border border-slate-200 bg-white text-xs font-medium text-slate-700 text-center transition hover:border-blue-400">
-                                    Debit
-                                </div>
-                            </label>
-                            {{-- Transfer --}}
-                            <label class="cursor-pointer">
-                                <input type="radio" name="shipping_payment_type" value="TRANSFER"
-                                    onchange="onShippingPaymentTypeChange(this.value, true)" class="sr-only">
-                                <div
-                                    class="shipping-pay-card flex items-center justify-center py-2 px-1 rounded-xl border border-slate-200 bg-white text-xs font-medium text-slate-700 text-center transition hover:border-blue-400">
-                                    Transfer
-                                </div>
-                            </label>
-                        </div>
-                    </div>
-
-                    {{-- Bank Selector untuk Ongkir (QRIS, Debit, Transfer) --}}
-                    <div id="shippingBankWrapper"
-                        class="hidden mt-1.5 p-2 bg-white border border-slate-200 rounded-xl transition-all">
-                        <div class="flex items-center justify-between mb-1">
-                            <label class="text-[10px] font-semibold text-slate-700 flex items-center gap-1">
-                                <span id="shippingBankBadge"
-                                    class="px-1.5 py-0.2 rounded text-[9px] font-bold uppercase bg-blue-100 text-blue-700">Bank</span>
-                                <span>Pilih Bank Tujuan Ongkir:</span>
-                            </label>
-                        </div>
-                        @php
-                            $shippingBankOptions = !empty($availableBanks) && count($availableBanks) > 0
-                                ? collect($availableBanks)
-                                : collect(['Mandiri', 'BNI', 'BCA', 'BRI', 'BTN'])->map(fn($b) => ['bank_name' => $b, 'name' => 'Bank ' . $b, 'account_number' => null]);
-                        @endphp
-                        <div class="grid grid-cols-5 gap-1 mb-1.5">
-                            @foreach ($shippingBankOptions as $bankOpt)
-                                @php $bankItem = $bankOpt['bank_name'] ?? ''; @endphp
-                                <button type="button"
-                                    class="shipping-bank-chip-btn py-1 px-1 rounded-lg border border-slate-200 bg-slate-50 text-[10px] font-semibold text-slate-700 hover:border-blue-400 hover:bg-blue-50/50 transition text-center"
-                                    data-bank="{{ $bankItem }}"
-                                    onclick="selectShippingBankChip('{{ $bankItem }}', true)">
-                                    {{ $bankItem }}
-                                </button>
-                            @endforeach
-                        </div>
-                        <select
-                            class="w-full rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-xs font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                            id="shipping_bank_name" onchange="syncShippingBankSelect(this.value, true)">
-                            <option value="">-- Pilih Bank --</option>
-                            @foreach ($shippingBankOptions as $bankOpt)
-                                <option value="{{ $bankOpt['bank_name'] }}">
-                                    {{ $bankOpt['name'] }}@if (!empty($bankOpt['account_number'])) ({{ $bankOpt['account_number'] }})@endif
-                                </option>
-                            @endforeach
-                        </select>
-                    </div>
-                </div>
-            </div>
             <div class="mt-5">
                 <form id="checkoutForm">
                     @csrf
@@ -2153,6 +2194,23 @@
 
     var totaltransaction = {{ $totaltransaction }};
     var transaction_type = "{{ $transaction?->transaction_type ?? 'null' }}";
+
+    // ── Jasa (hanya untuk transaksi tipe JASA) ────────────────────────────
+    // serviceAmount bernilai 0 untuk tipe lain sehingga rumus lama tidak berubah.
+    var isServiceTransaction = {{ ($isServiceTransaction ?? false) ? 'true' : 'false' }};
+    var serviceAmount = {{ (float) ($serviceAmount ?? 0) }};
+    var serviceInvoiceType = "{{ $serviceInvoiceType ?? 'UPDS' }}";
+    @php
+        $serviceDataForJs = $transactionService
+            ? [
+                'id' => $transactionService->id,
+                'name' => $transactionService->service_name,
+                'price' => (float) $transactionService->price,
+            ]
+            : null;
+    @endphp
+    var serviceData = @json($serviceDataForJs);
+    var medicineSubtotal = Math.max(0, totaltransaction - (isServiceTransaction ? serviceAmount : 0));
 
     // Elemen DOM
     const input = document.getElementById('productSearch');
@@ -3892,7 +3950,8 @@
         if (val > 100) {
             discount = val;
         } else {
-            discount = totaltransaction * val / 100;
+            // Diskon transaksi hanya mengurangi obat; jasa tidak pernah kena diskon.
+            discount = (isServiceTransaction ? medicineSubtotal : totaltransaction) * val / 100;
         }
         discount = Math.ceil(discount / 1000) * 1000;
         final_price = totaltransaction - discount;
@@ -3956,7 +4015,7 @@
             document.querySelectorAll('input[name="trxid"]').forEach(el => {
                 el.value = newId;
             });
-            ['kredit', 'resep', 'hv', 'upds'].forEach(slug => {
+            ['kredit', 'resep', 'hv', 'upds', 'jasa'].forEach(slug => {
                 const chipEl = document.getElementById('trx-type-' + slug);
                 if (chipEl) chipEl.href = `/transaction/${slug}/${newId}`;
             });
@@ -3967,6 +4026,17 @@
 
         if (data.cart_signature) {
             currentCartSignature = data.cart_signature;
+        }
+
+        // Sinkronkan nilai jasa dari server (hanya ada pada transaksi tipe JASA).
+        if (isServiceTransaction && data.service_amount !== undefined) {
+            serviceAmount = parseFloat(data.service_amount) || 0;
+            serviceData = data.service ? {
+                id: data.service.id,
+                name: data.service.name,
+                price: parseFloat(data.service.price) || 0
+            } : null;
+            renderServiceSelection();
         }
 
         const tbody = document.getElementById('carts');
@@ -3989,12 +4059,19 @@
             });
             totalbought = sumBought;
             total_discount = sumDiscount;
-            totaltransaction = sumFinal;
+            medicineSubtotal = sumFinal;
+            totaltransaction = sumFinal + (isServiceTransaction ? serviceAmount : 0);
         } else {
             if (data.total_transaction !== undefined) {
                 totaltransaction = parseFloat(data.total_transaction) || 0;
             } else if (data.totaltransaction !== undefined) {
                 totaltransaction = parseFloat(data.totaltransaction) || 0;
+            }
+
+            if (data.medicine_subtotal !== undefined) {
+                medicineSubtotal = parseFloat(data.medicine_subtotal) || 0;
+            } else {
+                medicineSubtotal = Math.max(0, totaltransaction - (isServiceTransaction ? serviceAmount : 0));
             }
 
             if (data.total_discount !== undefined) {
@@ -6801,6 +6878,244 @@
             }
         });
     });
+
+    // =====================================================
+    // Jasa (transaksi tipe JASA) — UI pemilihan jasa
+    // Blok ini hanya aktif bila halaman bertipe JASA.
+    // =====================================================
+    let serviceSearchTimer = null;
+
+    function serviceRupiah(value) {
+        return 'Rp ' + Number(value || 0).toLocaleString('id-ID');
+    }
+
+    function renderServiceSelection() {
+        const wrap = document.getElementById('serviceSelectedWrap');
+        const picker = document.getElementById('servicePickerWrap');
+        const badge = document.getElementById('serviceSelectedBadge');
+        const amountLabel = document.getElementById('serviceAmountLabel');
+
+        if (amountLabel) amountLabel.textContent = serviceRupiah(serviceAmount);
+
+        if (!wrap || !picker) return;
+
+        if (serviceData) {
+            const nameEl = document.getElementById('serviceSelectedName');
+            const priceEl = document.getElementById('serviceSelectedPrice');
+            if (nameEl) nameEl.textContent = serviceData.name || '';
+            if (priceEl) priceEl.textContent = serviceRupiah(serviceData.price ?? serviceAmount);
+            wrap.classList.remove('hidden');
+            picker.classList.add('hidden');
+            if (badge) badge.classList.remove('hidden');
+        } else {
+            wrap.classList.add('hidden');
+            picker.classList.remove('hidden');
+            if (badge) badge.classList.add('hidden');
+        }
+    }
+
+    function showServicePicker() {
+        const picker = document.getElementById('servicePickerWrap');
+        if (picker) picker.classList.remove('hidden');
+        const input = document.getElementById('serviceSearch');
+        if (input) {
+            input.value = '';
+            input.focus();
+        }
+        searchServices('');
+    }
+
+    function renderServiceList(items) {
+        const list = document.getElementById('serviceList');
+        const results = document.getElementById('serviceResults');
+        if (!list || !results) return;
+
+        if (!items || items.length === 0) {
+            list.innerHTML = '<li class="px-3 py-2 text-[11px] text-gray-400">Jasa tidak ditemukan.</li>';
+            results.classList.remove('hidden');
+            return;
+        }
+
+        list.innerHTML = items.map(function(item) {
+            const safeName = String(item.name || '').replace(/</g, '&lt;');
+            const priceLabel = item.price_label || serviceRupiah(item.price);
+
+            return '<li class="px-3 py-2 text-[11px] cursor-pointer hover:bg-gray-50 flex items-center justify-between gap-2"' +
+                ' data-service-id="' + item.id + '">' +
+                '<span class="text-gray-700">' + safeName + '</span>' +
+                '<span class="font-semibold text-gray-800">' + priceLabel + '</span>' +
+                '</li>';
+        }).join('');
+
+        results.classList.remove('hidden');
+    }
+
+    async function searchServices(keyword) {
+        if (!isServiceTransaction) return;
+
+        try {
+            const { data } = await axios.get("{{ route('transaction.service.search') }}", {
+                params: { q: keyword || '' }
+            });
+            renderServiceList(data);
+        } catch (e) {
+            renderServiceList([]);
+        }
+    }
+
+    async function chooseService(serviceId) {
+        try {
+            const { data } = await axios.post("{{ route('transaction.service.save') }}", {
+                transaction_id: transaction_id,
+                doctor_service_id: serviceId,
+            });
+
+            serviceAmount = parseFloat(data.service_amount) || 0;
+            serviceData = data.service ? {
+                id: data.service.id,
+                name: data.service.name,
+                price: parseFloat(data.service.price) || 0
+            } : null;
+
+            renderServiceSelection();
+            syncCartFromServer(data);
+
+            iziToast.success({
+                title: 'Berhasil',
+                message: data.message,
+                position: 'topRight'
+            });
+
+            const productSearch = document.getElementById('productSearch');
+            if (productSearch) productSearch.focus();
+        } catch (e) {
+            iziToast.error({
+                title: 'Gagal',
+                message: e.response?.data?.message || 'Gagal memilih jasa.',
+                position: 'topRight'
+            });
+        }
+    }
+
+    async function removeService() {
+        if (!serviceData) return;
+        if (!confirm('Hapus jasa dari transaksi ini?')) return;
+
+        try {
+            const { data } = await axios.delete("{{ route('transaction.service.delete') }}", {
+                data: { transaction_id: transaction_id }
+            });
+
+            serviceAmount = parseFloat(data.service_amount) || 0;
+            serviceData = null;
+            renderServiceSelection();
+            syncCartFromServer(data);
+
+            iziToast.success({
+                title: 'Berhasil',
+                message: data.message,
+                position: 'topRight'
+            });
+        } catch (e) {
+            iziToast.error({
+                title: 'Gagal',
+                message: e.response?.data?.message || 'Gagal menghapus jasa.',
+                position: 'topRight'
+            });
+        }
+    }
+
+
+    async function setServiceInvoiceType(type) {
+        if (!isServiceTransaction) return;
+        if (type === serviceInvoiceType) return;
+
+        const previousType = serviceInvoiceType;
+        const itemsInCart = document.querySelectorAll('#carts tr.cart-row').length;
+
+        if (itemsInCart > 0) {
+            const proceed = confirm('Ubah jenis faktur obat ke ' + type +
+                '? Keranjang obat akan dikosongkan karena harga obat berbeda per jenis.');
+
+            if (!proceed) {
+                const radioPrev = document.querySelector('input[name="service_invoice_type"][value="' + previousType + '"]');
+                if (radioPrev) radioPrev.checked = true;
+                return;
+            }
+        }
+
+        try {
+            const { data } = await axios.post("{{ route('transaction.service.invoiceType') }}", {
+                transaction_id: transaction_id,
+                invoice_type: type,
+            });
+
+            serviceInvoiceType = type;
+
+            iziToast.success({
+                title: 'Berhasil',
+                message: data.message,
+                position: 'topRight'
+            });
+
+            // Harga obat & perilaku UI mengikuti parameter jenis faktur → muat ulang.
+            window.location.reload();
+        } catch (e) {
+            const radioPrev = document.querySelector('input[name="service_invoice_type"][value="' + previousType + '"]');
+            if (radioPrev) radioPrev.checked = true;
+
+            iziToast.error({
+                title: 'Gagal',
+                message: e.response?.data?.message || 'Gagal mengubah jenis faktur obat.',
+                position: 'topRight'
+            });
+        }
+    }
+
+    // Inisialisasi panel jasa (hanya pada halaman bertipe JASA)
+    (function initServicePanel() {
+        if (!isServiceTransaction) return;
+
+        renderServiceSelection();
+
+        const searchInput = document.getElementById('serviceSearch');
+        if (searchInput) {
+            searchInput.addEventListener('input', function() {
+                clearTimeout(serviceSearchTimer);
+                const keyword = this.value;
+                serviceSearchTimer = setTimeout(function() {
+                    searchServices(keyword);
+                }, 250);
+            });
+
+            searchInput.addEventListener('focus', function() {
+                searchServices(this.value);
+            });
+        }
+
+        const list = document.getElementById('serviceList');
+        if (list) {
+            list.addEventListener('click', function(e) {
+                const li = e.target.closest('li[data-service-id]');
+                if (!li) return;
+                chooseService(li.getAttribute('data-service-id'));
+            });
+        }
+
+        const changeBtn = document.getElementById('serviceChangeBtn');
+        if (changeBtn) changeBtn.addEventListener('click', showServicePicker);
+
+        const clearBtn = document.getElementById('serviceClearBtn');
+        if (clearBtn) clearBtn.addEventListener('click', removeService);
+
+        document.addEventListener('click', function(e) {
+            const results = document.getElementById('serviceResults');
+            const picker = document.getElementById('servicePickerWrap');
+            if (!results || !picker) return;
+            if (!picker.contains(e.target)) results.classList.add('hidden');
+        });
+    })();
+
 </script>
 
 {{-- ------------------- Fixed Cart Card --------------------- --}}
