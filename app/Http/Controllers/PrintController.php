@@ -33,8 +33,16 @@ class PrintController extends Controller
         $pharmacy_phone = $transaction->pharmacy->phone;
         $pharmacy_address = $transaction->pharmacy->address;
         $subtotaldiscount = $transaction->discount ?? 0;
-        $totaldiscount = ceil(($discount + $subtotaldiscount) / 1000) * 1000;
+        // Tampilan struk: gunakan nilai diskon apa adanya (item + transaksi)
+        // agar "Jumlah - Diskon = Total Beli" selalu pas.
+        $totaldiscount = $discount + $subtotaldiscount;
         $payment = $totalFinalPrice - $totaldiscount;
+
+        // Ongkir (talangan): tampil di struk, TIDAK menambah total transaksi.
+        $shippingFee = (float) ($transaction->doctor_shipping_fee ?? 0);
+        $shippingMethod = strtoupper(trim((string) ($transaction->doctor_shipping_payment_method ?? '')));
+        $shippingBank = trim((string) ($transaction->doctor_shipping_bank_name ?? ''));
+        $shippingLabel = trim($shippingMethod . ($shippingBank !== '' ? ' ' . $shippingBank : ''));
 
         return view('kasir.receipt', compact(
             'payment',
@@ -49,7 +57,9 @@ class PrintController extends Controller
             'pharmacy_name',
             'pharmacy_address',
             'service',
-            'serviceAmount'
+            'serviceAmount',
+            'shippingFee',
+            'shippingLabel'
         ));
     }
 
@@ -77,8 +87,16 @@ class PrintController extends Controller
         $pharmacy_phone = $transaction->pharmacy->phone;
         $pharmacy_address = $transaction->pharmacy->address;
         $subtotaldiscount = $transaction->discount ?? 0;
-        $totaldiscount = ceil(($discount + $subtotaldiscount) / 1000) * 1000;
+        // Tampilan struk: gunakan nilai diskon apa adanya (item + transaksi)
+        // agar "Jumlah - Diskon = Total Beli" selalu pas.
+        $totaldiscount = $discount + $subtotaldiscount;
         $payment = $totalFinalPrice - $totaldiscount;
+
+        // Ongkir (talangan): tampil di struk, TIDAK menambah total transaksi.
+        $shippingFee = (float) ($transaction->doctor_shipping_fee ?? 0);
+        $shippingMethod = strtoupper(trim((string) ($transaction->doctor_shipping_payment_method ?? '')));
+        $shippingBank = trim((string) ($transaction->doctor_shipping_bank_name ?? ''));
+        $shippingLabel = trim($shippingMethod . ($shippingBank !== '' ? ' ' . $shippingBank : ''));
 
         return view('kasir.allreceipt', compact(
             'payment',
@@ -93,7 +111,9 @@ class PrintController extends Controller
             'pharmacy_name',
             'pharmacy_address',
             'service',
-            'serviceAmount'
+            'serviceAmount',
+            'shippingFee',
+            'shippingLabel'
         ));
     }
 

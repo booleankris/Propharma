@@ -1590,6 +1590,133 @@
                 </div>
             @endif
 
+            {{-- Ongkir (talangan; tidak menambah total transaksi) --}}
+            <div class="mt-4 pt-4 border-t border-slate-100">
+                <label
+                    class="flex items-center justify-between gap-3 p-3 rounded-xl border border-slate-200 bg-slate-50/70 hover:bg-slate-100/70 transition cursor-pointer select-none">
+                    <div class="flex items-center gap-3">
+                        <input type="checkbox" id="toggleDoctorShipping"
+                            onchange="handleDoctorShippingToggle(this.checked)"
+                            class="w-4 h-4 rounded text-blue-600 focus:ring-blue-500 border-gray-300 transition cursor-pointer">
+                        <div>
+                            <span class="text-[13px] font-bold text-slate-800">Ongkir</span>
+                            <span class="block text-[11px] text-slate-500 font-normal">Talangan ongkir (tidak
+                                menambah total transaksi)</span>
+                        </div>
+                    </div>
+                    <span id="shippingBadgeStatus"
+                        class="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-slate-200 text-slate-600 uppercase">Nonaktif</span>
+                </label>
+
+                <div id="doctorShippingContainer"
+                    class="hidden mt-2 p-3 bg-blue-50/40 border border-blue-200/70 rounded-2xl space-y-3 transition-all duration-200">
+                    <div>
+                        <label for="doctor_shipping_fee_input"
+                            class="block text-[11px] font-bold text-slate-700 mb-1">Nominal Ongkir (Rp)</label>
+                        <input type="text" id="doctor_shipping_fee_input" oninput="formatDoctorShippingFee(this)"
+                            onfocus="this.select()" placeholder="Rp 0" inputmode="numeric" autocomplete="off"
+                            class="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm font-semibold text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-sm transition" />
+                    </div>
+
+                    <div>
+                        <div class="flex items-center justify-between mb-1.5">
+                            <label class="text-[11px] font-bold text-slate-700">Dibayar Ke</label>
+                            <button type="button" id="btnSyncShippingPayment" onclick="resetShippingPaymentSync()"
+                                class="text-[10px] font-medium text-blue-600 hover:text-blue-700 hover:underline flex items-center gap-1">
+                                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                                </svg>
+                                <span>Samakan dg Pembayaran Utama</span>
+                            </button>
+                        </div>
+
+                        <div class="grid grid-cols-3 gap-1.5" id="shippingPaymentTypeGroup">
+                            @foreach (['QRIS' => 'QRIS', 'DEBIT' => 'Debit', 'TRANSFER' => 'Transfer'] as $shipValue => $shipLabel)
+                                <label class="cursor-pointer">
+                                    <input type="radio" name="shipping_payment_type"
+                                        value="{{ $shipValue }}"
+                                        onchange="onShippingPaymentTypeChange(this.value, true)" class="sr-only">
+                                    <div
+                                        class="shipping-pay-card flex items-center justify-center py-2 px-1 rounded-xl border border-slate-200 bg-white text-xs font-medium text-slate-700 text-center transition hover:border-blue-400">
+                                        {{ $shipLabel }}
+                                    </div>
+                                </label>
+                            @endforeach
+                        </div>
+
+                        <p class="text-[10px] text-slate-500 mt-1.5">
+                            Ongkir tidak dapat dibayar tunai (CASH) — pilih QRIS, Debit, atau Transfer.
+                        </p>
+                    </div>
+
+                    {{-- Bank / Merchant tujuan ongkir --}}
+                    <div id="shippingBankWrapper" class="p-2 bg-white border border-slate-200 rounded-xl transition-all">
+                        <div class="flex items-center justify-between mb-1">
+                            <label class="text-[10px] font-semibold text-slate-700 flex items-center gap-1">
+                                <span id="shippingBankBadge"
+                                    class="px-1.5 py-0.2 rounded text-[9px] font-bold uppercase bg-blue-100 text-blue-700">Bank</span>
+                                <span>Pilih Bank Tujuan Ongkir:</span>
+                            </label>
+                        </div>
+                        @php
+                            $shippingBankOptions = !empty($availableBanks) && count($availableBanks) > 0
+                                ? collect($availableBanks)
+                                : collect(['Mandiri', 'BNI', 'BCA', 'BRI', 'BTN'])->map(fn($b) => ['bank_name' => $b, 'name' => 'Bank ' . $b, 'account_number' => null]);
+                        @endphp
+                        <div class="grid grid-cols-5 gap-1 mb-1.5">
+                            @foreach ($shippingBankOptions as $bankOpt)
+                                @php $bankItem = $bankOpt['bank_name'] ?? ''; @endphp
+                                <button type="button"
+                                    class="shipping-bank-chip-btn py-1 px-1 rounded-lg border border-slate-200 bg-slate-50 text-[10px] font-semibold text-slate-700 hover:border-blue-400 hover:bg-blue-50/50 transition text-center"
+                                    data-bank="{{ $bankItem }}"
+                                    onclick="selectShippingBankChip('{{ $bankItem }}', true)">
+                                    {{ $bankItem }}
+                                </button>
+                            @endforeach
+                        </div>
+                        <select id="shipping_bank_name" onchange="syncShippingBankSelect(this.value, true)"
+                            class="w-full rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-xs font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            <option value="">-- Pilih Bank --</option>
+                            @foreach ($shippingBankOptions as $bankOpt)
+                                <option value="{{ $bankOpt['bank_name'] }}">
+                                    {{ $bankOpt['name'] }}@if (!empty($bankOpt['account_number'])) ({{ $bankOpt['account_number'] }})@endif
+                                </option>
+                            @endforeach
+                        </select>
+                    </div>
+
+                    {{-- Ringkasan: total setelah ongkir (tampilan saja, tidak mengubah total transaksi) --}}
+                    <div class="mt-1 pt-3 border-t border-blue-200/70 space-y-1.5">
+                        <div class="flex items-center justify-between gap-3 text-[11px]">
+                            <span class="text-slate-600">Total transaksi (setelah diskon)</span>
+                            <span id="shippingBaseTotal"
+                                class="font-semibold text-slate-800 tabular-nums">Rp 0</span>
+                        </div>
+                        <div class="flex items-center justify-between gap-3 text-[11px]">
+                            <span class="text-slate-600">Ongkir</span>
+                            <span id="shippingFeeDisplay"
+                                class="font-semibold text-slate-800 tabular-nums">Rp 0</span>
+                        </div>
+                        <div class="flex items-center justify-between gap-3 text-[11px]">
+                            <span class="text-slate-600">Masuk ke rekening</span>
+                            <span id="shippingBankDestination"
+                                class="font-semibold text-slate-800">-</span>
+                        </div>
+                        <div
+                            class="flex items-center justify-between gap-3 rounded-xl bg-white border border-blue-300 px-3 py-2">
+                            <span class="text-[12px] font-bold text-slate-800">Total + Ongkir</span>
+                            <span id="grandTotalWithShipping"
+                                class="text-[15px] font-bold text-blue-700 tabular-nums">Rp 0</span>
+                        </div>
+                        <p class="text-[10px] text-slate-500">
+                            Ongkir dicatat sebagai talangan (tidak menambah total transaksi) — tekan
+                            <span class="font-semibold">Enter</span> untuk lanjut.
+                        </p>
+                    </div>
+                </div>
+            </div>
+
             <div class="mt-5">
                 <form id="checkoutForm">
                     @csrf
@@ -2272,7 +2399,7 @@
     var subtotal_discount = "";
     var paymentType = (currenttransaction === 'KREDIT') ? "KREDIT" : "CASH";
     var isDoctorShippingManualOverride = false;
-    var shippingPaymentType = 'CASH';
+    var shippingPaymentType = 'QRIS';
 
     const subtotalpreview = document.getElementById('subtotal');
 
@@ -3412,7 +3539,7 @@
         }
 
         // ==========================================
-        // Jasa Dokter & Ongkir (Talangan Sementara)
+        // Ongkir (Talangan Sementara)
         // ==========================================
 
         function handleDoctorShippingToggle(checked) {
@@ -3439,11 +3566,46 @@
                         'text-[10px] font-semibold px-2 py-0.5 rounded-full bg-slate-200 text-slate-600 uppercase';
                 }
             }
+
+            updateShippingTotals();
         }
 
         function formatDoctorShippingFee(el) {
             let raw = el.value.replace(/\D/g, "");
             el.value = raw ? "Rp. " + parseInt(raw, 10).toLocaleString("id-ID") : "";
+            updateShippingTotals();
+        }
+
+        // Tampilan saja: total transaksi (setelah diskon) + ongkir.
+        // Tidak mengubah totaltransaction / nilai yang dikirim ke checkout.
+        function updateShippingTotals() {
+            const baseEl = document.getElementById('shippingBaseTotal');
+            const feeEl = document.getElementById('shippingFeeDisplay');
+            const grandEl = document.getElementById('grandTotalWithShipping');
+            if (!baseEl && !feeEl && !grandEl) return;
+
+            const fmt = (value) => 'Rp ' + Number(Math.max(0, Math.round(Number(value) || 0))).toLocaleString('id-ID');
+
+            // Ambil nilai yang benar-benar tampil di field "Total" agar konsisten
+            // (field Total sudah memperhitungkan diskon & pembulatan yang ada).
+            const totalFieldEl = document.getElementById('carttotal');
+            const totalFieldDigits = (totalFieldEl?.value || '').replace(/\D/g, '');
+            const payable = totalFieldDigits !== '' ?
+                (parseInt(totalFieldDigits, 10) || 0) :
+                Math.max(0, (parseFloat(totaltransaction) || 0) - (parseFloat(subtotal_discount) || 0));
+
+            const feeRaw = (document.getElementById('doctor_shipping_fee_input')?.value || '').replace(/\D/g, '');
+            const fee = parseInt(feeRaw, 10) || 0;
+
+            if (baseEl) baseEl.textContent = fmt(payable);
+            if (feeEl) feeEl.textContent = fmt(fee);
+            if (grandEl) grandEl.textContent = fmt(payable + fee);
+
+            const destEl = document.getElementById('shippingBankDestination');
+            if (destEl) {
+                const bank = (document.getElementById('shipping_bank_name')?.value || '').trim();
+                destEl.textContent = bank !== '' ? bank : '-';
+            }
         }
 
         function onShippingPaymentTypeChange(val, isManual = false) {
@@ -3482,6 +3644,7 @@
             const bankSelect = document.getElementById('shipping_bank_name');
             if (bankSelect) bankSelect.value = bankName;
             updateShippingBankChipsVisual(bankName);
+            updateShippingTotals();
         }
 
         function syncShippingBankSelect(val, isManual = false) {
@@ -3489,6 +3652,7 @@
                 isDoctorShippingManualOverride = true;
             }
             updateShippingBankChipsVisual(val);
+            updateShippingTotals();
         }
 
         function updateShippingBankChipsVisual(selectedBank) {
@@ -3504,16 +3668,22 @@
         function syncShippingPaymentWithMain() {
             if (isDoctorShippingManualOverride) return;
 
-            const mainPayment = (typeof paymentType !== 'undefined' && ['CASH', 'QRIS', 'DEBIT', 'TRANSFER'].includes(
-                    paymentType)) ?
+            const mainPaymentRaw = (typeof paymentType !== 'undefined' && ['CASH', 'QRIS', 'DEBIT', 'TRANSFER']
+                    .includes(paymentType)) ?
                 paymentType :
                 'CASH';
 
-            onShippingPaymentTypeChange(mainPayment, false);
+            // Ongkir tidak boleh CASH → otomatis memakai QRIS bila pembayaran utama tunai.
+            const shipPayment = ['QRIS', 'DEBIT', 'TRANSFER'].includes(mainPaymentRaw) ? mainPaymentRaw : 'QRIS';
 
-            if (['QRIS', 'DEBIT', 'TRANSFER'].includes(mainPayment)) {
+            onShippingPaymentTypeChange(shipPayment, false);
+
+            // Bank hanya disalin bila pembayaran utama juga non-tunai.
+            if (['QRIS', 'DEBIT', 'TRANSFER'].includes(mainPaymentRaw)) {
                 const mainBank = document.getElementById('bank_name')?.value || '';
-                selectShippingBankChip(mainBank, false);
+                if (mainBank) {
+                    selectShippingBankChip(mainBank, false);
+                }
             }
         }
 
@@ -3525,15 +3695,136 @@
         function resetShippingPaymentSync() {
             isDoctorShippingManualOverride = false;
             syncShippingPaymentWithMain();
+
+            const mainIsCash = !['QRIS', 'DEBIT', 'TRANSFER'].includes(typeof paymentType !== 'undefined' ?
+                paymentType : 'CASH');
+
             if (typeof iziToast !== 'undefined') {
                 iziToast.info({
                     title: 'Info',
-                    message: 'Metode ongkir kembali disamakan dengan pembayaran utama.',
+                    message: mainIsCash ?
+                        'Ongkir tidak bisa CASH. Metode ongkir diset ke QRIS — silakan pilih bank tujuan.' :
+                        'Metode ongkir kembali disamakan dengan pembayaran utama.',
                     position: 'topRight',
-                    timeout: 2000
+                    timeout: 2500
                 });
             }
         }
+
+        // ==========================================
+        // Navigasi keyboard (Enter) untuk Ongkir
+        // Alur: centang Ongkir -> nominal -> metode -> bank -> Bayar
+        // Tidak mengubah perhitungan; hanya memindahkan fokus.
+        // ==========================================
+        (function initShippingKeyboardNavigation() {
+            const toggle = document.getElementById('toggleDoctorShipping');
+            const feeInput = document.getElementById('doctor_shipping_fee_input');
+            const methodRadios = Array.from(document.querySelectorAll('input[name="shipping_payment_type"]'));
+            const bankChips = Array.from(document.querySelectorAll('.shipping-bank-chip-btn'));
+            const bankSelect = document.getElementById('shipping_bank_name');
+            const payField = document.getElementById('pay');
+
+            const focusEl = (el) => {
+                if (!el) return;
+                el.focus({ preventScroll: true });
+                if (el.tagName === 'INPUT' && typeof el.select === 'function') {
+                    try {
+                        el.select();
+                    } catch (e) {}
+                }
+            };
+
+            const focusFirstShippingBank = () => {
+                if (bankChips.length > 0) {
+                    focusEl(bankChips[0]);
+                } else if (bankSelect) {
+                    focusEl(bankSelect);
+                }
+            };
+
+            const ensureShippingMethodSelected = () => {
+                let selected = methodRadios.find(r => r.checked);
+                if (!selected) {
+                    selected = methodRadios.find(r => r.value === shippingPaymentType) || methodRadios[0];
+                    if (selected) {
+                        selected.checked = true;
+                        onShippingPaymentTypeChange(selected.value, false);
+                    }
+                }
+                return selected;
+            };
+
+            // Enter pada centang -> aktifkan ongkir & fokus ke nominal
+            if (toggle) {
+                toggle.addEventListener('keydown', function(e) {
+                    if (e.key !== 'Enter') return;
+                    e.preventDefault();
+                    if (!this.checked) {
+                        this.checked = true;
+                        handleDoctorShippingToggle(true);
+                    }
+                    focusEl(feeInput);
+                });
+            }
+
+            // Enter pada nominal -> fokus ke metode ongkir (QRIS/Debit/Transfer)
+            if (feeInput) {
+                feeInput.addEventListener('keydown', function(e) {
+                    if (e.key !== 'Enter') return;
+                    e.preventDefault();
+                    focusEl(ensureShippingMethodSelected());
+                });
+            }
+
+            // Metode ongkir: panah untuk pilih, Enter -> fokus ke bank tujuan
+            methodRadios.forEach(function(radio, index) {
+                radio.addEventListener('keydown', function(e) {
+                    if (['ArrowRight', 'ArrowDown', 'ArrowLeft', 'ArrowUp'].includes(e.key)) {
+                        e.preventDefault();
+                        const dir = (e.key === 'ArrowRight' || e.key === 'ArrowDown') ? 1 : -1;
+                        const nextRadio = methodRadios[(index + dir + methodRadios.length) % methodRadios.length];
+                        nextRadio.checked = true;
+                        nextRadio.focus({ preventScroll: true });
+                        onShippingPaymentTypeChange(nextRadio.value, true);
+                        return;
+                    }
+
+                    if (e.key === 'Enter') {
+                        e.preventDefault();
+                        onShippingPaymentTypeChange(radio.value, true);
+                        setTimeout(focusFirstShippingBank, 30);
+                    }
+                });
+            });
+
+            // Bank ongkir: panah untuk pindah, Enter -> pilih bank & lanjut ke Bayar
+            bankChips.forEach(function(chip, index) {
+                chip.addEventListener('keydown', function(e) {
+                    if (['ArrowRight', 'ArrowDown', 'ArrowLeft', 'ArrowUp'].includes(e.key)) {
+                        e.preventDefault();
+                        const dir = (e.key === 'ArrowRight' || e.key === 'ArrowDown') ? 1 : -1;
+                        focusEl(bankChips[(index + dir + bankChips.length) % bankChips.length]);
+                        return;
+                    }
+
+                    if (e.key === 'Enter') {
+                        e.preventDefault();
+                        selectShippingBankChip(chip.dataset.bank, true);
+                        focusEl(payField);
+                    }
+                });
+            });
+
+            // Dropdown bank ongkir: Enter -> lanjut ke Bayar
+            if (bankSelect) {
+                bankSelect.addEventListener('keydown', function(e) {
+                    if (e.key !== 'Enter') return;
+                    e.preventDefault();
+                    syncShippingBankSelect(this.value, true);
+                    focusEl(payField);
+                });
+            }
+        })();
 
         // Modal level shortcuts (1: CASH, 2: QRIS, 3: DEBIT, 4: TRANSFER)
         const modalPaymentElem = document.getElementById('paymentModal');
@@ -3959,6 +4250,7 @@
         final_price = Math.ceil(final_price / 1000) * 1000;
         subtotal_discount = discount;
         cartTotalInput.value = formatRupiah(final_price);
+        updateShippingTotals();
     }
 
     // ===============================
@@ -4143,6 +4435,8 @@
                 });
             } catch (e) {}
         }
+
+        updateShippingTotals();
     }
 
     function addToCart(medicine_id, transaction_id, quantity, discount, embalase, cart_type, package, dosage_r, price2,
@@ -4807,7 +5101,7 @@
             activeShipMethod) && !doctor_shipping_bank_name) {
             iziToast.warning({
                 title: 'Peringatan',
-                message: 'Silahkan Pilih Bank / Merchant Terlebih Dahulu untuk Ongkir & Jasa ' +
+                message: 'Silahkan Pilih Bank / Merchant Terlebih Dahulu untuk Ongkir ' +
                     activeShipMethod,
                 position: 'topRight'
             });
@@ -7115,6 +7409,9 @@
             if (!picker.contains(e.target)) results.classList.add('hidden');
         });
     })();
+
+    // Ringkasan "Total + Ongkir" saat halaman dibuka (tampilan saja).
+    updateShippingTotals();
 
 </script>
 

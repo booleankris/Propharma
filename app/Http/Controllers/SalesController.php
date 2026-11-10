@@ -1375,6 +1375,26 @@ class SalesController extends Controller
                 ? trim((string) $request->input('doctor_shipping_bank_name', ''))
                 : null;
 
+            // Ongkir tidak boleh dibayar tunai (CASH) dan wajib punya bank tujuan.
+            // Catatan: hanya berlaku bila ongkir diaktifkan; transaksi lain tidak berubah.
+            if ($hasDoctorShippingFee && $doctorShippingFee > 0) {
+                if (! in_array($doctorShippingPaymentMethod, ['QRIS', 'DEBIT', 'TRANSFER'], true)) {
+                    DB::rollBack();
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'Ongkir tidak dapat dibayar tunai (CASH). Silakan pilih QRIS, Debit, atau Transfer.',
+                    ], 422);
+                }
+
+                if ($doctorShippingBankName === '') {
+                    DB::rollBack();
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'Silakan pilih bank tujuan ongkir terlebih dahulu.',
+                    ], 422);
+                }
+            }
+
             // created_at is intentionally not mass assignable on the model.
             // Set it explicitly at checkout so reports that fall back to the
             // transaction timestamp use the sale time, not when the cart began.
@@ -1457,7 +1477,7 @@ class SalesController extends Controller
                             'payment_date' => Carbon::now()->toDateString(),
                             'amount' => $doctorShippingFee,
                             'reference_number' => $transaction->transaction_code,
-                            'notes' => 'Penerimaan talangan ongkir & jasa dokter (Tunai)',
+                            'notes' => 'Penerimaan talangan ongkir (Tunai)',
                             'created_by' => Auth::id(),
                         ]);
                         $shippingCashAccount->increment('balance', $doctorShippingFee);
@@ -1475,7 +1495,7 @@ class SalesController extends Controller
                             'payment_date' => Carbon::now()->toDateString(),
                             'amount' => $doctorShippingFee,
                             'reference_number' => $transaction->transaction_code,
-                            'notes' => "Penerimaan talangan ongkir & jasa dokter ({$doctorShippingPaymentMethod} melalui {$shipBankShort})",
+                            'notes' => "Penerimaan talangan ongkir ({$doctorShippingPaymentMethod} melalui {$shipBankShort})",
                             'created_by' => Auth::id(),
                         ]);
                         $shippingBankAccount->increment('balance', $doctorShippingFee);

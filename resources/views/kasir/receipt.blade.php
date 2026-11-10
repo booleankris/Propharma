@@ -209,8 +209,12 @@
 
     Jumlah <span style="float:right">{{ number_format($totalPrice + $totalEmbalase + ($serviceAmount ?? 0)) }}</span><br>
 
-    Discount <span style="float:right">-{{ number_format($totaldiscount) }}</span><br>
+    Diskon <span style="float:right">-{{ number_format($totaldiscount) }}</span><br>
     <strong>Total Beli <span style="float:right">{{ number_format($totalFinalPrice) }}</span></strong><br>
+    @if (($shippingFee ?? 0) > 0)
+        Ongkir{{ ($shippingLabel ?? '') !== '' ? ' (' . $shippingLabel . ')' : '' }} <span style="float:right">{{ number_format($shippingFee) }}</span><br>
+        <strong>Total + Ongkir <span style="float:right">{{ number_format($totalFinalPrice + $shippingFee) }}</span></strong><br>
+    @endif
     Bayar <span style="float:right">{{ number_format($transaction->paid) }}</span><br>
     Kembalian<span style="float:right">{{ number_format($transaction->changes) }}</span>
 
