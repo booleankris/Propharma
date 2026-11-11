@@ -81,6 +81,13 @@
             grid-template-columns: repeat(2, minmax(0, 1fr));
         }
 
+        /* Wajib: pastikan class `hidden` tetap menang di atas display:grid
+           (dipakai untuk menyembunyikan ringkasan pada transaksi KREDIT). */
+        .pay-summary.hidden,
+        .pay-summary--two.hidden {
+            display: none !important;
+        }
+
         .pay-summary-field {
             min-width: 0;
         }
@@ -1403,7 +1410,8 @@
                         </div>
                     @endif
 
-                    <div class="pay-summary @if ($transaction->transaction_type == 'KREDIT') hidden @endif">
+                    <div class="pay-summary @if ($transaction->transaction_type == 'KREDIT') hidden @endif"
+                        @if ($transaction->transaction_type == 'KREDIT') style="display:none" @endif>
                         @if ($transaction->transaction_type != 'KREDIT')
                             <div class="pay-summary-field">
                                 <label for="subtotal">Sub Total</label>
@@ -1575,7 +1583,8 @@
                 @endif
             @endif
             @if ($check_transaction != 0)
-                <div class="pay-summary pay-summary--two mt-4 @if ($transaction->transaction_type == 'KREDIT') hidden @endif">
+                <div class="pay-summary pay-summary--two mt-4 @if ($transaction->transaction_type == 'KREDIT') hidden @endif"
+                    @if ($transaction->transaction_type == 'KREDIT') style="display:none" @endif>
                     <div class="pay-summary-field">
                         <label for="pay">Bayar</label>
                         <input id="pay" onkeyup="pay(this.value)"
@@ -1591,7 +1600,8 @@
             @endif
 
             {{-- Ongkir (talangan; tidak menambah total transaksi) --}}
-            <div class="mt-4 pt-4 border-t border-slate-100">
+            <div class="mt-4 pt-4 border-t border-slate-100 @if ($transaction->transaction_type == 'KREDIT') hidden @endif"
+                @if ($transaction->transaction_type == 'KREDIT') style="display:none" @endif>
                 <label
                     class="flex items-center justify-between gap-3 p-3 rounded-xl border border-slate-200 bg-slate-50/70 hover:bg-slate-100/70 transition cursor-pointer select-none">
                     <div class="flex items-center gap-3">
@@ -3567,46 +3577,69 @@
                 }
             }
 
-            updateShippingTotals();
         }
 
         function formatDoctorShippingFee(el) {
             let raw = el.value.replace(/\D/g, "");
             el.value = raw ? "Rp. " + parseInt(raw, 10).toLocaleString("id-ID") : "";
-            updateShippingTotals();
         }
 
-        // Tampilan saja: total transaksi (setelah diskon) + ongkir.
-        // Tidak mengubah totaltransaction / nilai yang dikirim ke checkout.
-        function updateShippingTotals() {
+        // ==========================================
+        // Ringkasan "Total + Ongkir" (TAMPILAN SAJA)
+        // Mandiri penuh: tidak memanggil fungsi lain dan tidak dipanggil
+        // dari fungsi lain, sehingga tidak bisa mengganggu proses transaksi.
+        // ==========================================
+        (function initShippingTotalsDisplay() {
             const baseEl = document.getElementById('shippingBaseTotal');
             const feeEl = document.getElementById('shippingFeeDisplay');
             const grandEl = document.getElementById('grandTotalWithShipping');
+            const destEl = document.getElementById('shippingBankDestination');
             if (!baseEl && !feeEl && !grandEl) return;
 
+            const digits = (value) => String(value || '').replace(/\D/g, '');
             const fmt = (value) => 'Rp ' + Number(Math.max(0, Math.round(Number(value) || 0))).toLocaleString('id-ID');
 
-            // Ambil nilai yang benar-benar tampil di field "Total" agar konsisten
-            // (field Total sudah memperhitungkan diskon & pembulatan yang ada).
-            const totalFieldEl = document.getElementById('carttotal');
-            const totalFieldDigits = (totalFieldEl?.value || '').replace(/\D/g, '');
-            const payable = totalFieldDigits !== '' ?
-                (parseInt(totalFieldDigits, 10) || 0) :
-                Math.max(0, (parseFloat(totaltransaction) || 0) - (parseFloat(subtotal_discount) || 0));
+            const render = () => {
+                try {
+                    const totalField = document.getElementById('carttotal');
+                    const totalDigits = digits(totalField?.value);
+                    const globalTotal = typeof window.totaltransaction !== 'undefined' ? Number(window.totaltransaction) : 0;
+                    const globalDiscount = typeof window.subtotal_discount !== 'undefined' ? Number(window.subtotal_discount) : 0;
+                    const payable = totalDigits !== '' ? Number(totalDigits) : Math.max(0, globalTotal - globalDiscount);
+                    const fee = Number(digits(document.getElementById('doctor_shipping_fee_input')?.value)) || 0;
 
-            const feeRaw = (document.getElementById('doctor_shipping_fee_input')?.value || '').replace(/\D/g, '');
-            const fee = parseInt(feeRaw, 10) || 0;
+                    if (baseEl) baseEl.textContent = fmt(payable);
+                    if (feeEl) feeEl.textContent = fmt(fee);
+                    if (grandEl) grandEl.textContent = fmt(payable + fee);
 
-            if (baseEl) baseEl.textContent = fmt(payable);
-            if (feeEl) feeEl.textContent = fmt(fee);
-            if (grandEl) grandEl.textContent = fmt(payable + fee);
+                    if (destEl) {
+                        const bank = (document.getElementById('shipping_bank_name')?.value || '').trim();
+                        destEl.textContent = bank || '-';
+                    }
+                } catch (e) {
+                    // jangan pernah menghentikan alur transaksi
+                }
+            };
 
-            const destEl = document.getElementById('shippingBankDestination');
-            if (destEl) {
-                const bank = (document.getElementById('shipping_bank_name')?.value || '').trim();
-                destEl.textContent = bank !== '' ? bank : '-';
-            }
-        }
+            // Perbarui saat ada interaksi di area pembayaran/ongkir.
+            ['input', 'change', 'keyup', 'click'].forEach(function(eventName) {
+                document.addEventListener(eventName, function(e) {
+                    const target = e.target;
+                    if (!target || !target.closest) return;
+                    if (target.closest('#doctorShippingContainer') ||
+                        target.id === 'toggleDoctorShipping' ||
+                        target.id === 'carttotal' ||
+                        target.id === 'subtotal' ||
+                        target.id === 'discounsubtotal') {
+                        render();
+                    }
+                }, true);
+            });
+
+            render();
+            // Keranjang berubah lewat AJAX → sinkronkan ringan secara berkala.
+            setInterval(render, 500);
+        })();
 
         function onShippingPaymentTypeChange(val, isManual = false) {
             if (isManual) {
@@ -3644,7 +3677,6 @@
             const bankSelect = document.getElementById('shipping_bank_name');
             if (bankSelect) bankSelect.value = bankName;
             updateShippingBankChipsVisual(bankName);
-            updateShippingTotals();
         }
 
         function syncShippingBankSelect(val, isManual = false) {
@@ -3652,7 +3684,6 @@
                 isDoctorShippingManualOverride = true;
             }
             updateShippingBankChipsVisual(val);
-            updateShippingTotals();
         }
 
         function updateShippingBankChipsVisual(selectedBank) {
@@ -4250,7 +4281,6 @@
         final_price = Math.ceil(final_price / 1000) * 1000;
         subtotal_discount = discount;
         cartTotalInput.value = formatRupiah(final_price);
-        updateShippingTotals();
     }
 
     // ===============================
@@ -4435,8 +4465,6 @@
                 });
             } catch (e) {}
         }
-
-        updateShippingTotals();
     }
 
     function addToCart(medicine_id, transaction_id, quantity, discount, embalase, cart_type, package, dosage_r, price2,
@@ -7409,10 +7437,6 @@
             if (!picker.contains(e.target)) results.classList.add('hidden');
         });
     })();
-
-    // Ringkasan "Total + Ongkir" saat halaman dibuka (tampilan saja).
-    updateShippingTotals();
-
 </script>
 
 {{-- ------------------- Fixed Cart Card --------------------- --}}
