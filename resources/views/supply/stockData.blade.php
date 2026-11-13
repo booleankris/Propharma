@@ -514,8 +514,8 @@
                         className: 'text-right font-semibold tabular-nums px-1',
                         render: function(data) {
                             let n = parseFloat(data || 0);
-                            if (n > 0) return `<span class="text-blue-600">-${formatQty(n)}</span>`;
-                            if (n < 0) return `<span class="text-emerald-600">+${formatQty(Math.abs(n))}</span>`;
+                            if (n > 0) return `<span class="text-blue-600">${formatQty(n)}</span>`;
+                            if (n < 0) return `<span class="text-rose-600">-${formatQty(Math.abs(n))}</span>`;
                             return `<span class="text-slate-400">0</span>`;
                         }
                     },
@@ -539,7 +539,7 @@
                         className: 'text-right font-semibold tabular-nums px-1',
                         render: function(data) {
                             let n = parseFloat(data || 0);
-                            return `<span class="${n > 0 ? 'text-indigo-600 font-bold' : 'text-slate-400'}">${n > 0 ? '-' : ''}${formatQty(n)}</span>`;
+                            return `<span class="${n > 0 ? 'text-indigo-600 font-bold' : 'text-slate-400'}">${formatQty(n)}</span>`;
                         }
                     },
                     {
