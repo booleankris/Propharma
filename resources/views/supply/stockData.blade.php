@@ -236,7 +236,7 @@
         <div class="fixed inset-0 bg-slate-900/60 backdrop-blur-xs transition-opacity mutation-backdrop" style="z-index: 99999998 !important;" onclick="closeMutationModal()"></div>
 
         <div class="flex min-h-full items-center justify-center p-4 text-center sm:p-6 mutation-content-wrapper" style="z-index: 99999999 !important;">
-            <div class="relative transform overflow-hidden rounded-2xl bg-white text-left shadow-2xl transition-all w-full max-w-4xl border border-slate-200">
+            <div class="relative transform overflow-hidden rounded-2xl bg-white text-left shadow-2xl transition-all w-full max-w-5xl border border-slate-200">
                 <!-- Modal Header -->
                 <div class="flex items-start justify-between border-b border-slate-200/80 px-6 py-4 bg-slate-50/70">
                     <div class="flex items-center gap-3">
@@ -294,18 +294,18 @@
 
                         <!-- Table -->
                         <div class="border border-slate-200 rounded-xl overflow-hidden shadow-2xs">
-                            <div class="max-h-[360px] overflow-y-auto">
+                            <div class="max-h-[360px] overflow-y-auto overflow-x-auto">
                                 <table class="w-full text-left text-xs text-slate-600">
                                     <thead class="bg-slate-100/90 text-slate-700 uppercase font-bold sticky top-0 z-10 border-b border-slate-200 text-[11px]">
                                         <tr>
-                                            <th class="px-4 py-2.5 text-center w-10">#</th>
-                                            <th class="px-4 py-2.5">No. Mutasi</th>
-                                            <th class="px-4 py-2.5">Tanggal</th>
-                                            <th class="px-4 py-2.5">Asal</th>
-                                            <th class="px-4 py-2.5">Tujuan</th>
-                                            <th class="px-4 py-2.5">Batch</th>
-                                            <th class="px-4 py-2.5 text-right">Qty</th>
-                                            <th class="px-4 py-2.5">Di-mutasi Oleh</th>
+                                            <th class="px-3 py-2.5 text-center w-9">#</th>
+                                            <th class="px-3 py-2.5 whitespace-nowrap">No. Mutasi</th>
+                                            <th class="px-3 py-2.5 whitespace-nowrap">Tanggal</th>
+                                            <th class="px-3 py-2.5 whitespace-nowrap">Asal</th>
+                                            <th class="px-3 py-2.5 whitespace-nowrap">Tujuan</th>
+                                            <th class="px-3 py-2.5 whitespace-nowrap">Batch</th>
+                                            <th class="px-3 py-2.5 text-right whitespace-nowrap">Qty</th>
+                                            <th class="px-3 py-2.5 whitespace-nowrap">Di-mutasi Oleh</th>
                                         </tr>
                                     </thead>
                                     <tbody id="modalTableBody" class="divide-y divide-slate-100 bg-white">
@@ -700,24 +700,24 @@
                                 : `<span class="inline-block px-2 py-0.5 bg-slate-100 rounded border border-slate-200">-</span>`;
 
                             tr.innerHTML = `
-                                <td class="px-4 py-2.5 text-center text-slate-400 font-medium">${idx + 1}</td>
-                                <td class="px-4 py-2.5 font-mono font-bold text-slate-700 whitespace-nowrap">
+                                <td class="px-3 py-2.5 text-center text-slate-400 font-medium">${idx + 1}</td>
+                                <td class="px-3 py-2.5 font-mono font-bold text-slate-700 whitespace-nowrap">
                                     ${copyBtnHtml}
                                 </td>
-                                <td class="px-4 py-2.5 whitespace-nowrap text-slate-600">${log.formatted_date || '-'}</td>
-                                <td class="px-4 py-2.5 whitespace-nowrap">
+                                <td class="px-3 py-2.5 whitespace-nowrap text-slate-600">${log.formatted_date || '-'}</td>
+                                <td class="px-3 py-2.5 whitespace-nowrap">
                                     <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-slate-100 text-slate-700 border border-slate-200">
                                         ${log.formatted_source || '-'}
                                     </span>
                                 </td>
-                                <td class="px-4 py-2.5 whitespace-nowrap">
+                                <td class="px-3 py-2.5 whitespace-nowrap">
                                     <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-indigo-50 text-indigo-700 border border-indigo-200">
                                         ${log.formatted_destination || '-'}
                                     </span>
                                 </td>
-                                <td class="px-4 py-2.5 whitespace-nowrap font-medium text-slate-700">${log.batch_name || '-'}</td>
-                                <td class="px-4 py-2.5 text-right font-bold text-indigo-700 tabular-nums whitespace-nowrap">${formatQty(log.qty_number || 0)}</td>
-                                <td class="px-4 py-2.5 whitespace-nowrap text-slate-600 font-medium">${log.operator_name || '-'}</td>
+                                <td class="px-3 py-2.5 whitespace-nowrap font-medium text-slate-700">${log.batch_name || '-'}</td>
+                                <td class="px-3 py-2.5 text-right font-bold text-indigo-700 tabular-nums whitespace-nowrap">${formatQty(log.qty_number || 0)}</td>
+                                <td class="px-3 py-2.5 whitespace-nowrap text-slate-600 font-medium">${log.operator_name || '-'}</td>
                             `;
                             tbody.appendChild(tr);
                         });

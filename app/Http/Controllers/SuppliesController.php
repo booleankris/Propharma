@@ -1168,10 +1168,25 @@ class SuppliesController extends Controller
         $warehouseId = getWarehousePharmacyId(); // 9 (Gudang PMI)
         $pmiPharmacyId = 1; // Sahabat PMI
         $canSeeWarehouse = canAccessWarehouseStock($pharmacyId);
+        $startPharmacyIds = $canSeeWarehouse ? [$warehouseId, $pmiPharmacyId] : [$pharmacyId];
         $transferSourcePharmacyIds = $canSeeWarehouse ? [$warehouseId, $pmiPharmacyId] : [$pharmacyId];
 
         $startDate = $request->filled('start_date') ? Carbon::parse($request->start_date)->toDateString() : null;
         $endDate = $request->filled('end_date') ? Carbon::parse($request->end_date)->toDateString() : null;
+        $hasDateFilter = ($startDate !== null || $endDate !== null);
+
+        $latestOpeningLog = null;
+        if (!$hasDateFilter) {
+            $latestOpeningLog = DB::table('items_log as il')
+                ->join('batches as b', 'b.id', '=', 'il.batches_id')
+                ->where('il.type', 'SO-SALDO-AWAL')
+                ->whereIn('b.pharmacy_id', $startPharmacyIds)
+                ->where('il.medicine_id', $medicineId)
+                ->orderByDesc('il.id')
+                ->select(DB::raw('DATE(il.date) as op_date'))
+                ->first();
+        }
+        $opDate = $latestOpeningLog ? $latestOpeningLog->op_date : null;
 
         $batchIds = Batches::where('medicine_id', $medicineId)->pluck('id')->all();
 
@@ -1222,6 +1237,9 @@ class SuppliesController extends Controller
               ->orWhereRaw('COALESCE(mt.source_pharmacy_id, src_batch.pharmacy_id, 0) != mt.destination_pharmacy_id');
         });
 
+        if (!$hasDateFilter && $opDate) {
+            $query->whereDate('mt.created_at', '>', $opDate);
+        }
         if ($startDate) {
             $query->whereDate('mt.created_at', '>=', $startDate);
         }
@@ -1291,7 +1309,7 @@ class SuppliesController extends Controller
             'logs' => $items,
             'period_label' => ($startDate && $endDate)
                 ? (Carbon::parse($startDate)->format('d/m/Y') . ' - ' . Carbon::parse($endDate)->format('d/m/Y'))
-                : 'Semua Waktu',
+                : ($opDate ? ('Setelah SO ' . Carbon::parse($opDate)->format('d/m/Y')) : 'Semua Waktu'),
         ]);
     }
     public function medicineSelect(Request $request)
