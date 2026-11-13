@@ -229,11 +229,19 @@
                     <label class="block text-[11px] font-semibold text-slate-500 mb-1">Cari Obat</label>
                     <input type="text" name="search" value="{{ request('search') }}" placeholder="Nama obat / kode..." class="text-xs bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 outline-none focus:border-indigo-500 transition w-44 sm:w-52">
                 </div>
+                <div>
+                    <label class="block text-[11px] font-semibold text-slate-500 mb-1">Status Penerimaan</label>
+                    <select name="status" class="text-xs bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 outline-none focus:border-indigo-500 transition">
+                        <option value="" {{ !request()->filled('status') ? 'selected' : '' }}>Semua Status</option>
+                        <option value="unreceived" {{ request('status') === 'unreceived' ? 'selected' : '' }}>Belum Diterima (Pending)</option>
+                        <option value="received" {{ request('status') === 'received' ? 'selected' : '' }}>Sudah Diterima</option>
+                    </select>
+                </div>
                 <div class="flex gap-2">
                     <button type="submit" class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-xs font-semibold transition shadow-sm">
                         Filter
                     </button>
-                    @if(request()->anyFilled(['start_date', 'end_date', 'expired_date', 'search']))
+                    @if(request()->anyFilled(['start_date', 'end_date', 'expired_date', 'search', 'status']))
                         <a href="{{ route('transfers.incoming') }}" class="bg-slate-100 hover:bg-slate-200 text-slate-600 px-3.5 py-2 rounded-lg text-xs font-semibold transition flex items-center">
                             Reset
                         </a>
@@ -840,7 +848,18 @@
                     exportBtn.classList.add('opacity-75', 'cursor-not-allowed', 'pointer-events-none');
 
                     try {
-                        const response = await fetch(exportBtn.href, {
+                        const filterForm = exportBtn.closest('.mb-6')?.querySelector('form');
+                        const exportUrl = new URL('{{ route('transfers.export') }}', window.location.origin);
+                        if (filterForm) {
+                            const formData = new FormData(filterForm);
+                            for (const [key, val] of formData.entries()) {
+                                if (val !== null && String(val).trim() !== '') {
+                                    exportUrl.searchParams.set(key, String(val).trim());
+                                }
+                            }
+                        }
+
+                        const response = await fetch(exportUrl.toString(), {
                             headers: { 'Accept': 'application/json' }
                         });
                         if (!response.ok) throw new Error('Gagal mengunduh');

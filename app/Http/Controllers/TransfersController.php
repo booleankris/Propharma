@@ -800,8 +800,9 @@ class TransfersController extends Controller
         $startDate = request('start_date');
         $endDate = request('end_date');
         $expiredDate = request('expired_date');
+        $status = request('status'); // '', 'unreceived', 'received'
 
-        $applyFilters = function ($query) use ($search, $startDate, $endDate, $expiredDate) {
+        $applyFilters = function ($query) use ($search, $startDate, $endDate, $expiredDate, $status) {
             $query->whereDoesntHave('items', function ($q) {
                 $q->whereNotNull('receiving_items_id');
             });
@@ -828,6 +829,17 @@ class TransfersController extends Controller
                 $query->whereHas('items.batches', function ($subQ) use ($expiredDate) {
                     $subQ->whereDate('expired_date', $expiredDate);
                 });
+            }
+
+            if ($status === 'unreceived') {
+                $query->where('status', '!=', 2)
+                    ->where(function ($sq) {
+                        $sq->where('status', 0)
+                            ->orWhereHas('items', fn($i) => $i->where('status', 0));
+                    });
+            } elseif ($status === 'received') {
+                $query->where('status', 1)
+                    ->whereDoesntHave('items', fn($i) => $i->where('status', 0));
             }
         };
 
@@ -903,6 +915,8 @@ class TransfersController extends Controller
         $endDate = $request->end_date;
         $search = $request->search;
         $type = $request->type ?? 'semua'; // pending, accepted, denied, semua
+        $expiredDate = $request->expired_date;
+        $status = $request->status;
 
         $job = ExportJob::create([
             'type' => 'transfers',
@@ -911,12 +925,14 @@ class TransfersController extends Controller
         ]);
 
         dispatch(new ProcessTransfersExport(
-            $job->id, 
-            $pharmacyId, 
-            $startDate, 
-            $endDate, 
-            $search, 
-            $type
+            $job->id,
+            $pharmacyId,
+            $startDate,
+            $endDate,
+            $search,
+            $type,
+            $expiredDate,
+            $status
         ));
 
         return response()->json([

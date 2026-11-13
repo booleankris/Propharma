@@ -17,14 +17,18 @@ class TransfersExport implements FromQuery, WithHeadings, WithMapping, ShouldAut
     protected $endDate;
     protected $search;
     protected $type;
+    protected $expiredDate;
+    protected $status;
 
-    public function __construct($pharmacyId, $startDate, $endDate, $search, $type)
+    public function __construct($pharmacyId, $startDate, $endDate, $search, $type, $expiredDate = null, $status = null)
     {
         $this->pharmacyId = $pharmacyId;
         $this->startDate = $startDate;
         $this->endDate = $endDate;
         $this->search = $search;
         $this->type = $type;
+        $this->expiredDate = $expiredDate;
+        $this->status = $status;
     }
 
     public function query()
@@ -41,21 +45,48 @@ class TransfersExport implements FromQuery, WithHeadings, WithMapping, ShouldAut
         ])->whereNull('receiving_items_id');
 
         if ($this->startDate && $this->endDate) {
-            $query->whereIn('medicine_transfer_id', function($q) {
-                $q->select('id')->from('medicine_transfers')
-                  ->whereBetween('created_at', [$this->startDate . ' 00:00:00', $this->endDate . ' 23:59:59']);
+            $query->whereHas('transfer', function ($q) {
+                $q->whereBetween('created_at', [$this->startDate . ' 00:00:00', $this->endDate . ' 23:59:59']);
+            });
+        }
+
+        if ($this->expiredDate) {
+            $query->whereHas('batches', function ($q) {
+                $q->whereDate('expired_date', $this->expiredDate);
             });
         }
 
         if ($this->search) {
-            $query->where(function ($query) {
-                $query->whereIn('batches_id', function($q) {
-                  $q->select('id')->from('batches')
-                  ->whereIn('medicine_id', function($q2) {
-                      $q2->select('id')->from('medicines')->where('name', 'like', "%{$this->search}%");
-                  });
-                })->orWhereHas('requestedMedicine', fn($medicine) => $medicine->where('name', 'like', "%{$this->search}%"));
+            $search = $this->search;
+            $query->where(function ($q) use ($search) {
+                $q->whereHas('transfer', fn($t) => $t->where('code', 'like', "%{$search}%"))
+                    ->orWhereHas('batches.medicines', function ($m) use ($search) {
+                        $m->where('name', 'like', "%{$search}%")
+                            ->orWhere('code', 'like', "%{$search}%");
+                    })
+                    ->orWhereHas('sourceBatch.medicines', function ($m) use ($search) {
+                        $m->where('name', 'like', "%{$search}%")
+                            ->orWhere('code', 'like', "%{$search}%");
+                    })
+                    ->orWhereHas('requestedMedicine', function ($m) use ($search) {
+                        $m->where('name', 'like', "%{$search}%")
+                            ->orWhere('code', 'like', "%{$search}%");
+                    });
             });
+        }
+
+        if ($this->status === 'unreceived') {
+            $query->where('status', 0)
+                ->whereHas('transfer', function ($t) {
+                    $t->where('status', '!=', 2)
+                        ->where(function ($req) {
+                            $req->where('is_request', false)
+                                ->orWhereNull('is_request')
+                                ->orWhere('request_status', 1);
+                        });
+                });
+        } elseif ($this->status === 'received') {
+            $query->where('status', 1);
         }
 
         $pharmacyId = (int) $this->pharmacyId;

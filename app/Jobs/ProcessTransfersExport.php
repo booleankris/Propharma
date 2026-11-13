@@ -20,8 +20,10 @@ class ProcessTransfersExport implements ShouldQueue
     protected $endDate;
     protected $search;
     protected $type;
+    protected $expiredDate;
+    protected $status;
 
-    public function __construct($exportJobId, $pharmacyId, $startDate, $endDate, $search, $type)
+    public function __construct($exportJobId, $pharmacyId, $startDate, $endDate, $search, $type, $expiredDate = null, $status = null)
     {
         $this->exportJobId = $exportJobId;
         $this->pharmacyId = $pharmacyId;
@@ -29,6 +31,8 @@ class ProcessTransfersExport implements ShouldQueue
         $this->endDate = $endDate;
         $this->search = $search;
         $this->type = $type;
+        $this->expiredDate = $expiredDate;
+        $this->status = $status;
     }
 
     public function handle()
@@ -41,12 +45,25 @@ class ProcessTransfersExport implements ShouldQueue
             'progress' => 10
         ]);
 
-        $fileName = 'Mutasi_Apotek_' . time() . '.xlsx';
+        $suffix = match ($this->status) {
+            'unreceived' => '_Belum_Diterima',
+            'received' => '_Sudah_Diterima',
+            default => '',
+        };
+        $fileName = 'Mutasi_Apotek' . $suffix . '_' . time() . '.xlsx';
         $path = 'exports/' . $fileName;
 
         try {
             Excel::store(
-                new TransfersExport($this->pharmacyId, $this->startDate, $this->endDate, $this->search, $this->type),
+                new TransfersExport(
+                    $this->pharmacyId,
+                    $this->startDate,
+                    $this->endDate,
+                    $this->search,
+                    $this->type,
+                    $this->expiredDate,
+                    $this->status
+                ),
                 $path,
                 'public'
             );
