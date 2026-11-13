@@ -354,6 +354,7 @@
                                 @foreach ($accounts as $acc)
                                     <option value="{{ $acc->id }}">{{ $acc->name }} ({{ $acc->code }})</option>
                                 @endforeach
+                                <option value="credit_only">— Potong Piutang / Tanpa Pengembalian Kas —</option>
                             @else
                                 <option value="">— Pilih akun kas / bank —</option>
                             @endif
@@ -675,8 +676,9 @@
                         const opt = document.createElement('option');
                         opt.value = acc.id;
                         opt.textContent = `${acc.name} (${acc.code})`;
-                        select.appendChild(opt);
+                        optGroup.appendChild(opt);
                     });
+                    select.appendChild(optGroup);
                 } else {
                     accounts.forEach(acc => {
                         const opt = document.createElement('option');
@@ -693,7 +695,10 @@
 
                 // Defaultkan pilihan sesuai akun/metode bayar saat transaksi dibuat
                 if (trx.default_account_id) {
-                    select.value = trx.default_account_id;
+                    select.value = String(trx.default_account_id);
+                }
+                if (!select.value && select.options.length > 0) {
+                    select.selectedIndex = 0;
                 }
 
                 const hint = document.getElementById('account_hint');

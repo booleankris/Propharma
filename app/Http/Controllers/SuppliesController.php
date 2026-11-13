@@ -19,6 +19,7 @@ use App\Models\ReceivingItems;
 use App\Models\Etalases;
 use App\Models\Pharmacies;
 use App\Models\StockOpname;
+use App\Services\StockDataReportService;
 use App\Services\StockOpnameImportService;
 use Carbon\Carbon;
 use DataTables;
@@ -820,20 +821,8 @@ class SuppliesController extends Controller
     {
         if ($request->ajax()) {
             $pharmacyId = getActivePharmacyId();
-            $warehouseId = getWarehousePharmacyId(); // 9 (Gudang PMI)
-            $pmiPharmacyId = 1; // SAHABAT PMI
-            $canSeeWarehouse = canAccessWarehouseStock($pharmacyId);
-
             $startDate = $request->filled('start_date') ? Carbon::parse($request->start_date)->toDateString() : null;
             $endDate = $request->filled('end_date') ? Carbon::parse($request->end_date)->toDateString() : null;
-            $hasDateFilter = ($startDate || $endDate);
-
-            // Tentukan target pharmacy_id untuk filter pembelian, penjualan, saldo awal, dan stok counter
-            $ordersPharmacyId = $canSeeWarehouse ? $warehouseId : $pharmacyId;
-            $salesPharmacyId = $canSeeWarehouse ? $pmiPharmacyId : $pharmacyId;
-            $startPharmacyIds = $canSeeWarehouse ? [$warehouseId, $pmiPharmacyId] : [$pharmacyId];
-            $counterPharmacyId = $canSeeWarehouse ? $pmiPharmacyId : $pharmacyId;
-            $allPharmacyIds = array_unique(array_merge([$ordersPharmacyId, $salesPharmacyId], $startPharmacyIds));
 
             // Base query on medicines table ONLY (ultra fast, no subqueries)
             $query = Medicines::query()
@@ -893,246 +882,30 @@ class SuppliesController extends Controller
             }
 
             $pageMedicineIds = $pageMedicines->pluck('id')->all();
+            $metricsMap = app(StockDataReportService::class)->computeMetrics(
+                $pageMedicineIds,
+                (int) $pharmacyId,
+                $startDate,
+                $endDate,
+                false
+            );
 
-            // 1. Storage stock (Gudang PMI)
-            $storageStockMap = [];
-            if ($canSeeWarehouse) {
-                $storageStockMap = Batches::whereIn('medicine_id', $pageMedicineIds)
-                    ->where('pharmacy_id', $warehouseId)
-                    ->selectRaw('medicine_id, SUM(stock) as total')
-                    ->groupBy('medicine_id')
-                    ->pluck('total', 'medicine_id')
-                    ->all();
-            }
-
-            // 2. Counter stock (Pelayanan PMI / Etalase Cabang)
-            $counterStockMap = MedicineTransferItems::join('batches', 'batches.id', '=', 'medicine_transfer_items.batches_id')
-                ->whereIn('batches.medicine_id', $pageMedicineIds)
-                ->where('batches.pharmacy_id', $counterPharmacyId)
-                ->where('medicine_transfer_items.status', 1)
-                ->where(function ($q) {
-                    $q->whereNull('medicine_transfer_items.source_type')
-                      ->orWhere('medicine_transfer_items.source_type', '!=', 'retur_gudang');
-                })
-                ->selectRaw('batches.medicine_id, SUM(medicine_transfer_items.qty) as total')
-                ->groupBy('batches.medicine_id')
-                ->pluck('total', 'batches.medicine_id')
-                ->all();
-
-            // 3. Latest Opening Balances (SO-SALDO-AWAL)
-            $latestOpeningLogs = DB::table('items_log as il')
-                ->join('batches as b', 'b.id', '=', 'il.batches_id')
-                ->joinSub(
-                    DB::table('items_log as il2')
-                        ->join('batches as b2', 'b2.id', '=', 'il2.batches_id')
-                        ->where('il2.type', 'SO-SALDO-AWAL')
-                        ->whereIn('b2.pharmacy_id', $startPharmacyIds)
-                        ->whereIn('il2.medicine_id', $pageMedicineIds)
-                        ->groupBy('il2.medicine_id')
-                        ->select('il2.medicine_id', DB::raw('MAX(il2.id) as max_id')),
-                    'latest',
-                    'latest.max_id', '=', 'il.id'
-                )
-                ->select('il.medicine_id', 'il.qty_before', DB::raw('DATE(il.date) as op_date'))
-                ->get()
-                ->keyBy('medicine_id');
-
-            // 4. Movements from items_log (Beli, Jual, Retur Beli, Retur Jual, Penyesuaian/Opname)
-            $logsQuery = DB::table('items_log')
-                ->join('batches', 'batches.id', '=', 'items_log.batches_id')
-                ->whereIn('items_log.medicine_id', $pageMedicineIds)
-                ->whereIn('batches.pharmacy_id', $allPharmacyIds)
-                ->whereIn('items_log.status', [1, 2, 3, 4, 5, 6, 7]);
-
-            if ($startDate) {
-                $logsQuery->whereDate('items_log.date', '>=', $startDate);
-            }
-            if ($endDate) {
-                $logsQuery->whereDate('items_log.date', '<=', $endDate);
-            }
-
-            $logs = $logsQuery->select([
-                'items_log.medicine_id',
-                'batches.pharmacy_id',
-                'items_log.status',
-                'items_log.date',
-                'items_log.qty',
-                'items_log.qty_before',
-                'items_log.qty_after',
-                'items_log.total',
-            ])->get();
-
-            $aggOrders = [];
-            $aggSales = [];
-            $aggOrdersRt = [];
-            $aggSalesRt = [];
-            $aggAdjustments = [];
-
-            foreach ($logs as $log) {
-                $mId = $log->medicine_id;
-                $pId = $log->pharmacy_id;
-                $st = (int) $log->status;
-                $logDate = substr($log->date, 0, 10);
-
-                if (!$hasDateFilter) {
-                    $opDate = isset($latestOpeningLogs[$mId]) ? $latestOpeningLogs[$mId]->op_date : '1000-01-01';
-                    if ($logDate <= $opDate) {
-                        continue;
-                    }
-                }
-
-                $qty = (int) $log->qty;
-
-                if ($st === 2 && $pId == $ordersPharmacyId) {
-                    $aggOrders[$mId] = ($aggOrders[$mId] ?? 0) + $qty;
-                } elseif ($st === 1 && $pId == $salesPharmacyId) {
-                    $aggSales[$mId] = ($aggSales[$mId] ?? 0) + $qty;
-                } elseif ($st === 4 && $pId == $ordersPharmacyId) {
-                    $aggOrdersRt[$mId] = ($aggOrdersRt[$mId] ?? 0) + $qty;
-                } elseif ($st === 3 && $pId == $salesPharmacyId) {
-                    $aggSalesRt[$mId] = ($aggSalesRt[$mId] ?? 0) + $qty;
-                } elseif (in_array($st, [5, 6, 7]) && in_array($pId, $startPharmacyIds)) {
-                    if ($st === 5) {
-                        if ($log->total !== null && preg_match('/^[+-]?[0-9]+([.][0-9]+)?([eE][+-]?[0-9]+)?$/', trim($log->total))) {
-                            $diff = (int) $log->total;
-                        } else {
-                            $diff = (int) $log->qty_after - (int) $log->qty_before;
-                        }
-                    } else {
-                        $diff = (int) $log->qty_after - (int) $log->qty_before;
-                    }
-                    $aggAdjustments[$mId] = ($aggAdjustments[$mId] ?? 0) + $diff;
-                }
-            }
-
-            // 5. Transfers / Mutations (Gudang PMI + Sahabat PMI outbound, excluding retur_gudang & dummy init)
-            $pageBatchIds = Batches::whereIn('medicine_id', $pageMedicineIds)->pluck('id')->all();
-            $transferSourcePharmacyIds = $canSeeWarehouse
-                ? [$warehouseId, $pmiPharmacyId]
-                : [$pharmacyId];
-
-            $transferQuery = DB::table('medicine_transfer_items as mti')
-                ->join('medicine_transfers as mt', 'mt.id', '=', 'mti.medicine_transfer_id')
-                ->leftJoin('batches as src_batches', 'src_batches.id', '=', 'mti.source_batches_id')
-                ->leftJoin('batches as dst_batches', 'dst_batches.id', '=', 'mti.batches_id')
-                ->where(function ($q) use ($pageMedicineIds, $pageBatchIds) {
-                    if (!empty($pageBatchIds)) {
-                        $q->whereIn('mti.source_batches_id', $pageBatchIds)
-                          ->orWhereIn('mti.batches_id', $pageBatchIds);
-                    }
-                    $q->orWhereIn('mti.requested_medicine_id', $pageMedicineIds);
-                })
-                ->where(function ($sq) use ($transferSourcePharmacyIds) {
-                    $sq->whereIn('mt.source_pharmacy_id', $transferSourcePharmacyIds)
-                       ->orWhere(function ($sq2) use ($transferSourcePharmacyIds) {
-                           $sq2->whereNull('mt.source_pharmacy_id')
-                               ->whereIn('src_batches.pharmacy_id', $transferSourcePharmacyIds);
-                       });
-                })
-                ->where('mt.status', '!=', 2)
-                ->where(function ($q) {
-                    $q->whereNull('mt.is_request')
-                      ->orWhere('mt.is_request', 0)
-                      ->orWhere('mt.request_status', 1);
-                })
-                ->where('mt.code', 'not like', 'TRF-INIT%')
-                ->where(function ($q) {
-                    $q->whereNull('mti.source_type')
-                      ->orWhere('mti.source_type', '!=', 'retur_gudang');
-                })
-                ->where(DB::raw('COALESCE(mti.original_qty, mti.qty)'), '>', 0);
-
-            if ($canSeeWarehouse) {
-                // Exclude returns from Sahabat PMI back into Gudang PMI (internal warehouse consolidation)
-                $transferQuery->where(function ($q) use ($warehouseId) {
-                    $q->whereNull('mt.destination_pharmacy_id')
-                      ->orWhere('mt.destination_pharmacy_id', '!=', $warehouseId);
-                });
-            }
-
-            $transferQuery->where(function ($q) {
-                $q->whereNull('mt.destination_pharmacy_id')
-                  ->orWhereRaw('COALESCE(mt.source_pharmacy_id, src_batches.pharmacy_id, 0) != mt.destination_pharmacy_id');
-            });
-
-            if ($startDate) {
-                $transferQuery->whereDate('mt.created_at', '>=', $startDate);
-            }
-            if ($endDate) {
-                $transferQuery->whereDate('mt.created_at', '<=', $endDate);
-            }
-
-            $transfers = $transferQuery->select([
-                DB::raw('COALESCE(src_batches.medicine_id, dst_batches.medicine_id, mti.requested_medicine_id) as medicine_id'),
-                DB::raw('DATE(mt.created_at) as transfer_date'),
-                DB::raw('COALESCE(mti.original_qty, mti.qty) as qty'),
-            ])->get();
-
-            $aggTransfers = [];
-            foreach ($transfers as $tr) {
-                $mId = $tr->medicine_id;
-                if (!$mId) continue;
-                if (!$hasDateFilter) {
-                    $opDate = isset($latestOpeningLogs[$mId]) ? $latestOpeningLogs[$mId]->op_date : '1000-01-01';
-                    if ($tr->transfer_date <= $opDate) {
-                        continue;
-                    }
-                }
-                $aggTransfers[$mId] = ($aggTransfers[$mId] ?? 0) + (int) $tr->qty;
-            }
-
-            // 6. Payment methods (Keterangan)
-            $paymentMethods = DB::table('receiving_items as ri')
-                ->join('receiving_details as rd', 'rd.id', '=', 'ri.receiving_details_id')
-                ->join('receiving as r', 'r.id', '=', 'rd.receiving_id')
-                ->leftJoin('batches as b', 'b.id', '=', 'ri.batches_id')
-                ->leftJoin('order_items as oi', 'oi.id', '=', 'ri.order_items_id')
-                ->where(function ($q) use ($pageMedicineIds, $pageBatchIds) {
-                    if (!empty($pageBatchIds)) {
-                        $q->whereIn('ri.batches_id', $pageBatchIds);
-                    }
-                    $q->orWhereIn('oi.medicine_id', $pageMedicineIds);
-                })
-                ->where('r.pharmacy_id', $ordersPharmacyId)
-                ->when($endDate, fn($q) => $q->whereDate('rd.invoice_date', '<=', $endDate))
-                ->select(
-                    DB::raw('COALESCE(b.medicine_id, oi.medicine_id) as medicine_id'),
-                    'rd.invoice_payment'
-                )
-                ->orderBy('rd.invoice_date', 'desc')
-                ->orderBy('rd.id', 'desc')
-                ->get()
-                ->filter(fn($row) => !empty($row->medicine_id))
-                ->unique('medicine_id')
-                ->pluck('invoice_payment', 'medicine_id')
-                ->all();
-
-            // 7. Assemble final response for the 10 rows
+            // Assemble final response for the current page rows
             $data = [];
             foreach ($pageMedicines as $index => $m) {
-                $mId = $m->id;
-                $qtyStorage = $canSeeWarehouse ? (int) ($storageStockMap[$mId] ?? 0) : 0;
-                $qtyCounter = (int) ($counterStockMap[$mId] ?? 0);
-                $totalStok = $qtyStorage + $qtyCounter;
-
-                $qtyOrders = (int) ($aggOrders[$mId] ?? 0);
-                $qtyOrdersRt = (int) ($aggOrdersRt[$mId] ?? 0);
-                $qtySales = (int) ($aggSales[$mId] ?? 0);
-                $qtySalesRt = (int) ($aggSalesRt[$mId] ?? 0);
-                $qtyTransferred = (int) ($aggTransfers[$mId] ?? 0);
-
-                $netIn = $qtyOrders - $qtyOrdersRt;
-                $netOut = $qtySales - $qtySalesRt;
-                $adjustments = (int) ($aggAdjustments[$mId] ?? 0);
-
-                $opLog = $latestOpeningLogs[$mId] ?? null;
-                $qtyStart = (!$hasDateFilter && $opLog !== null)
-                    ? (int) $opLog->qty_before
-                    : $totalStok - $netIn + $netOut - $adjustments;
-
-                $rawPayment = $paymentMethods[$mId] ?? null;
-                $p = $rawPayment ? strtoupper(trim($rawPayment)) : null;
-                $keterangan = ($p === 'TUNAI' || $p === 'CASH') ? 'Cash' : (($p === 'KREDIT') ? 'Kredit' : (($p === 'KONSINYASI') ? 'Konsinyasi' : ($p ? ucfirst(strtolower($p)) : '-')));
+                $metrics = $metricsMap[(int) $m->id] ?? [
+                    'qty_start' => 0,
+                    'qty_orders' => 0,
+                    'qty_sales' => 0,
+                    'qty_transferred_pmi' => 0,
+                    'qty_transferred_branch' => 0,
+                    'qty_transferred' => 0,
+                    'qty_adjustments' => 0,
+                    'qty_storage' => 0,
+                    'qty_counter' => 0,
+                    'qty_now' => 0,
+                    'keterangan' => '-',
+                ];
 
                 $data[] = [
                     'DT_RowIndex' => $start + $index + 1,
@@ -1140,15 +913,17 @@ class SuppliesController extends Controller
                     'code' => $m->code,
                     'name' => $m->name,
                     'unit' => $m->unit,
-                    'qty_start' => $qtyStart,
-                    'qty_orders' => $qtyOrders,
-                    'qty_sales' => $qtySales,
-                    'qty_transferred' => $qtyTransferred,
-                    'qty_remaining' => $totalStok,
-                    'qty_storage' => $qtyStorage,
-                    'qty_counter' => $qtyCounter,
-                    'qty_now' => $totalStok,
-                    'keterangan' => $keterangan,
+                    'qty_start' => $metrics['qty_start'],
+                    'qty_orders' => $metrics['qty_orders'],
+                    'qty_sales' => $metrics['qty_sales'],
+                    'qty_transferred_pmi' => $metrics['qty_transferred_pmi'],
+                    'qty_transferred_branch' => $metrics['qty_transferred_branch'],
+                    'qty_transferred' => $metrics['qty_transferred'],
+                    'qty_adjustments' => $metrics['qty_adjustments'],
+                    'qty_storage' => $metrics['qty_storage'],
+                    'qty_counter' => $metrics['qty_counter'],
+                    'qty_now' => $metrics['qty_now'],
+                    'keterangan' => $metrics['keterangan'],
                 ];
             }
 
@@ -1182,6 +957,7 @@ class SuppliesController extends Controller
                 ->where('il.type', 'SO-SALDO-AWAL')
                 ->whereIn('b.pharmacy_id', $startPharmacyIds)
                 ->where('il.medicine_id', $medicineId)
+                ->orderByDesc(DB::raw('DATE(il.date)'))
                 ->orderByDesc('il.id')
                 ->select(DB::raw('DATE(il.date) as op_date'))
                 ->first();
@@ -1296,6 +1072,12 @@ class SuppliesController extends Controller
             ];
         })->values();
 
+        $pmiQty = $canSeeWarehouse
+            ? $items->where('destination_pharmacy_id', $pmiPharmacyId)->sum('qty_number')
+            : 0;
+        $totalQty = $items->sum('qty_number');
+        $branchQty = $totalQty - $pmiQty;
+
         return response()->json([
             'success' => true,
             'medicine' => [
@@ -1304,7 +1086,9 @@ class SuppliesController extends Controller
                 'name' => $medicine->name,
                 'unit' => $medicine->unit ? strtoupper($medicine->unit) : '-',
             ],
-            'total_qty' => $items->sum('qty_number'),
+            'total_qty' => $totalQty,
+            'pmi_qty' => $pmiQty,
+            'branch_qty' => $branchQty,
             'summary' => $summary,
             'logs' => $items,
             'period_label' => ($startDate && $endDate)

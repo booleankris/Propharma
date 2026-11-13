@@ -24,11 +24,113 @@ use Illuminate\Support\Facades\DB;
 class ReturController extends Controller
 {
 
+    /**
+     * Ambil daftar akun Kas & Bank aktif untuk cabang tertentu.
+     */
+    private function getBranchCashBankAccounts(int $pharmacyId)
+    {
+        if ($pharmacyId > 0) {
+            FinanceAccount::ensureBranchDefaultAccounts($pharmacyId);
+        }
+
+        return FinanceAccount::where('pharmacy_id', $pharmacyId)
+            ->where('category', 'Kas & Bank')
+            ->where('is_active', true)
+            ->orderByRaw("CASE WHEN account_type = 'kas_apotek' THEN 0 ELSE 1 END")
+            ->orderBy('code')
+            ->get(['id', 'code', 'name', 'account_type']);
+    }
+
+    /**
+     * Tentukan metadata pengembalian dana & akun default berdasarkan transaksi asal.
+     */
+    private function resolveTransactionRefundMeta(MedicineTransactions $transaction, $accounts): array
+    {
+        $trxPharmacyId = (int) ($transaction->pharmacy_id ?: getActivePharmacyId());
+        $payMethod = trim((string) ($transaction->payment_method ?? ''));
+        $bankName = trim((string) ($transaction->transfer_bank_name ?? ''));
+        $isCredit = in_array($transaction->transaction_type, ['KREDIT', 'RESEP KREDIT'], true)
+            || strcasecmp($payMethod, 'KREDIT') === 0;
+
+        if ($isCredit) {
+            $paymentMethodDesc = 'Kredit / Piutang';
+            $defaultAccountId = 'credit_only';
+            $defaultAccountName = 'Potong Piutang (Tanpa Pengeluaran Kas/Bank)';
+        } else {
+            $paymentMethodDesc = $bankName !== ''
+                ? strtoupper($payMethod ?: 'TRANSFER') . ' - ' . $bankName
+                : strtoupper($payMethod ?: 'TUNAI');
+
+            // Prioritaskan akun persis seperti tercatat di FinancePayment saat penjualan
+            $loggedAccountId = FinancePayment::where('medicine_transaction_id', $transaction->id)
+                ->whereIn('payment_type', ['PENJUALAN TUNAI', 'PENJUALAN NON TUNAI'])
+                ->orderBy('id')
+                ->value('account_id');
+
+            $matchedAccount = $loggedAccountId
+                ? $accounts->firstWhere('id', (int) $loggedAccountId)
+                : null;
+
+            if (!$matchedAccount) {
+                $isNonCash = $bankName !== ''
+                    || stripos($payMethod, 'transfer') !== false
+                    || stripos($payMethod, 'non') !== false
+                    || stripos($payMethod, 'qris') !== false
+                    || stripos($payMethod, 'debit') !== false
+                    || stripos($payMethod, 'edc') !== false;
+
+                if ($isNonCash) {
+                    $resolvedBank = FinanceAccount::resolveBranchBankAccount(
+                        $trxPharmacyId,
+                        $bankName !== '' ? $bankName : $payMethod,
+                        false,
+                        true
+                    );
+                    if ($resolvedBank) {
+                        $accounts = $this->getBranchCashBankAccounts($trxPharmacyId);
+                        $matchedAccount = $accounts->firstWhere('id', $resolvedBank->id) ?? $resolvedBank;
+                    }
+                }
+            }
+
+            if (!$matchedAccount) {
+                $resolvedCash = FinanceAccount::resolveBranchCashAccount($trxPharmacyId, false);
+                if ($resolvedCash) {
+                    $matchedAccount = $accounts->firstWhere('id', $resolvedCash->id) ?? $resolvedCash;
+                }
+            }
+
+            if (!$matchedAccount) {
+                $matchedAccount = $accounts->first();
+            }
+
+            $defaultAccountId = $matchedAccount ? $matchedAccount->id : null;
+            $defaultAccountName = $matchedAccount
+                ? "{$matchedAccount->name} ({$matchedAccount->code})"
+                : 'Kas Apotek';
+        }
+
+        return [
+            'accounts' => $accounts,
+            'transaction' => [
+                'id' => $transaction->id,
+                'transaction_code' => $transaction->transaction_code,
+                'transaction_type' => $transaction->transaction_type,
+                'payment_method' => $payMethod ?: 'TUNAI',
+                'payment_method_desc' => $paymentMethodDesc,
+                'is_credit' => $isCredit,
+                'default_account_id' => $defaultAccountId,
+                'default_account_name' => $defaultAccountName,
+            ],
+        ];
+    }
+
     public function retur()
     {
         $now = Carbon::now()->format('d/m/Y');
         $retur_code = $this->generateReturCode();
-        return view('kasir.retur.sales_retur', compact('retur_code', 'now'));
+        $accounts = $this->getBranchCashBankAccounts((int) getActivePharmacyId());
+        return view('kasir.retur.sales_retur', compact('retur_code', 'now', 'accounts'));
     }
     public function returOrders()
     {
@@ -82,12 +184,23 @@ class ReturController extends Controller
         $transactionCode = $request->transaction_code;
 
         if (empty($transactionCode)) {
-            return response()->json([]);
+            return response()->json([
+                'transaction' => null,
+                'accounts' => $this->getBranchCashBankAccounts((int) getActivePharmacyId())->values(),
+                'items' => [],
+            ]);
         }
 
         // Ambil transaksi berdasarkan transaction_code
         $transaction = MedicineTransactions::where('transaction_code', $transactionCode)->first();
-        $transactionId = $transaction ? $transaction->id : null;
+        if (!$transaction) {
+            return response()->json([
+                'transaction' => null,
+                'accounts' => $this->getBranchCashBankAccounts((int) getActivePharmacyId())->values(),
+                'items' => [],
+            ]);
+        }
+        $transactionId = $transaction->id;
 
         // Ambil data retur yang sudah pernah dilakukan pada transaksi ini
         // 1. Dari tabel Retur
@@ -176,7 +289,15 @@ class ReturController extends Controller
                 ];
             });
 
-        return response()->json($transactionCart);
+        $trxPharmacyId = (int) ($transaction->pharmacy_id ?: getActivePharmacyId());
+        $accounts = $this->getBranchCashBankAccounts($trxPharmacyId);
+        $refundMeta = $this->resolveTransactionRefundMeta($transaction, $accounts);
+
+        return response()->json([
+            'transaction' => $refundMeta['transaction'],
+            'accounts' => $refundMeta['accounts']->values(),
+            'items' => $transactionCart->values(),
+        ]);
     }
     function generateReturCode()
     {
@@ -251,6 +372,7 @@ class ReturController extends Controller
             'total_retur' => 'required',
             'old_qty' => 'required',
             'transfer_id' => 'required',
+            'account_id' => 'nullable|string',
         ]);
 
         $findcode = MedicineTransactions::findOrFail($request->transaction_id);
@@ -419,32 +541,50 @@ class ReturController extends Controller
             // Get & Increase stock
             $medicine->increment('stock', $request->qty_retur);
 
-            // Pencatatan otomatis ke Buku Mutasi Kas & Bank jika Retur Penjualan Tunai
-            if ($transaction->transaction_type === 'RETUR JUAL') {
-                $returPharmacyId = (int) $getTransactiondata->pharmacy_id;
-                $cashAccount = FinanceAccount::resolveBranchCashAccount($returPharmacyId, true);
-                if ($cashAccount) {
-                    $patientName = $findcode->patients->name ?? ($findcode->debtors->name ?? 'Pelanggan Umum');
-                    $medName = $medicine->name ?? 'Obat';
-                    $origCode = $findcode->transaction_code ?? '-';
+            // Pencatatan otomatis ke Buku Mutasi Kas & Bank sesuai akun yang dipilih
+            // (kecuali user memilih 'credit_only' / potong piutang tanpa pengeluaran kas/bank)
+            $returPharmacyId = (int) ($getTransactiondata->pharmacy_id ?: getActivePharmacyId());
+            $selectedAccountId = $request->input('account_id');
+            $refundAccount = null;
 
-                    FinancePayment::create([
-                        'pharmacy_id' => $returPharmacyId,
-                        'medicine_transaction_id' => $transaction->id,
-                        'account_id' => $cashAccount->id,
-                        'payment_type' => 'RETUR PENJUALAN',
-                        'payment_date' => Carbon::now()->toDateString(),
-                        'amount' => (float) $request->total_retur,
-                        'reference_number' => $returCode,
-                        'notes' => 'Pengembalian dana retur penjualan tunai: ' . $medName . ' (' . $patientName . ' - Struk: ' . $origCode . ')',
-                        'created_by' => auth()->id(),
-                    ]);
+            if ($selectedAccountId === 'credit_only') {
+                $refundAccount = null;
+            } elseif (is_numeric($selectedAccountId)) {
+                $refundAccount = FinanceAccount::where('id', (int) $selectedAccountId)
+                    ->where('pharmacy_id', $returPharmacyId)
+                    ->where('category', 'Kas & Bank')
+                    ->where('is_active', true)
+                    ->lockForUpdate()
+                    ->first();
+            } elseif ($transaction->transaction_type === 'RETUR JUAL') {
+                $refundAccount = FinanceAccount::resolveBranchCashAccount($returPharmacyId, true);
+            }
 
-                    $cashAccount->decrement('balance', (float) $request->total_retur);
+            $refundAmount = (float) $request->total_retur;
+            if ($refundAccount && $refundAmount > 0) {
+                $patientName = $findcode->patients->name ?? ($findcode->debtors->name ?? 'Pelanggan Umum');
+                $medName = $medicine->name ?? 'Obat';
+                $origCode = $findcode->transaction_code ?? '-';
+                $viaLabel = $refundAccount->account_type === 'kas_apotek'
+                    ? 'tunai'
+                    : ('rekening ' . $refundAccount->name);
 
-                    Cache::forget('finance_stats_summary_branch_' . $returPharmacyId . '_' . $returPharmacyId);
-                    Cache::forget('finance_stats_summary');
-                }
+                FinancePayment::create([
+                    'pharmacy_id' => $returPharmacyId,
+                    'medicine_transaction_id' => $transaction->id,
+                    'account_id' => $refundAccount->id,
+                    'payment_type' => 'RETUR PENJUALAN',
+                    'payment_date' => Carbon::now()->toDateString(),
+                    'amount' => $refundAmount,
+                    'reference_number' => $returCode,
+                    'notes' => 'Pengembalian dana retur penjualan (' . $viaLabel . '): ' . $medName . ' (' . $patientName . ' - Struk: ' . $origCode . ')',
+                    'created_by' => auth()->id(),
+                ]);
+
+                $refundAccount->decrement('balance', $refundAmount);
+
+                Cache::forget('finance_stats_summary_branch_' . $returPharmacyId . '_' . $returPharmacyId);
+                Cache::forget('finance_stats_summary');
             }
 
             DB::commit();

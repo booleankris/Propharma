@@ -2,11 +2,9 @@
 
 namespace App\Exports\Stocks;
 
-use App\Models\Batches;
-use App\Models\ItemsLog;
 use App\Models\Medicines;
-use App\Models\MedicineTransferItems;
 use App\Models\Pharmacies;
+use App\Services\StockDataReportService;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 use Maatwebsite\Excel\Concerns\FromArray;
@@ -72,11 +70,12 @@ class StockDataExport extends DefaultValueBinder implements FromArray, WithStyle
                 'SATUAN',
                 'ISI',
                 'HNA',
-                'QTY AWAL GUDANG',
+                'QTY AWAL',
                 'QTY BELI PBF',
                 'QTY JUAL (PMI)',
-                'QTY TERMUTASI',
-                'SISA STOK',
+                'MUTASI KE PMI',
+                'MUTASI CABANG',
+                'PENYESUAIAN',
                 'STOK GUDANG',
                 'STOK PELAYANAN',
                 'TOTAL STOK',
@@ -92,11 +91,11 @@ class StockDataExport extends DefaultValueBinder implements FromArray, WithStyle
             'SATUAN',
             'ISI',
             'HNA',
-            'QTY AWAL GUDANG',
-            'QTY BELI PBF',
+            'QTY AWAL',
+            'QTY MASUK',
             'QTY JUAL',
-            'QTY TERMUTASI',
-            'SISA STOK',
+            'MUTASI KELUAR',
+            'PENYESUAIAN',
             'STOK ETALASE',
             'TOTAL STOK',
             'KETERANGAN',
@@ -114,15 +113,16 @@ class StockDataExport extends DefaultValueBinder implements FromArray, WithStyle
                 'E' => 12,  // Satuan
                 'F' => 10,  // Isi
                 'G' => 16,  // HNA
-                'H' => 18,  // QTY Awal Gudang
+                'H' => 16,  // QTY Awal (Gudang + Pelayanan)
                 'I' => 16,  // QTY Beli PBF
                 'J' => 16,  // QTY Jual PMI
-                'K' => 16,  // QTY Termutasi
-                'L' => 14,  // Sisa Stok
-                'M' => 17,  // Stok Gudang
-                'N' => 18,  // Stok Pelayanan PMI
-                'O' => 16,  // Total Stok
-                'P' => 16,  // Keterangan
+                'K' => 16,  // Mutasi ke PMI
+                'L' => 16,  // Mutasi Cabang
+                'M' => 16,  // Penyesuaian
+                'N' => 17,  // Stok Gudang
+                'O' => 18,  // Stok Pelayanan
+                'P' => 16,  // Total Stok
+                'Q' => 16,  // Keterangan
             ];
         }
 
@@ -134,11 +134,11 @@ class StockDataExport extends DefaultValueBinder implements FromArray, WithStyle
             'E' => 12,  // Satuan
             'F' => 10,  // Isi
             'G' => 16,  // HNA
-            'H' => 18,  // QTY Awal Gudang
-            'I' => 16,  // QTY Beli PBF
+            'H' => 16,  // QTY Awal
+            'I' => 16,  // QTY Masuk
             'J' => 16,  // QTY Jual
-            'K' => 16,  // QTY Termutasi
-            'L' => 14,  // Sisa Stok
+            'K' => 16,  // Mutasi Keluar
+            'L' => 16,  // Penyesuaian
             'M' => 16,  // Stok Etalase
             'N' => 16,  // Total Stok
             'O' => 16,  // Keterangan
@@ -147,8 +147,6 @@ class StockDataExport extends DefaultValueBinder implements FromArray, WithStyle
 
     public function array(): array
     {
-        $warehouseId = getWarehousePharmacyId();
-        $pmiPharmacyId = 1;
         $req = $this->request;
         $pharmacyId = $this->pharmacyId;
         $canSeeWarehouse = $this->canSeeWarehouse;
@@ -179,11 +177,6 @@ class StockDataExport extends DefaultValueBinder implements FromArray, WithStyle
             [''],  // Row 4 Blank
             $this->headings(),  // Row 5 Table Headers
         ];
-
-        $ordersPharmacyId = $canSeeWarehouse ? $warehouseId : $pharmacyId;
-        $salesPharmacyId = $canSeeWarehouse ? $pmiPharmacyId : $pharmacyId;
-        $startPharmacyIds = $canSeeWarehouse ? [$warehouseId, $pmiPharmacyId] : [$pharmacyId];
-        $counterPharmacyId = $canSeeWarehouse ? $pmiPharmacyId : $pharmacyId;
 
         // 1. Medicines List
         $medicines = Medicines::query()
@@ -222,245 +215,60 @@ class StockDataExport extends DefaultValueBinder implements FromArray, WithStyle
             return $rows;
         }
 
-        // 2. Storage stock map
-        $storageStockMap = [];
-        if ($canSeeWarehouse) {
-            $storageStockMap = Batches::where('pharmacy_id', $warehouseId)
-                ->selectRaw('medicine_id, SUM(stock) as total')
-                ->groupBy('medicine_id')
-                ->pluck('total', 'medicine_id')
-                ->all();
-        }
+        $medicineIds = $medicines->pluck('id')->all();
+        $isAllMedicines = !($req && ($req->filled('searchMedicine') || $req->filled('medicine_id') || ($req->filled('status') && $req->status !== '1')));
 
-        // 3. Counter stock map
-        $counterStockMap = MedicineTransferItems::join('batches', 'batches.id', '=', 'medicine_transfer_items.batches_id')
-            ->where('batches.pharmacy_id', $counterPharmacyId)
-            ->where('medicine_transfer_items.status', 1)
-            ->where(function ($q) {
-                $q
-                    ->whereNull('medicine_transfer_items.source_type')
-                    ->orWhere('medicine_transfer_items.source_type', '!=', 'retur_gudang');
-            })
-            ->selectRaw('batches.medicine_id, SUM(medicine_transfer_items.qty) as total')
-            ->groupBy('batches.medicine_id')
-            ->pluck('total', 'batches.medicine_id')
-            ->all();
+        $metricsMap = app(StockDataReportService::class)->computeMetrics(
+            $medicineIds,
+            (int) $pharmacyId,
+            $startDate,
+            $endDate,
+            $isAllMedicines
+        );
 
-        // 4. Latest Opening Balances (SO-SALDO-AWAL)
-        $latestOpeningLogs = DB::table('items_log as il')
-            ->join('batches as b', 'b.id', '=', 'il.batches_id')
-            ->joinSub(
-                DB::table('items_log as il2')
-                    ->join('batches as b2', 'b2.id', '=', 'il2.batches_id')
-                    ->where('il2.type', 'SO-SALDO-AWAL')
-                    ->whereIn('b2.pharmacy_id', $startPharmacyIds)
-                    ->groupBy('il2.medicine_id')
-                    ->select('il2.medicine_id', DB::raw('MAX(il2.id) as max_id')),
-                'latest',
-                'latest.max_id', '=', 'il.id'
-            )
-            ->select('il.medicine_id', 'il.qty_before', DB::raw('DATE(il.date) as op_date'))
-            ->get()
-            ->keyBy('medicine_id');
-
-        // 5. Movements from items_log
-        $hasDateFilter = ($startDate || $endDate);
-        $allPharmacyIds = array_unique(array_merge([$ordersPharmacyId, $salesPharmacyId], $startPharmacyIds));
-
-        $logsQuery = DB::table('items_log')
-            ->join('batches', 'batches.id', '=', 'items_log.batches_id')
-            ->whereIn('batches.pharmacy_id', $allPharmacyIds)
-            ->whereIn('items_log.status', [1, 2, 3, 4, 5, 6, 7]);
-
-        if ($startDate) {
-            $logsQuery->whereDate('items_log.date', '>=', $startDate);
-        }
-        if ($endDate) {
-            $logsQuery->whereDate('items_log.date', '<=', $endDate);
-        }
-
-        $logs = $logsQuery->select([
-            'items_log.medicine_id',
-            'batches.pharmacy_id',
-            'items_log.status',
-            'items_log.date',
-            'items_log.qty',
-            'items_log.qty_before',
-            'items_log.qty_after',
-            'items_log.total',
-        ])->get();
-
-        $aggOrders = [];
-        $aggSales = [];
-        $aggOrdersRt = [];
-        $aggSalesRt = [];
-        $aggAdjustments = [];
-
-        foreach ($logs as $log) {
-            $mId = $log->medicine_id;
-            $pId = $log->pharmacy_id;
-            $st = (int) $log->status;
-            $logDate = substr($log->date, 0, 10);
-
-            if (!$hasDateFilter) {
-                $opDate = isset($latestOpeningLogs[$mId]) ? $latestOpeningLogs[$mId]->op_date : '1000-01-01';
-                if ($logDate <= $opDate) {
-                    continue;
-                }
-            }
-
-            $qty = (int) $log->qty;
-
-            if ($st === 2 && $pId == $ordersPharmacyId) {
-                $aggOrders[$mId] = ($aggOrders[$mId] ?? 0) + $qty;
-            } elseif ($st === 1 && $pId == $salesPharmacyId) {
-                $aggSales[$mId] = ($aggSales[$mId] ?? 0) + $qty;
-            } elseif ($st === 4 && $pId == $ordersPharmacyId) {
-                $aggOrdersRt[$mId] = ($aggOrdersRt[$mId] ?? 0) + $qty;
-            } elseif ($st === 3 && $pId == $salesPharmacyId) {
-                $aggSalesRt[$mId] = ($aggSalesRt[$mId] ?? 0) + $qty;
-            } elseif (in_array($st, [5, 6, 7]) && in_array($pId, $startPharmacyIds)) {
-                if ($st === 5) {
-                    if ($log->total !== null && preg_match('/^[+-]?[0-9]+([.][0-9]+)?([eE][+-]?[0-9]+)?$/', trim($log->total))) {
-                        $diff = (int) $log->total;
-                    } else {
-                        $diff = (int) $log->qty_after - (int) $log->qty_before;
-                    }
-                } else {
-                    $diff = (int) $log->qty_after - (int) $log->qty_before;
-                }
-                $aggAdjustments[$mId] = ($aggAdjustments[$mId] ?? 0) + $diff;
-            }
-        }
-
-        // 5b. Transfers / Mutations (Gudang PMI + Sahabat PMI outbound, excluding retur_gudang & dummy init)
-        $transferSourcePharmacyIds = $canSeeWarehouse
-            ? [$warehouseId, $pmiPharmacyId]
-            : [$pharmacyId];
-
-        $transferQuery = DB::table('medicine_transfer_items as mti')
-            ->join('medicine_transfers as mt', 'mt.id', '=', 'mti.medicine_transfer_id')
-            ->leftJoin('batches as src_batches', 'src_batches.id', '=', 'mti.source_batches_id')
-            ->leftJoin('batches as dst_batches', 'dst_batches.id', '=', 'mti.batches_id')
-            ->where(function ($sq) use ($transferSourcePharmacyIds) {
-                $sq->whereIn('mt.source_pharmacy_id', $transferSourcePharmacyIds)
-                   ->orWhere(function ($sq2) use ($transferSourcePharmacyIds) {
-                       $sq2->whereNull('mt.source_pharmacy_id')
-                           ->whereIn('src_batches.pharmacy_id', $transferSourcePharmacyIds);
-                   });
-            })
-            ->where('mt.status', '!=', 2)
-            ->where(function ($q) {
-                $q->whereNull('mt.is_request')
-                  ->orWhere('mt.is_request', 0)
-                  ->orWhere('mt.request_status', 1);
-            })
-            ->where('mt.code', 'not like', 'TRF-INIT%')
-            ->where(function ($q) {
-                $q->whereNull('mti.source_type')
-                  ->orWhere('mti.source_type', '!=', 'retur_gudang');
-            })
-            ->where(DB::raw('COALESCE(mti.original_qty, mti.qty)'), '>', 0);
-
-        if ($canSeeWarehouse) {
-            $transferQuery->where(function ($q) use ($warehouseId) {
-                $q->whereNull('mt.destination_pharmacy_id')
-                  ->orWhere('mt.destination_pharmacy_id', '!=', $warehouseId);
-            });
-        }
-
-        $transferQuery->where(function ($q) {
-            $q->whereNull('mt.destination_pharmacy_id')
-              ->orWhereRaw('COALESCE(mt.source_pharmacy_id, src_batches.pharmacy_id, 0) != mt.destination_pharmacy_id');
-        });
-
-        if ($startDate) {
-            $transferQuery->whereDate('mt.created_at', '>=', $startDate);
-        }
-        if ($endDate) {
-            $transferQuery->whereDate('mt.created_at', '<=', $endDate);
-        }
-
-        $transfers = $transferQuery->select([
-            DB::raw('COALESCE(src_batches.medicine_id, dst_batches.medicine_id, mti.requested_medicine_id) as medicine_id'),
-            DB::raw('DATE(mt.created_at) as transfer_date'),
-            DB::raw('COALESCE(mti.original_qty, mti.qty) as qty'),
-        ])->get();
-
-        $aggTransfers = [];
-        foreach ($transfers as $tr) {
-            $mId = $tr->medicine_id;
-            if (!$mId) continue;
-            if (!$hasDateFilter) {
-                $opDate = isset($latestOpeningLogs[$mId]) ? $latestOpeningLogs[$mId]->op_date : '1000-01-01';
-                if ($tr->transfer_date <= $opDate) {
-                    continue;
-                }
-            }
-            $aggTransfers[$mId] = ($aggTransfers[$mId] ?? 0) + (int) $tr->qty;
-        }
-
-        // 6. Payment Methods
-        $paymentMethods = DB::table('receiving_items as ri')
-            ->join('receiving_details as rd', 'rd.id', '=', 'ri.receiving_details_id')
-            ->join('receiving as r', 'r.id', '=', 'rd.receiving_id')
-            ->leftJoin('batches as b', 'b.id', '=', 'ri.batches_id')
-            ->leftJoin('order_items as oi', 'oi.id', '=', 'ri.order_items_id')
-            ->where('r.pharmacy_id', $ordersPharmacyId)
-            ->when($endDate, fn($q) => $q->whereDate('rd.invoice_date', '<=', $endDate))
-            ->select(
-                DB::raw('COALESCE(b.medicine_id, oi.medicine_id) as medicine_id'),
-                'rd.invoice_payment'
-            )
-            ->orderBy('rd.invoice_date', 'desc')
-            ->orderBy('rd.id', 'desc')
-            ->get()
-            ->filter(fn($row) => !empty($row->medicine_id))
-            ->unique('medicine_id')
-            ->pluck('invoice_payment', 'medicine_id')
-            ->all();
-
-        // 7. Assemble Rows
+        // Assemble Rows
         $sumQtyStart = 0;
         $sumQtyOrders = 0;
         $sumQtySales = 0;
-        $sumQtyTransferred = 0;
-        $sumSisaStok = 0;
+        $sumQtyTransferredPmi = 0;
+        $sumQtyTransferredBranch = 0;
+        $sumQtyAdjustments = 0;
         $sumQtyStorage = 0;
         $sumQtyCounter = 0;
         $sumTotalStok = 0;
 
         foreach ($medicines as $index => $m) {
-            $mId = $m->id;
-            $qtyStorage = $canSeeWarehouse ? (int) ($storageStockMap[$mId] ?? 0) : 0;
-            $qtyCounter = (int) ($counterStockMap[$mId] ?? 0);
-            $totalStok = $qtyStorage + $qtyCounter;
+            $mId = (int) $m->id;
+            $metrics = $metricsMap[$mId] ?? [
+                'qty_start' => 0,
+                'qty_orders' => 0,
+                'qty_sales' => 0,
+                'qty_transferred_pmi' => 0,
+                'qty_transferred_branch' => 0,
+                'qty_adjustments' => 0,
+                'qty_storage' => 0,
+                'qty_counter' => 0,
+                'qty_now' => 0,
+                'keterangan' => '-',
+            ];
 
-            $qtyOrders = (int) ($aggOrders[$mId] ?? 0);
-            $qtyOrdersRt = (int) ($aggOrdersRt[$mId] ?? 0);
-            $qtySales = (int) ($aggSales[$mId] ?? 0);
-            $qtySalesRt = (int) ($aggSalesRt[$mId] ?? 0);
-            $qtyTransferred = (int) ($aggTransfers[$mId] ?? 0);
-
-            $netIn = $qtyOrders - $qtyOrdersRt;
-            $netOut = $qtySales - $qtySalesRt;
-            $adjustments = (int) ($aggAdjustments[$mId] ?? 0);
-
-            $opLog = $latestOpeningLogs[$mId] ?? null;
-            $qtyStart = (!$hasDateFilter && $opLog !== null)
-                ? (int) $opLog->qty_before
-                : $totalStok - $netIn + $netOut - $adjustments;
-            $sisaStok = $totalStok;
-
-            $rawPayment = $paymentMethods[$mId] ?? null;
-            $p = $rawPayment ? strtoupper(trim($rawPayment)) : null;
-            $keterangan = ($p === 'TUNAI' || $p === 'CASH') ? 'Cash' : (($p === 'KREDIT') ? 'Kredit' : (($p === 'KONSINYASI') ? 'Konsinyasi' : ($p ? ucfirst(strtolower($p)) : '-')));
+            $qtyStart = (int) $metrics['qty_start'];
+            $qtyOrders = (int) $metrics['qty_orders'];
+            $qtySales = (int) $metrics['qty_sales'];
+            $qtyTransferredPmi = (int) $metrics['qty_transferred_pmi'];
+            $qtyTransferredBranch = (int) $metrics['qty_transferred_branch'];
+            $qtyAdjustments = (int) $metrics['qty_adjustments'];
+            $qtyStorage = (int) $metrics['qty_storage'];
+            $qtyCounter = (int) $metrics['qty_counter'];
+            $totalStok = (int) $metrics['qty_now'];
+            $keterangan = $metrics['keterangan'];
 
             $sumQtyStart += $qtyStart;
             $sumQtyOrders += $qtyOrders;
             $sumQtySales += $qtySales;
-            $sumQtyTransferred += $qtyTransferred;
-            $sumSisaStok += $sisaStok;
+            $sumQtyTransferredPmi += $qtyTransferredPmi;
+            $sumQtyTransferredBranch += $qtyTransferredBranch;
+            $sumQtyAdjustments += $qtyAdjustments;
             $sumQtyStorage += $qtyStorage;
             $sumQtyCounter += $qtyCounter;
             $sumTotalStok += $totalStok;
@@ -481,8 +289,9 @@ class StockDataExport extends DefaultValueBinder implements FromArray, WithStyle
                     $qtyStart,
                     $qtyOrders,
                     $qtySales,
-                    $qtyTransferred,
-                    $sisaStok,
+                    $qtyTransferredPmi,
+                    $qtyTransferredBranch,
+                    $qtyAdjustments,
                     $qtyStorage,
                     $qtyCounter,
                     $totalStok,
@@ -500,8 +309,8 @@ class StockDataExport extends DefaultValueBinder implements FromArray, WithStyle
                     $qtyStart,
                     $qtyOrders,
                     $qtySales,
-                    $qtyTransferred,
-                    $sisaStok,
+                    $qtyTransferredBranch,
+                    $qtyAdjustments,
                     $qtyCounter,
                     $totalStok,
                     $keterangan,
@@ -522,8 +331,9 @@ class StockDataExport extends DefaultValueBinder implements FromArray, WithStyle
                 $sumQtyStart,
                 $sumQtyOrders,
                 $sumQtySales,
-                $sumQtyTransferred,
-                $sumSisaStok,
+                $sumQtyTransferredPmi,
+                $sumQtyTransferredBranch,
+                $sumQtyAdjustments,
                 $sumQtyStorage,
                 $sumQtyCounter,
                 $sumTotalStok,
@@ -541,8 +351,8 @@ class StockDataExport extends DefaultValueBinder implements FromArray, WithStyle
                 $sumQtyStart,
                 $sumQtyOrders,
                 $sumQtySales,
-                $sumQtyTransferred,
-                $sumSisaStok,
+                $sumQtyTransferredBranch,
+                $sumQtyAdjustments,
                 $sumQtyCounter,
                 $sumTotalStok,
                 '',
@@ -559,7 +369,7 @@ class StockDataExport extends DefaultValueBinder implements FromArray, WithStyle
 
     public function styles(Worksheet $sheet)
     {
-        $lastCol = $this->canSeeWarehouse ? 'P' : 'O';
+        $lastCol = $this->canSeeWarehouse ? 'Q' : 'O';
         $startRow = $this->dataStartRow;  // 6
         $count = $this->dataRowCount;
 
@@ -607,23 +417,24 @@ class StockDataExport extends DefaultValueBinder implements FromArray, WithStyle
         // Section A-G: Info Identitas Obat (Dark Slate 900)
         $sheet->getStyle('A5:G5')->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB('0F172A');
 
-        // Section H-L: Arus Mutasi Stok (Royal Indigo 800)
-        $sheet->getStyle('H5:L5')->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB('1E3A8A');
+        // Section H-M (warehouse) / H-L (branch): Arus Mutasi Stok (Royal Indigo 800)
+        $flowEndCol = $this->canSeeWarehouse ? 'M' : 'L';
+        $sheet->getStyle("H5:{$flowEndCol}5")->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB('1E3A8A');
 
         if ($this->canSeeWarehouse) {
-            // Col M: STOK GUDANG (Warm Amber/Bronze - distinctive warehouse highlight!)
-            $sheet->getStyle('M5')->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB('B45309');
-            $sheet->getStyle('M5')->getFont()->setSize(10.5);
+            // Col N: STOK GUDANG (Warm Amber/Bronze - distinctive warehouse highlight!)
+            $sheet->getStyle('N5')->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB('B45309');
+            $sheet->getStyle('N5')->getFont()->setSize(10.5);
 
-            // Col N: STOK PELAYANAN (Teal 700)
-            $sheet->getStyle('N5')->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB('0F766E');
+            // Col O: STOK PELAYANAN (Teal 700)
+            $sheet->getStyle('O5')->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB('0F766E');
 
-            // Col O: TOTAL STOK (Emerald 700)
-            $sheet->getStyle('O5')->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB('047857');
-            $sheet->getStyle('O5')->getFont()->setSize(10.5);
+            // Col P: TOTAL STOK (Emerald 700)
+            $sheet->getStyle('P5')->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB('047857');
+            $sheet->getStyle('P5')->getFont()->setSize(10.5);
 
-            // Col P: KETERANGAN (Slate 600)
-            $sheet->getStyle('P5')->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB('475569');
+            // Col Q: KETERANGAN (Slate 600)
+            $sheet->getStyle('Q5')->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB('475569');
         } else {
             // Col M: STOK ETALASE (Teal 700)
             $sheet->getStyle('M5')->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB('0F766E');
@@ -639,7 +450,7 @@ class StockDataExport extends DefaultValueBinder implements FromArray, WithStyle
         // 3. Data Rows Styling (Optimized bulk ranges for instant generation on 8,000+ rows)
         if ($count > 0) {
             $endRow = $startRow + $count - 1;
-            $stockCol = $this->canSeeWarehouse ? 'O' : 'N';
+            $stockCol = $this->canSeeWarehouse ? 'P' : 'N';
 
             // Set default data row height
             $sheet->getDefaultRowDimension()->setRowHeight(22);
@@ -681,27 +492,29 @@ class StockDataExport extends DefaultValueBinder implements FromArray, WithStyle
             $sheet->getStyle("G{$startRow}:G{$endRow}")->getFont()->setSize(9.5)->getColor()->setRGB('334155');
 
             // Movements text color accents
-            $sheet->getStyle("I{$startRow}:I{$endRow}")->getFont()->setBold(true)->getColor()->setRGB('0284C7');
-            $sheet->getStyle("J{$startRow}:J{$endRow}")->getFont()->setBold(true)->getColor()->setRGB('4F46E5');
-            $sheet->getStyle("K{$startRow}:K{$endRow}")->getFont()->setBold(true)->getColor()->setRGB('D97706');
-            $sheet->getStyle("L{$startRow}:L{$endRow}")->getFont()->setBold(true)->getColor()->setRGB('0F766E');
+            $sheet->getStyle("I{$startRow}:I{$endRow}")->getFont()->setBold(true)->getColor()->setRGB('059669');
+            $sheet->getStyle("J{$startRow}:J{$endRow}")->getFont()->setBold(true)->getColor()->setRGB('2563EB');
+            $sheet->getStyle("K{$startRow}:K{$endRow}")->getFont()->setBold(true)->getColor()->setRGB('475569');
+            $sheet->getStyle("L{$startRow}:L{$endRow}")->getFont()->setBold(true)->getColor()->setRGB('4F46E5');
 
             // Dedicated Stock Columns Styling
             if ($this->canSeeWarehouse) {
-                // Col M (Stok Gudang): Prominent warm Amber lane for warehouse visibility
-                $sheet->getStyle("M{$startRow}:M{$endRow}")->applyFromArray([
+                $sheet->getStyle("M{$startRow}:M{$endRow}")->getFont()->setBold(true)->getColor()->setRGB('D97706');
+
+                // Col N (Stok Gudang): Prominent warm Amber lane for warehouse visibility
+                $sheet->getStyle("N{$startRow}:N{$endRow}")->applyFromArray([
                     'fill' => ['fillType' => Fill::FILL_SOLID, 'startColor' => ['rgb' => 'FEF3C7']],
                     'font' => ['bold' => true, 'color' => ['rgb' => '92400E']],
                 ]);
 
-                // Col N (Stok Pelayanan): Soft Sky lane
-                $sheet->getStyle("N{$startRow}:N{$endRow}")->applyFromArray([
+                // Col O (Stok Pelayanan): Soft Sky lane
+                $sheet->getStyle("O{$startRow}:O{$endRow}")->applyFromArray([
                     'fill' => ['fillType' => Fill::FILL_SOLID, 'startColor' => ['rgb' => 'E0F2FE']],
                     'font' => ['bold' => true, 'color' => ['rgb' => '0369A1']],
                 ]);
 
-                // Col O (Total Stok): Soft Emerald lane
-                $sheet->getStyle("O{$startRow}:O{$endRow}")->applyFromArray([
+                // Col P (Total Stok): Soft Emerald lane
+                $sheet->getStyle("P{$startRow}:P{$endRow}")->applyFromArray([
                     'fill' => ['fillType' => Fill::FILL_SOLID, 'startColor' => ['rgb' => 'DCFCE7']],
                     'font' => ['bold' => true, 'color' => ['rgb' => '15803D']],
                 ]);
@@ -763,9 +576,9 @@ class StockDataExport extends DefaultValueBinder implements FromArray, WithStyle
             ]);
 
             if ($this->canSeeWarehouse) {
-                $sheet->getStyle("M{$totalRow}")->getFont()->getColor()->setRGB('B45309');
-                $sheet->getStyle("N{$totalRow}")->getFont()->getColor()->setRGB('0369A1');
-                $sheet->getStyle("O{$totalRow}")->getFont()->getColor()->setRGB('15803D');
+                $sheet->getStyle("N{$totalRow}")->getFont()->getColor()->setRGB('B45309');
+                $sheet->getStyle("O{$totalRow}")->getFont()->getColor()->setRGB('0369A1');
+                $sheet->getStyle("P{$totalRow}")->getFont()->getColor()->setRGB('15803D');
             } else {
                 $sheet->getStyle("M{$totalRow}")->getFont()->getColor()->setRGB('0369A1');
                 $sheet->getStyle("N{$totalRow}")->getFont()->getColor()->setRGB('15803D');

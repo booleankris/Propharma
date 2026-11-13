@@ -198,11 +198,16 @@
                                 <th class="whitespace-nowrap">Kode</th>
                                 <th class="min-w-[140px]">Nama Obat</th>
                                 <th class="text-center">Satuan</th>
-                                <th class="text-right leading-tight">Qty Awal<br><span class="text-[10px] text-slate-400 font-normal">Gudang</span></th>
-                                <th class="text-right leading-tight">Qty Beli<br><span class="text-[10px] text-slate-400 font-normal">PBF</span></th>
+                                <th class="text-right leading-tight">Qty Awal<br><span class="text-[10px] text-slate-400 font-normal">{{ $canSeeWarehouse ? 'Gudang+PMI' : 'Etalase' }}</span></th>
+                                <th class="text-right leading-tight">{{ $canSeeWarehouse ? 'Qty Beli' : 'Qty Masuk' }}<br><span class="text-[10px] text-slate-400 font-normal">{{ $canSeeWarehouse ? 'PBF' : 'Beli/Terima' }}</span></th>
                                 <th class="text-right leading-tight">Qty Jual<br><span class="text-[10px] text-slate-400 font-normal">{{ $canSeeWarehouse ? '(PMI)' : '' }}</span></th>
-                                <th class="text-right leading-tight">Qty<br><span class="text-[10px] text-slate-400 font-normal">Termutasi</span></th>
-                                <th class="text-right leading-tight">Sisa<br><span class="text-[10px] text-slate-400 font-normal">Stok</span></th>
+                                @if($canSeeWarehouse)
+                                    <th class="text-right leading-tight">Mutasi<br><span class="text-[10px] text-slate-400 font-normal">Ke PMI</span></th>
+                                    <th class="text-right leading-tight">Mutasi<br><span class="text-[10px] text-slate-400 font-normal">Cabang</span></th>
+                                @else
+                                    <th class="text-right leading-tight">Mutasi<br><span class="text-[10px] text-slate-400 font-normal">Keluar</span></th>
+                                @endif
+                                <th class="text-right leading-tight">Penyesuaian<br><span class="text-[10px] text-slate-400 font-normal">SO/Adj</span></th>
                                 @if($canSeeWarehouse)
                                     <th class="text-center !bg-amber-50/90 !border-b-2 !border-amber-300 leading-tight">
                                         <span class="inline-block px-1.5 py-0.5 rounded text-[11px] font-bold bg-amber-100 text-amber-900 border border-amber-300">Gudang</span>
@@ -280,7 +285,7 @@
                                     <span id="modalTotalQty" class="text-2xl font-black tabular-nums">0</span>
                                     <span id="modalUnitSuffix" class="text-xs font-medium text-indigo-200"></span>
                                 </div>
-                                <span class="text-[11px] text-indigo-100/90 mt-1 block">Akumulasi seluruh tujuan</span>
+                                <span id="modalTotalBreakdown" class="text-[11px] text-indigo-100/90 mt-1 block">Akumulasi seluruh tujuan</span>
                             </div>
 
                             <!-- Ringkasan per Tujuan -->
@@ -498,7 +503,9 @@
                         className: 'text-right font-semibold tabular-nums px-1',
                         render: function(data) {
                             let n = parseFloat(data || 0);
-                            return `<span class="${n > 0 ? 'text-emerald-600' : 'text-slate-400'}">${n > 0 ? '+' : ''}${formatQty(data)}</span>`;
+                            if (n > 0) return `<span class="text-emerald-600">+${formatQty(n)}</span>`;
+                            if (n < 0) return `<span class="text-rose-600">-${formatQty(Math.abs(n))}</span>`;
+                            return `<span class="text-slate-400">0</span>`;
                         }
                     },
                     {
@@ -507,24 +514,43 @@
                         className: 'text-right font-semibold tabular-nums px-1',
                         render: function(data) {
                             let n = parseFloat(data || 0);
-                            return `<span class="${n > 0 ? 'text-blue-600' : 'text-slate-400'}">${n > 0 ? '-' : ''}${formatQty(data)}</span>`;
+                            if (n > 0) return `<span class="text-blue-600">-${formatQty(n)}</span>`;
+                            if (n < 0) return `<span class="text-emerald-600">+${formatQty(Math.abs(n))}</span>`;
+                            return `<span class="text-slate-400">0</span>`;
                         }
                     },
+                    @if($canSeeWarehouse)
                     {
-                        data: 'qty_transferred',
+                        data: 'qty_transferred_pmi',
+                        orderable: false,
+                        className: 'text-right font-medium tabular-nums px-1',
+                        render: function(data) {
+                            let n = parseFloat(data || 0);
+                            if (n > 0) {
+                                return `<span class="inline-block px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 text-[11px] font-semibold border border-slate-200" title="Mutasi internal Gudang PMI ke Pelayanan PMI (tidak mengurangi total stok)">${formatQty(n)}</span>`;
+                            }
+                            return `<span class="text-slate-400">0</span>`;
+                        }
+                    },
+                    @endif
+                    {
+                        data: 'qty_transferred_branch',
                         orderable: false,
                         className: 'text-right font-semibold tabular-nums px-1',
                         render: function(data) {
                             let n = parseFloat(data || 0);
-                            return `<span class="${n > 0 ? 'text-indigo-600 font-bold' : 'text-slate-400'}">${n > 0 ? '-' : ''}${formatQty(data)}</span>`;
+                            return `<span class="${n > 0 ? 'text-indigo-600 font-bold' : 'text-slate-400'}">${n > 0 ? '-' : ''}${formatQty(n)}</span>`;
                         }
                     },
                     {
-                        data: 'qty_remaining',
+                        data: 'qty_adjustments',
                         orderable: false,
-                        className: 'text-right font-bold text-slate-700 tabular-nums px-1',
+                        className: 'text-right font-semibold tabular-nums px-1',
                         render: function(data) {
-                            return formatQty(data);
+                            let n = parseFloat(data || 0);
+                            if (n > 0) return `<span class="text-emerald-600">+${formatQty(n)}</span>`;
+                            if (n < 0) return `<span class="text-rose-600">-${formatQty(Math.abs(n))}</span>`;
+                            return `<span class="text-slate-400">0</span>`;
                         }
                     },
                     @if($canSeeWarehouse)
@@ -662,6 +688,16 @@
 
                     document.getElementById('modalPeriodLabel').innerText = data.period_label || 'Semua Waktu';
                     document.getElementById('modalTotalQty').innerText = formatQty(data.total_qty || 0);
+                    const breakdownEl = document.getElementById('modalTotalBreakdown');
+                    if (breakdownEl) {
+                        const pmiQty = parseInt(data.pmi_qty || 0, 10);
+                        const branchQty = parseInt(data.branch_qty || 0, 10);
+                        if (pmiQty > 0 || branchQty > 0) {
+                            breakdownEl.innerText = `Ke PMI: ${formatQty(pmiQty)} • Keluar Cabang: ${formatQty(branchQty)}`;
+                        } else {
+                            breakdownEl.innerText = 'Akumulasi seluruh tujuan';
+                        }
+                    }
 
                     // Summary per destination
                     const summaryContainer = document.getElementById('modalSummaryList');
