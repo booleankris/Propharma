@@ -311,7 +311,7 @@ export default function Dashboard({
 
                         <div className="mt-4 pt-3 border-t border-slate-100 space-y-1.5 text-xs">
                             <div className="flex items-center justify-between">
-                                <span className="text-slate-500">Margin</span>
+                                <span className="text-slate-500">Persentase Laba</span>
                                 <span className={`font-semibold tabular-nums ${isProfitable ? 'text-emerald-700' : 'text-rose-600'}`}>
                                     {laba.marginPersen}%
                                 </span>

@@ -35,21 +35,44 @@
             box-shadow: 0 0 0 3px rgba(191, 219, 254, 0.5);
         }
 
+        /* Modal Z-Index and Stacking: ensure modal is strictly on top of everything */
+        #mutationModal {
+            z-index: 99999999 !important;
+        }
+        #mutationModal .mutation-backdrop {
+            z-index: 99999998 !important;
+        }
+        #mutationModal .mutation-content-wrapper {
+            z-index: 99999999 !important;
+            position: relative;
+        }
+        .iziToast-wrapper {
+            z-index: 100000000 !important;
+        }
+
+        /* Compact Table Layout to Fit Screen Without Horizontal Scroll */
+        #orderItemsTable {
+            width: 100% !important;
+            table-layout: auto !important;
+        }
+
         #orderItemsTable thead th {
             background-color: #f8fafc !important;
             color: #334155 !important;
             font-weight: 700 !important;
-            font-size: 11px !important;
+            font-size: 10.5px !important;
+            line-height: 1.25 !important;
             text-transform: uppercase !important;
-            letter-spacing: 0.05em !important;
+            letter-spacing: 0.02em !important;
             border-bottom: 2px solid #e2e8f0 !important;
-            padding: 13px 16px !important;
-            white-space: nowrap;
+            padding: 8px 6px !important;
+            white-space: normal !important;
+            vertical-align: middle !important;
         }
 
         #orderItemsTable tbody td {
-            padding: 11px 16px !important;
-            font-size: 13px !important;
+            padding: 7px 6px !important;
+            font-size: 12px !important;
             vertical-align: middle !important;
             color: #334155 !important;
             border-bottom: 1px solid #f1f5f9 !important;
@@ -167,79 +190,147 @@
                     </div>
                 </div>
 
-                <div class="mt-4 overflow-x-auto">
+                <div class="mt-4 overflow-x-auto xl:overflow-x-visible">
                     <table id="orderItemsTable" class="w-full text-sm text-left text-slate-600">
                         <thead>
                             <tr>
-                                <th class="px-4 py-3.5 text-center w-12">#</th>
-                                <th class="px-4 py-3.5">Kode Obat</th>
-                                <th class="px-4 py-3.5">Nama Obat</th>
-                                <th class="px-4 py-3.5 text-center">Satuan</th>
-                                <th class="px-4 py-3.5 text-right">QTY Awal</th>
-                                <th class="px-4 py-3.5 text-right">QTY Beli</th>
-                                <th class="px-4 py-3.5 text-right">
-                                    {{ $canSeeWarehouse ? 'QTY Jual (PMI)' : 'QTY Jual' }}
-                                </th>
-                                <th class="px-4 py-3.5 text-right">Sisa Stok</th>
+                                <th class="w-7 text-center">#</th>
+                                <th class="whitespace-nowrap">Kode</th>
+                                <th class="min-w-[140px]">Nama Obat</th>
+                                <th class="text-center">Satuan</th>
+                                <th class="text-right leading-tight">Qty Awal<br><span class="text-[10px] text-slate-400 font-normal">Gudang</span></th>
+                                <th class="text-right leading-tight">Qty Beli<br><span class="text-[10px] text-slate-400 font-normal">PBF</span></th>
+                                <th class="text-right leading-tight">Qty Jual<br><span class="text-[10px] text-slate-400 font-normal">{{ $canSeeWarehouse ? '(PMI)' : '' }}</span></th>
+                                <th class="text-right leading-tight">Qty<br><span class="text-[10px] text-slate-400 font-normal">Termutasi</span></th>
+                                <th class="text-right leading-tight">Sisa<br><span class="text-[10px] text-slate-400 font-normal">Stok</span></th>
                                 @if($canSeeWarehouse)
-                                    <th class="px-4 py-3.5 text-center !bg-amber-50/80 !border-b-2 !border-amber-300">
-                                        <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-amber-100 text-amber-900 font-bold text-xs border border-amber-300">
-                                            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-tabler icon-tabler-building-warehouse">
-                                                <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
-                                                <path d="M3 21v-13l9 -4l9 4v13" />
-                                                <path d="M13 13h4v8h-10v-6h6" />
-                                                <path d="M13 21v-9a1 1 0 0 0 -1 -1h-2a1 1 0 0 0 -1 1v3" />
-                                            </svg>
-                                            Stok Gudang
-                                        </span>
+                                    <th class="text-center !bg-amber-50/90 !border-b-2 !border-amber-300 leading-tight">
+                                        <span class="inline-block px-1.5 py-0.5 rounded text-[11px] font-bold bg-amber-100 text-amber-900 border border-amber-300">Gudang</span>
                                     </th>
-                                    <th class="px-4 py-3.5 text-center !bg-sky-50/80 !border-b-2 !border-sky-300">
-                                        <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-sky-100 text-sky-900 font-bold text-xs border border-sky-300">
-                                            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-tabler icon-tabler-building-store">
-                                                <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
-                                                <path d="M3 21l18 0" />
-                                                <path d="M3 7v1a3 3 0 0 0 6 0v-1m0 1a3 3 0 0 0 6 0v-1m0 1a3 3 0 0 0 6 0v-1h-18l2 -4h14l2 4" />
-                                                <path d="M5 21l0 -10.15" />
-                                                <path d="M19 21l0 -10.15" />
-                                                <path d="M9 21v-4a2 2 0 0 1 2 -2h2a2 2 0 0 1 2 2v4" />
-                                            </svg>
-                                            Pelayanan
-                                        </span>
+                                    <th class="text-center !bg-sky-50/90 !border-b-2 !border-sky-300 leading-tight">
+                                        <span class="inline-block px-1.5 py-0.5 rounded text-[11px] font-bold bg-sky-100 text-sky-900 border border-sky-300">Pelayanan</span>
                                     </th>
                                 @else
-                                    <th class="px-4 py-3.5 text-center !bg-sky-50/80 !border-b-2 !border-sky-300">
-                                        <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-sky-100 text-sky-900 font-bold text-xs border border-sky-300">
-                                            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-tabler icon-tabler-building-store">
-                                                <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
-                                                <path d="M3 21l18 0" />
-                                                <path d="M3 7v1a3 3 0 0 0 6 0v-1m0 1a3 3 0 0 0 6 0v-1m0 1a3 3 0 0 0 6 0v-1h-18l2 -4h14l2 4" />
-                                                <path d="M5 21l0 -10.15" />
-                                                <path d="M19 21l0 -10.15" />
-                                                <path d="M9 21v-4a2 2 0 0 1 2 -2h2a2 2 0 0 1 2 2v4" />
-                                            </svg>
-                                            Stok Etalase
-                                        </span>
+                                    <th class="text-center !bg-sky-50/90 !border-b-2 !border-sky-300 leading-tight">
+                                        <span class="inline-block px-1.5 py-0.5 rounded text-[11px] font-bold bg-sky-100 text-sky-900 border border-sky-300">Etalase</span>
                                     </th>
                                 @endif
-                                <th class="px-4 py-3.5 text-center !bg-emerald-50/80 !border-b-2 !border-emerald-300">
-                                    <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-emerald-100 text-emerald-900 font-bold text-xs border border-emerald-300">
-                                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-tabler icon-tabler-chart-bar">
-                                            <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
-                                            <path d="M3 13a1 1 0 0 1 1 -1h4a1 1 0 0 1 1 1v6a1 1 0 0 1 -1 1h-4a1 1 0 0 1 -1 -1z" />
-                                            <path d="M15 9a1 1 0 0 1 1 -1h4a1 1 0 0 1 1 1v10a1 1 0 0 1 -1 1h-4a1 1 0 0 1 -1 -1z" />
-                                            <path d="M9 5a1 1 0 0 1 1 -1h4a1 1 0 0 1 1 1v14a1 1 0 0 1 -1 1h-4a1 1 0 0 1 -1 -1z" />
-                                            <path d="M4 20h14" />
-                                        </svg>
-                                        Total Stok
-                                    </span>
+                                <th class="text-center !bg-emerald-50/90 !border-b-2 !border-emerald-300 leading-tight">
+                                    <span class="inline-block px-1.5 py-0.5 rounded text-[11px] font-bold bg-emerald-100 text-emerald-900 border border-emerald-300">Total Stok</span>
                                 </th>
-                                <th class="px-4 py-3.5 text-center">Keterangan</th>
+                                <th class="text-center">Keterangan</th>
+                                <th class="text-center whitespace-nowrap">Riwayat Mutasi</th>
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-slate-100"></tbody>
                     </table>
                 </div>
 
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Riwayat Mutasi -->
+    <div id="mutationModal" class="fixed inset-0 hidden overflow-y-auto" style="z-index: 99999999 !important;" aria-labelledby="modal-title" role="dialog" aria-modal="true">
+        <!-- Backdrop -->
+        <div class="fixed inset-0 bg-slate-900/60 backdrop-blur-xs transition-opacity mutation-backdrop" style="z-index: 99999998 !important;" onclick="closeMutationModal()"></div>
+
+        <div class="flex min-h-full items-center justify-center p-4 text-center sm:p-6 mutation-content-wrapper" style="z-index: 99999999 !important;">
+            <div class="relative transform overflow-hidden rounded-2xl bg-white text-left shadow-2xl transition-all w-full max-w-4xl border border-slate-200">
+                <!-- Modal Header -->
+                <div class="flex items-start justify-between border-b border-slate-200/80 px-6 py-4 bg-slate-50/70">
+                    <div class="flex items-center gap-3">
+                        <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-100 text-indigo-700 shrink-0">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+                            </svg>
+                        </div>
+                        <div>
+                            <div class="flex items-center gap-2 flex-wrap">
+                                <h3 class="text-base font-bold text-slate-900 leading-tight" id="modalMedicineName">-</h3>
+                                <span id="modalMedicineCode" class="font-mono text-xs font-semibold px-2 py-0.5 rounded bg-slate-200 text-slate-700 border border-slate-300">-</span>
+                                <span id="modalMedicineUnit" class="text-xs font-semibold px-2 py-0.5 rounded bg-indigo-50 text-indigo-700 border border-indigo-200">-</span>
+                            </div>
+                            <p class="text-xs text-slate-500 mt-0.5">
+                                Audit Log Riwayat Mutasi Stok Keluar &middot; Periode: <span id="modalPeriodLabel" class="font-semibold text-slate-700">-</span>
+                            </p>
+                        </div>
+                    </div>
+                    <button type="button" onclick="closeMutationModal()" class="rounded-lg p-1.5 text-slate-400 hover:bg-slate-200/60 hover:text-slate-700 transition cursor-pointer">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                    </button>
+                </div>
+
+                <!-- Modal Body -->
+                <div class="p-6 space-y-5">
+                    <!-- Loading State -->
+                    <div id="modalLoading" class="py-12 flex flex-col items-center justify-center gap-3 text-slate-400">
+                        <div class="w-8 h-8 border-3 border-indigo-200 border-t-indigo-600 rounded-full animate-spin"></div>
+                        <span class="text-xs font-medium">Memuat riwayat mutasi...</span>
+                    </div>
+
+                    <!-- Content State -->
+                    <div id="modalContent" class="space-y-5 hidden">
+                        <!-- Summary Cards -->
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+                            <!-- Total Termutasi -->
+                            <div class="p-4 rounded-xl bg-gradient-to-br from-indigo-500 to-indigo-700 text-white shadow-sm">
+                                <span class="text-[11px] font-semibold text-indigo-100 uppercase tracking-wider block">Total Termutasi</span>
+                                <div class="mt-1 flex items-baseline gap-1.5">
+                                    <span id="modalTotalQty" class="text-2xl font-black tabular-nums">0</span>
+                                    <span id="modalUnitSuffix" class="text-xs font-medium text-indigo-200"></span>
+                                </div>
+                                <span class="text-[11px] text-indigo-100/90 mt-1 block">Akumulasi seluruh tujuan</span>
+                            </div>
+
+                            <!-- Ringkasan per Tujuan -->
+                            <div class="md:col-span-2 p-4 rounded-xl bg-slate-50 border border-slate-200/80 flex flex-col justify-center">
+                                <span class="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-2 block">Ringkasan Mutasi per Tujuan:</span>
+                                <div id="modalSummaryList" class="flex flex-wrap gap-2">
+                                    <!-- Dynamic pills (e.g. Di-mutasi ke Sutomo sebanyak 400) -->
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Table -->
+                        <div class="border border-slate-200 rounded-xl overflow-hidden shadow-2xs">
+                            <div class="max-h-[360px] overflow-y-auto">
+                                <table class="w-full text-left text-xs text-slate-600">
+                                    <thead class="bg-slate-100/90 text-slate-700 uppercase font-bold sticky top-0 z-10 border-b border-slate-200 text-[11px]">
+                                        <tr>
+                                            <th class="px-4 py-2.5 text-center w-10">#</th>
+                                            <th class="px-4 py-2.5">No. Mutasi</th>
+                                            <th class="px-4 py-2.5">Tanggal</th>
+                                            <th class="px-4 py-2.5">Asal</th>
+                                            <th class="px-4 py-2.5">Tujuan</th>
+                                            <th class="px-4 py-2.5">Batch</th>
+                                            <th class="px-4 py-2.5 text-right">Qty</th>
+                                            <th class="px-4 py-2.5">Di-mutasi Oleh</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="modalTableBody" class="divide-y divide-slate-100 bg-white">
+                                        <!-- Dynamic Rows -->
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        <!-- Empty State -->
+                        <div id="modalEmptyState" class="hidden py-10 flex flex-col items-center justify-center gap-2 text-slate-400">
+                            <svg class="w-10 h-10 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
+                            </svg>
+                            <span class="text-xs font-medium text-slate-500">Tidak ada riwayat mutasi untuk obat ini pada periode yang dipilih.</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Modal Footer -->
+                <div class="px-6 py-3 bg-slate-50 border-t border-slate-200 flex justify-end">
+                    <button type="button" onclick="closeMutationModal()" class="px-4 py-2 text-xs font-semibold rounded-lg bg-white text-slate-700 border border-slate-300 hover:bg-slate-100 transition shadow-2xs cursor-pointer">
+                        Tutup
+                    </button>
+                </div>
             </div>
         </div>
     </div>
@@ -354,6 +445,9 @@
             orderItemsTable = $('#orderItemsTable').DataTable({
                 processing: true,
                 serverSide: true,
+                autoWidth: false,
+                scrollX: false,
+                order: [[2, 'asc']],
                 ajax: {
                     url: "{{ route('supplies.getStockData') }}",
                     data: function(d) {
@@ -367,38 +461,41 @@
                         data: 'DT_RowIndex',
                         orderable: false,
                         searchable: false,
-                        className: 'text-center text-xs font-medium text-slate-400'
+                        className: 'text-center text-xs font-medium text-slate-400 px-1'
                     },
                     {
                         data: 'code',
-                        className: 'font-mono text-xs font-semibold text-slate-700 whitespace-nowrap',
+                        className: 'font-mono text-xs font-semibold text-slate-700 whitespace-nowrap px-1',
                         render: function(data) {
-                            return `<span class="inline-block px-2 py-0.5 bg-slate-100 text-slate-700 rounded border border-slate-200/80">${data || '-'}</span>`;
+                            return `<span class="inline-block px-1.5 py-0.5 bg-slate-100 text-slate-700 rounded text-[11px] font-semibold border border-slate-200/80">${data || '-'}</span>`;
                         }
                     },
                     {
                         data: 'name',
+                        className: 'px-1.5',
                         render: function(data) {
-                            return `<div class="font-bold text-slate-800 text-[13px] leading-tight">${data || '-'}</div>`;
+                            return `<div class="font-bold text-slate-800 text-xs leading-snug">${data || '-'}</div>`;
                         }
                     },
                     {
                         data: 'unit',
-                        className: 'text-center',
+                        className: 'text-center text-xs text-slate-600 px-1',
                         render: function(data) {
-                            return `<span class="inline-block px-2 py-0.5 text-xs font-medium text-slate-600 bg-slate-50 rounded border border-slate-200/60">${data || '-'}</span>`;
+                            return `<span class="inline-block px-1.5 py-0.5 text-[11px] font-medium text-slate-600 bg-slate-50 rounded border border-slate-200/60">${data || '-'}</span>`;
                         }
                     },
                     {
                         data: 'qty_start',
-                        className: 'text-right font-medium text-slate-600 tabular-nums',
+                        orderable: false,
+                        className: 'text-right font-medium text-slate-600 tabular-nums px-1',
                         render: function(data) {
                             return formatQty(data);
                         }
                     },
                     {
                         data: 'qty_orders',
-                        className: 'text-right font-semibold tabular-nums',
+                        orderable: false,
+                        className: 'text-right font-semibold tabular-nums px-1',
                         render: function(data) {
                             let n = parseFloat(data || 0);
                             return `<span class="${n > 0 ? 'text-emerald-600' : 'text-slate-400'}">${n > 0 ? '+' : ''}${formatQty(data)}</span>`;
@@ -406,15 +503,26 @@
                     },
                     {
                         data: 'qty_sales',
-                        className: 'text-right font-semibold tabular-nums',
+                        orderable: false,
+                        className: 'text-right font-semibold tabular-nums px-1',
                         render: function(data) {
                             let n = parseFloat(data || 0);
                             return `<span class="${n > 0 ? 'text-blue-600' : 'text-slate-400'}">${n > 0 ? '-' : ''}${formatQty(data)}</span>`;
                         }
                     },
                     {
+                        data: 'qty_transferred',
+                        orderable: false,
+                        className: 'text-right font-semibold tabular-nums px-1',
+                        render: function(data) {
+                            let n = parseFloat(data || 0);
+                            return `<span class="${n > 0 ? 'text-indigo-600 font-bold' : 'text-slate-400'}">${n > 0 ? '-' : ''}${formatQty(data)}</span>`;
+                        }
+                    },
+                    {
                         data: 'qty_remaining',
-                        className: 'text-right font-bold text-slate-700 tabular-nums',
+                        orderable: false,
+                        className: 'text-right font-bold text-slate-700 tabular-nums px-1',
                         render: function(data) {
                             return formatQty(data);
                         }
@@ -422,52 +530,69 @@
                     @if($canSeeWarehouse)
                     {
                         data: 'qty_storage',
-                        className: 'text-center font-bold cell-storage tabular-nums',
+                        orderable: false,
+                        className: 'text-center font-bold cell-storage tabular-nums px-1',
                         render: function(data) {
-                            return `<span class="inline-flex items-center justify-center min-w-[56px] px-2.5 py-1 rounded-md text-xs font-bold bg-amber-100/90 text-amber-900 border border-amber-300 shadow-2xs">${formatQty(data)}</span>`;
+                            return `<span class="inline-block px-1.5 py-0.5 rounded text-xs font-bold bg-amber-100 text-amber-900 border border-amber-300 shadow-2xs">${formatQty(data)}</span>`;
                         }
                     },
                     {
                         data: 'qty_counter',
-                        className: 'text-center font-bold tabular-nums',
+                        orderable: false,
+                        className: 'text-center font-bold tabular-nums px-1',
                         render: function(data) {
-                            return `<span class="inline-flex items-center justify-center min-w-[56px] px-2.5 py-1 rounded-md text-xs font-bold bg-sky-50 text-sky-800 border border-sky-200 shadow-2xs">${formatQty(data)}</span>`;
+                            return `<span class="inline-block px-1.5 py-0.5 rounded text-xs font-bold bg-sky-50 text-sky-800 border border-sky-200 shadow-2xs">${formatQty(data)}</span>`;
                         }
                     },
                     @else
                     {
                         data: 'qty_counter',
-                        className: 'text-center font-bold tabular-nums',
+                        orderable: false,
+                        className: 'text-center font-bold tabular-nums px-1',
                         render: function(data) {
-                            return `<span class="inline-flex items-center justify-center min-w-[56px] px-2.5 py-1 rounded-md text-xs font-bold bg-sky-50 text-sky-800 border border-sky-200 shadow-2xs">${formatQty(data)}</span>`;
+                            return `<span class="inline-block px-1.5 py-0.5 rounded text-xs font-bold bg-sky-50 text-sky-800 border border-sky-200 shadow-2xs">${formatQty(data)}</span>`;
                         }
                     },
                     @endif
                     {
                         data: 'qty_now',
-                        className: 'text-center font-bold tabular-nums',
+                        orderable: false,
+                        className: 'text-center font-bold tabular-nums px-1',
                         render: function(data) {
                             let n = parseFloat(data || 0);
                             if (n <= 0) {
-                                return `<span class="inline-flex items-center gap-1 justify-center min-w-[62px] px-2.5 py-1 rounded-md text-xs font-black bg-rose-50 text-rose-700 border border-rose-300 shadow-2xs"><span class="w-1.5 h-1.5 rounded-full bg-rose-500"></span>${formatQty(n)}</span>`;
+                                return `<span class="inline-block px-1.5 py-0.5 rounded text-xs font-black bg-rose-50 text-rose-700 border border-rose-300 shadow-2xs">${formatQty(n)}</span>`;
                             }
-                            return `<span class="inline-flex items-center justify-center min-w-[62px] px-2.5 py-1 rounded-md text-xs font-black bg-emerald-50 text-emerald-800 border border-emerald-200 shadow-2xs">${formatQty(n)}</span>`;
+                            return `<span class="inline-block px-1.5 py-0.5 rounded text-xs font-black bg-emerald-50 text-emerald-800 border border-emerald-200 shadow-2xs">${formatQty(n)}</span>`;
                         }
                     },
                     {
                         data: 'keterangan',
-                        className: 'text-center font-medium',
+                        orderable: false,
+                        className: 'text-center font-medium px-1',
                         render: function(data) {
                             if (!data) return '<span class="text-xs text-slate-300">-</span>';
                             let val = String(data).toUpperCase().trim();
                             if (val === 'CASH' || val === 'TUNAI') {
-                                return `<span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">${val}</span>`;
+                                return `<span class="inline-block px-1.5 py-0.5 rounded text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">${val}</span>`;
                             } else if (val === 'KREDIT') {
-                                return `<span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold bg-amber-50 text-amber-700 border border-amber-200">${val}</span>`;
+                                return `<span class="inline-block px-1.5 py-0.5 rounded text-[10px] font-semibold bg-amber-50 text-amber-700 border border-amber-200">${val}</span>`;
                             } else if (val === 'KONSINYASI') {
-                                return `<span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold bg-purple-50 text-purple-700 border border-purple-200">${val}</span>`;
+                                return `<span class="inline-block px-1.5 py-0.5 rounded text-[10px] font-semibold bg-purple-50 text-purple-700 border border-purple-200">${val}</span>`;
                             }
-                            return `<span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium bg-slate-100 text-slate-600 border border-slate-200">${val}</span>`;
+                            return `<span class="inline-block px-1.5 py-0.5 rounded text-[10px] font-medium bg-slate-100 text-slate-600 border border-slate-200">${val}</span>`;
+                        }
+                    },
+                    {
+                        data: null,
+                        orderable: false,
+                        searchable: false,
+                        className: 'text-center whitespace-nowrap px-1',
+                        render: function(data, type, row) {
+                            return `<button type="button" onclick="openMutationModal(${row.id}, '${escapeQuote(row.name)}', '${escapeQuote(row.code)}', '${escapeQuote(row.unit)}')" class="inline-flex items-center gap-1 px-2 py-1 text-xs font-semibold rounded-md bg-indigo-50 text-indigo-700 border border-indigo-200 hover:bg-indigo-100 hover:text-indigo-800 transition shadow-2xs cursor-pointer" title="Lihat riwayat mutasi">
+                                <svg class="w-3.5 h-3.5 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" /></svg>
+                                <span>Mutasi</span>
+                            </button>`;
                         }
                     }
                 ],
@@ -492,6 +617,227 @@
                     }
                 },
             });
+        });
+
+        function escapeQuote(str) {
+            if (!str) return '';
+            return String(str).replace(/'/g, "\\'").replace(/"/g, '&quot;');
+        }
+
+        function openMutationModal(medicineId, medicineName, medicineCode, medicineUnit) {
+            // Close select2 and blur any active input
+            try {
+                $('#medicine').select2('close');
+            } catch (e) {}
+            if (document.activeElement && typeof document.activeElement.blur === 'function') {
+                document.activeElement.blur();
+            }
+
+            // Lock background body scroll
+            document.body.classList.add('overflow-hidden');
+
+            const modal = document.getElementById('mutationModal');
+            const loading = document.getElementById('modalLoading');
+            const content = document.getElementById('modalContent');
+            const emptyState = document.getElementById('modalEmptyState');
+
+            document.getElementById('modalMedicineName').innerText = medicineName || '-';
+            document.getElementById('modalMedicineCode').innerText = medicineCode || '-';
+            document.getElementById('modalMedicineUnit').innerText = medicineUnit || '-';
+            document.getElementById('modalUnitSuffix').innerText = medicineUnit || '';
+
+            modal.classList.remove('hidden');
+            loading.classList.remove('hidden');
+            content.classList.add('hidden');
+            emptyState.classList.add('hidden');
+
+            let url = "{{ route('supplies.stockDataMutationHistory', ':id') }}".replace(':id', medicineId);
+            url += `?start_date=${encodeURIComponent(startDate)}&end_date=${encodeURIComponent(endDate)}`;
+
+            fetch(url)
+                .then(res => res.json())
+                .then(data => {
+                    loading.classList.add('hidden');
+                    content.classList.remove('hidden');
+
+                    document.getElementById('modalPeriodLabel').innerText = data.period_label || 'Semua Waktu';
+                    document.getElementById('modalTotalQty').innerText = formatQty(data.total_qty || 0);
+
+                    // Summary per destination
+                    const summaryContainer = document.getElementById('modalSummaryList');
+                    summaryContainer.innerHTML = '';
+                    if (data.summary && data.summary.length > 0) {
+                        data.summary.forEach(item => {
+                            const badge = document.createElement('span');
+                            badge.className = 'inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-white border border-slate-200 text-slate-800 shadow-2xs';
+                            badge.innerHTML = `<span class="w-2 h-2 rounded-full bg-indigo-500"></span>${item.label}`;
+                            summaryContainer.appendChild(badge);
+                        });
+                    } else {
+                        summaryContainer.innerHTML = '<span class="text-xs text-slate-400 italic">Belum ada barang termutasi</span>';
+                    }
+
+                    // Table rows
+                    const tbody = document.getElementById('modalTableBody');
+                    tbody.innerHTML = '';
+                    if (data.logs && data.logs.length > 0) {
+                        emptyState.classList.add('hidden');
+                        data.logs.forEach((log, idx) => {
+                            const tr = document.createElement('tr');
+                            tr.className = 'hover:bg-slate-50 transition border-b border-slate-100 last:border-0';
+                            const code = log.transfer_code || '-';
+                            const copyBtnHtml = log.transfer_code
+                                ? `<button type="button" onclick="copyTransferCode(this)" data-code="${String(code).replace(/"/g, '&quot;')}" title="Klik untuk menyalin nomor mutasi" class="group inline-flex items-center gap-1.5 px-2 py-0.5 bg-slate-100 hover:bg-indigo-50 hover:text-indigo-700 hover:border-indigo-300 rounded border border-slate-200 transition cursor-pointer select-none">
+                                        <span class="pointer-events-none">${code}</span>
+                                        <svg class="copy-icon pointer-events-none w-3.5 h-3.5 text-slate-400 group-hover:text-indigo-600 transition shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                                        </svg>
+                                        <svg class="check-icon pointer-events-none hidden w-3.5 h-3.5 text-emerald-600 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7" />
+                                        </svg>
+                                        <span class="copied-label pointer-events-none hidden text-[10px] font-sans font-semibold text-emerald-700">Disalin</span>
+                                   </button>`
+                                : `<span class="inline-block px-2 py-0.5 bg-slate-100 rounded border border-slate-200">-</span>`;
+
+                            tr.innerHTML = `
+                                <td class="px-4 py-2.5 text-center text-slate-400 font-medium">${idx + 1}</td>
+                                <td class="px-4 py-2.5 font-mono font-bold text-slate-700 whitespace-nowrap">
+                                    ${copyBtnHtml}
+                                </td>
+                                <td class="px-4 py-2.5 whitespace-nowrap text-slate-600">${log.formatted_date || '-'}</td>
+                                <td class="px-4 py-2.5 whitespace-nowrap">
+                                    <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-slate-100 text-slate-700 border border-slate-200">
+                                        ${log.formatted_source || '-'}
+                                    </span>
+                                </td>
+                                <td class="px-4 py-2.5 whitespace-nowrap">
+                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-indigo-50 text-indigo-700 border border-indigo-200">
+                                        ${log.formatted_destination || '-'}
+                                    </span>
+                                </td>
+                                <td class="px-4 py-2.5 whitespace-nowrap font-medium text-slate-700">${log.batch_name || '-'}</td>
+                                <td class="px-4 py-2.5 text-right font-bold text-indigo-700 tabular-nums whitespace-nowrap">${formatQty(log.qty_number || 0)}</td>
+                                <td class="px-4 py-2.5 whitespace-nowrap text-slate-600 font-medium">${log.operator_name || '-'}</td>
+                            `;
+                            tbody.appendChild(tr);
+                        });
+                    } else {
+                        emptyState.classList.remove('hidden');
+                    }
+                })
+                .catch(err => {
+                    console.error(err);
+                    loading.classList.add('hidden');
+                    content.classList.remove('hidden');
+                    iziToast.error({
+                        title: 'Gagal',
+                        message: 'Tidak dapat memuat riwayat mutasi.',
+                        position: 'topRight'
+                    });
+                });
+        }
+
+        function copyTransferCode(btn) {
+            const code = btn?.getAttribute('data-code');
+            if (!code) return;
+
+            const showCopiedFeedback = () => {
+                const copyIcon = btn.querySelector('.copy-icon');
+                const checkIcon = btn.querySelector('.check-icon');
+                const copiedLabel = btn.querySelector('.copied-label');
+                if (copyIcon) copyIcon.classList.add('hidden');
+                if (checkIcon) checkIcon.classList.remove('hidden');
+                if (copiedLabel) copiedLabel.classList.remove('hidden');
+                btn.classList.add('bg-emerald-50', 'border-emerald-300', 'text-emerald-700');
+
+                if (typeof iziToast !== 'undefined') {
+                    iziToast.success({
+                        title: 'Disalin',
+                        message: `Nomor mutasi ${code} berhasil disalin.`,
+                        position: 'topRight',
+                        timeout: 2000
+                    });
+                }
+
+                if (btn._copyTimer) clearTimeout(btn._copyTimer);
+                btn._copyTimer = setTimeout(() => {
+                    if (copyIcon) copyIcon.classList.remove('hidden');
+                    if (checkIcon) checkIcon.classList.add('hidden');
+                    if (copiedLabel) copiedLabel.classList.add('hidden');
+                    btn.classList.remove('bg-emerald-50', 'border-emerald-300', 'text-emerald-700');
+                }, 1500);
+            };
+
+            // Try synchronous execCommand first only if Clipboard API is unavailable,
+            // or fall back synchronously whenever Clipboard API rejects or is unavailable.
+            if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function' && window.isSecureContext) {
+                navigator.clipboard.writeText(code)
+                    .then(showCopiedFeedback)
+                    .catch(() => fallbackCopyText(code, btn, showCopiedFeedback));
+            } else {
+                fallbackCopyText(code, btn, showCopiedFeedback);
+            }
+        }
+
+        function fallbackCopyText(text, anchorEl, onSuccess) {
+            const container = anchorEl?.closest('#mutationModal') || document.body;
+            const prevFocus = document.activeElement;
+            const textarea = document.createElement('textarea');
+            textarea.value = text;
+            textarea.setAttribute('readonly', '');
+            textarea.style.position = 'fixed';
+            textarea.style.top = '0';
+            textarea.style.left = '-9999px';
+            textarea.style.width = '2em';
+            textarea.style.height = '2em';
+            textarea.style.padding = '0';
+            textarea.style.border = 'none';
+            textarea.style.outline = 'none';
+            textarea.style.boxShadow = 'none';
+            textarea.style.background = 'transparent';
+            textarea.style.fontSize = '12pt';
+
+            container.appendChild(textarea);
+            textarea.focus({ preventScroll: true });
+            textarea.select();
+            textarea.setSelectionRange(0, text.length);
+
+            let copied = false;
+            try {
+                copied = document.execCommand('copy');
+            } catch (e) {
+                copied = false;
+            } finally {
+                container.removeChild(textarea);
+                if (prevFocus && typeof prevFocus.focus === 'function') {
+                    prevFocus.focus({ preventScroll: true });
+                }
+            }
+
+            if (copied && typeof onSuccess === 'function') {
+                onSuccess();
+            } else if (typeof iziToast !== 'undefined') {
+                iziToast.warning({
+                    title: 'Gagal Salin',
+                    message: 'Browser memblokir salin otomatis. Silakan salin manual: ' + text,
+                    position: 'topRight'
+                });
+            }
+        }
+
+        function closeMutationModal() {
+            const modal = document.getElementById('mutationModal');
+            if (modal) {
+                modal.classList.add('hidden');
+            }
+            document.body.classList.remove('overflow-hidden');
+        }
+
+        // Close on Escape key
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') {
+                closeMutationModal();
+            }
         });
     </script>
 @endsection

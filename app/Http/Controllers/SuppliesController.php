@@ -318,7 +318,7 @@ class SuppliesController extends Controller
                 'receiving.receiving_details.creditor', // Fetch creditor through receiving details
                 'medicine_transaction.user',            // Fetch cashier user through transactions
                 'users'                                 // Fetch user for creator display
-            ])->whereNotIn('status', [5, 6]);
+            ]);
 
             if ($med) {
                 $itemsQuery->orderByRaw($effectiveDateSql . ' ASC')->orderBy('id', 'asc');
@@ -398,8 +398,8 @@ class SuppliesController extends Controller
                     return $row->medicines->name;
                 })
                 ->addColumn('batch_name', function ($row) {
-                    if (in_array($row->status, [2, 4, 7, 8, 9]) && $row->batches) {
-                        return $row->batches->name;
+                    if (in_array($row->status, [2, 4, 5, 6, 7, 8, 9]) && $row->batches) {
+                        return $row->batches->name ?: ($row->batches->batch_1 ?: '-');
                     }
                     return '-';
                 })
@@ -481,13 +481,14 @@ class SuppliesController extends Controller
                         return "<div style='color:#d34163;font-weight:bold;'><span>+</span><b>" . $row->qty . "</b></div>";
                     } else if ($row->status == 4) {
                         return "<div style='color:#d34163;font-weight:bold;'><span>-</span><b>" . $row->qty . "</b></div>";
-                    } else if ($row->status == 5) {
-                        if ($row->qty < 0) {
-                            return "<div style='color:#d34163;font-weight:bold;'><span></span><b>" . $row->qty . "</b></div>";
-                        } else if ($row->qty > 0) {
-                            return "<div style='color:#d34163;font-weight:bold;'><span>+</span><b>" . $row->qty . "</b></div>";
+                    } else if (in_array($row->status, [5, 6])) {
+                        $delta = $this->stockLogDelta($row);
+                        if ($delta > 0) {
+                            return "<div style='color:#16a34a;font-weight:bold;'><span>+</span><b>" . $delta . "</b></div>";
+                        } else if ($delta < 0) {
+                            return "<div style='color:#d34163;font-weight:bold;'><span>-</span><b>" . abs($delta) . "</b></div>";
                         } else {
-                            return "<div style='color:#d34163;font-weight:bold;'><span></span><b>" . $row->qty . "</b></div>";
+                            return "<div style='color:#64748b;font-weight:bold;'><b>0</b></div>";
                         }
                     } else if ($row->status == 7) {
                         if ($row->qty_after < $row->qty_before) {
@@ -549,7 +550,9 @@ class SuppliesController extends Controller
                     } else if ($row->status == 4) {
                         return "<div style='text-align: center; font-weight: bold; text-transform: uppercase; background-color: rgb(255 177 0 / 31%); color: #c17800; padding: 6px 4px; width:100px; font-size: 9px; font-family: Poppins; border-radius: 25px;'>Retur Beli</div>";
                     } else if ($row->status == 5) {
-                        return "<div style='text-align: center; font-weight: bold; text-transform: uppercase; background-color: #fff035; color: #7a7817; padding: 6px 4px; width:100px; font-size: 9px; font-family: Poppins; border-radius: 25px;'>Stock Opname</div>";
+                        return "<div style='text-align: center; font-weight: bold; text-transform: uppercase; background-color: #ede9fe; color: #6d28d9; padding: 6px 4px; width:100px; font-size: 9px; font-family: Poppins; border-radius: 25px;'>Stock Opname</div>";
+                    } else if ($row->status == 6) {
+                        return "<div style='text-align: center; font-weight: bold; text-transform: uppercase; background-color: #e0f2fe; color: #0369a1; padding: 6px 4px; width:100px; font-size: 9px; font-family: Poppins; border-radius: 25px;'>Penyesuaian</div>";
                     } else if ($row->status == 7) {
                         return "<div style='text-align: center; font-weight: bold; text-transform: uppercase; background-color: #aeffeaad; color: #238787; padding: 6px 4px; width:100px; font-size: 9px; font-family: Poppins; border-radius: 25px;'>Mutasi Stok</div>";
                     } else if ($row->status == 8) {
@@ -823,180 +826,473 @@ class SuppliesController extends Controller
 
             $startDate = $request->filled('start_date') ? Carbon::parse($request->start_date)->toDateString() : null;
             $endDate = $request->filled('end_date') ? Carbon::parse($request->end_date)->toDateString() : null;
+            $hasDateFilter = ($startDate || $endDate);
 
             // Tentukan target pharmacy_id untuk filter pembelian, penjualan, saldo awal, dan stok counter
             $ordersPharmacyId = $canSeeWarehouse ? $warehouseId : $pharmacyId;
             $salesPharmacyId = $canSeeWarehouse ? $pmiPharmacyId : $pharmacyId;
             $startPharmacyIds = $canSeeWarehouse ? [$warehouseId, $pmiPharmacyId] : [$pharmacyId];
             $counterPharmacyId = $canSeeWarehouse ? $pmiPharmacyId : $pharmacyId;
+            $allPharmacyIds = array_unique(array_merge([$ordersPharmacyId, $salesPharmacyId], $startPharmacyIds));
 
-            $openingDateExpression = "DATE(items_log.date) > COALESCE((SELECT DATE(MAX(opening_logs.date)) FROM items_log AS opening_logs INNER JOIN batches AS opening_batches ON opening_batches.id = opening_logs.batches_id WHERE opening_logs.medicine_id = medicines.id AND opening_logs.type = ? AND opening_batches.pharmacy_id IN (" . implode(',', array_fill(0, count($startPharmacyIds), '?')) . ")), '1000-01-01')";
-            $openingDateBindings = array_merge(['SO-SALDO-AWAL'], $startPharmacyIds);
-
-            $medicines = Medicines::query()
+            // Base query on medicines table ONLY (ultra fast, no subqueries)
+            $query = Medicines::query()
                 ->where('medicines.status', 1)
                 ->select([
                     'medicines.id',
                     'medicines.code',
                     'medicines.name',
                     'medicines.unit',
-                ])
-                ->addSelect([
-                    // Latest mass opening-balance baseline, if one was imported.
-                    'opening_balance_qty' => ItemsLog::select('items_log.qty_before')
-                        ->join('batches', 'batches.id', '=', 'items_log.batches_id')
-                        ->whereColumn('items_log.medicine_id', 'medicines.id')
-                        ->where('items_log.type', 'SO-SALDO-AWAL')
-                        ->whereIn('batches.pharmacy_id', $startPharmacyIds)
-                        ->orderByDesc('items_log.date')->orderByDesc('items_log.id')->limit(1),
-                    // Qty Beli: Gudang PMI jika ada akses gudang, atau Pembelian cabang
-                    'qty_orders' => ItemsLog::select(DB::raw('COALESCE(SUM(CAST(items_log.qty AS UNSIGNED)), 0)'))
-                        ->join('batches', 'batches.id', '=', 'items_log.batches_id')
-                        ->whereColumn('items_log.medicine_id', 'medicines.id')
-                        ->where('items_log.status', 2)
-                        ->where('batches.pharmacy_id', $ordersPharmacyId)
-                        ->when(!$request->filled('start_date') && !$request->filled('end_date'), fn($q) => $q->whereRaw($openingDateExpression, $openingDateBindings))
-                        ->when($request->filled('start_date'), fn($q) => $q->whereDate('items_log.date', '>=', $request->start_date))
-                        ->when($request->filled('end_date'), fn($q) => $q->whereDate('items_log.date', '<=', $request->end_date)),
-
-                    // Qty Jual: Sahabat PMI jika ada akses gudang, atau Penjualan cabang
-                    'qty_sales' => ItemsLog::select(DB::raw('COALESCE(SUM(CAST(items_log.qty AS UNSIGNED)), 0)'))
-                        ->join('batches', 'batches.id', '=', 'items_log.batches_id')
-                        ->whereColumn('items_log.medicine_id', 'medicines.id')
-                        ->where('items_log.status', 1)
-                        ->where('batches.pharmacy_id', $salesPharmacyId)
-                        ->when(!$request->filled('start_date') && !$request->filled('end_date'), fn($q) => $q->whereRaw($openingDateExpression, $openingDateBindings))
-                        ->when($request->filled('start_date'), fn($q) => $q->whereDate('items_log.date', '>=', $request->start_date))
-                        ->when($request->filled('end_date'), fn($q) => $q->whereDate('items_log.date', '<=', $request->end_date)),
-
-                    // Qty Retur Beli cabang
-                    'qty_orders_rt' => ItemsLog::select(DB::raw('COALESCE(SUM(CAST(items_log.qty AS UNSIGNED)), 0)'))
-                        ->join('batches', 'batches.id', '=', 'items_log.batches_id')
-                        ->whereColumn('items_log.medicine_id', 'medicines.id')
-                        ->where('items_log.status', 4)
-                        ->where('batches.pharmacy_id', $ordersPharmacyId)
-                        ->when(!$request->filled('start_date') && !$request->filled('end_date'), fn($q) => $q->whereRaw($openingDateExpression, $openingDateBindings))
-                        ->when($request->filled('start_date'), fn($q) => $q->whereDate('items_log.date', '>=', $request->start_date))
-                        ->when($request->filled('end_date'), fn($q) => $q->whereDate('items_log.date', '<=', $request->end_date)),
-
-                    // Qty Retur Jual cabang
-                    'qty_sales_rt' => ItemsLog::select(DB::raw('COALESCE(SUM(CAST(items_log.qty AS UNSIGNED)), 0)'))
-                        ->join('batches', 'batches.id', '=', 'items_log.batches_id')
-                        ->whereColumn('items_log.medicine_id', 'medicines.id')
-                        ->where('items_log.status', 3)
-                        ->where('batches.pharmacy_id', $salesPharmacyId)
-                        ->when(!$request->filled('start_date') && !$request->filled('end_date'), fn($q) => $q->whereRaw($openingDateExpression, $openingDateBindings))
-                        ->when($request->filled('start_date'), fn($q) => $q->whereDate('items_log.date', '>=', $request->start_date))
-                        ->when($request->filled('end_date'), fn($q) => $q->whereDate('items_log.date', '<=', $request->end_date)),
-
-                    // Net stock opname, adjustment, and mutation movements are
-                    // required to reconstruct the opening balance from realtime stock.
-                    'qty_adjustments' => ItemsLog::select(DB::raw("COALESCE(SUM(CASE
-                        WHEN items_log.status = 5 THEN CASE
-                            WHEN items_log.total IS NOT NULL
-                                AND TRIM(items_log.total) REGEXP '^[+-]?[0-9]+([.][0-9]+)?([eE][+-]?[0-9]+)?$'
-                                THEN CAST(items_log.total AS SIGNED)
-                            ELSE CAST(items_log.qty_after AS SIGNED) - CAST(items_log.qty_before AS SIGNED)
-                        END
-                        ELSE CAST(items_log.qty_after AS SIGNED) - CAST(items_log.qty_before AS SIGNED)
-                    END), 0)"))
-                        ->join('batches', 'batches.id', '=', 'items_log.batches_id')
-                        ->whereColumn('items_log.medicine_id', 'medicines.id')
-                        ->whereIn('items_log.status', [5, 6, 7])
-                        ->whereIn('batches.pharmacy_id', $startPharmacyIds)
-                        ->when(!$request->filled('start_date') && !$request->filled('end_date'), fn($q) => $q->whereRaw($openingDateExpression, $openingDateBindings))
-                        ->when($request->filled('start_date'), fn($q) => $q->whereDate('items_log.date', '>=', $request->start_date))
-                        ->when($request->filled('end_date'), fn($q) => $q->whereDate('items_log.date', '<=', $request->end_date)),
-
-                    // Stok Gudang (hanya jika cabang memiliki/mengakses Gudang PMI)
-                    'qty_storage' => $canSeeWarehouse
-                        ? Batches::select(DB::raw('COALESCE(SUM(stock), 0)'))
-                            ->whereColumn('medicine_id', 'medicines.id')
-                            ->where('pharmacy_id', $warehouseId)
-                        : DB::raw('0'),
-
-                    // Stok Pelayanan / Etalase (Cabang atau Sahabat PMI)
-                    'qty_counter' => MedicineTransferItems::select(DB::raw('COALESCE(SUM(medicine_transfer_items.qty), 0)'))
-                        ->join('batches', 'batches.id', '=', 'medicine_transfer_items.batches_id')
-                        ->whereColumn('batches.medicine_id', 'medicines.id')
-                        ->where('batches.pharmacy_id', $counterPharmacyId)
-                        ->where('medicine_transfer_items.status', 1)
-                        ->where(function ($q) {
-                            $q->whereNull('medicine_transfer_items.source_type')
-                              ->orWhere('medicine_transfer_items.source_type', '!=', 'retur_gudang');
-                        }),
-
-                    // Keterangan: Metode pembayaran barang diterima (invoice_payment) terakhir s/d batas rentang tanggal
-                    'payment_method' => DB::table('receiving_items')
-                        ->join('receiving_details', 'receiving_details.id', '=', 'receiving_items.receiving_details_id')
-                        ->join('receiving', 'receiving.id', '=', 'receiving_details.receiving_id')
-                        ->leftJoin('batches', 'batches.id', '=', 'receiving_items.batches_id')
-                        ->leftJoin('order_items', 'order_items.id', '=', 'receiving_items.order_items_id')
-                        ->where(function ($q) {
-                            $q->whereColumn('batches.medicine_id', 'medicines.id')
-                              ->orWhereColumn('order_items.medicine_id', 'medicines.id');
-                        })
-                        ->where('receiving.pharmacy_id', $ordersPharmacyId)
-                        ->when($endDate, fn($q) => $q->whereDate('receiving_details.invoice_date', '<=', $endDate))
-                        ->orderByDesc('receiving_details.invoice_date')
-                        ->orderByDesc('receiving_details.id')
-                        ->select('receiving_details.invoice_payment')
-                        ->limit(1),
                 ]);
 
             if ($request->filled('medicine_id')) {
-                $medicines->where('medicines.id', $request->medicine_id);
+                $query->where('medicines.id', $request->medicine_id);
             }
 
-            return DataTables::of($medicines)
-                ->addIndexColumn()
-                ->editColumn('qty_start', function ($m) use ($canSeeWarehouse) {
-                    // With no date filter, show the explicitly imported opening
-                    // balance rather than reverse-engineering it from late imports.
-                    if (request()->filled('start_date') === false && request()->filled('end_date') === false && $m->opening_balance_qty !== null) {
-                        return (int) $m->opening_balance_qty;
-                    }
-                    $storage = $canSeeWarehouse ? (int) ($m->qty_storage ?? 0) : 0;
-                    $counter = (int) ($m->qty_counter ?? 0);
-                    $totalNow = $storage + $counter;
+            if ($request->filled('search.value')) {
+                $search = trim($request->input('search.value'));
+                if ($search !== '') {
+                    $query->where(function ($q) use ($search) {
+                        $q->where('medicines.name', 'like', "%{$search}%")
+                          ->orWhere('medicines.code', 'like', "%{$search}%");
+                    });
+                }
+            }
 
-                    $netIn = (int) ($m->qty_orders ?? 0) - (int) ($m->qty_orders_rt ?? 0);
-                    $netOut = (int) ($m->qty_sales ?? 0) - (int) ($m->qty_sales_rt ?? 0);
-                    $adjustments = (int) ($m->qty_adjustments ?? 0);
+            $totalRecords = Medicines::where('status', 1)->count();
+            $isFiltered = $request->filled('medicine_id') || ($request->filled('search.value') && trim($request->input('search.value')) !== '');
+            $filteredRecords = $isFiltered ? $query->count() : $totalRecords;
 
-                    return $totalNow - $netIn + $netOut - $adjustments;
+            // Ordering
+            $orderColIdx = (int) $request->input('order.0.column', 2);
+            $orderDir = strtolower($request->input('order.0.dir', 'asc')) === 'desc' ? 'desc' : 'asc';
+            $orderMap = [
+                1 => 'medicines.code',
+                2 => 'medicines.name',
+                3 => 'medicines.unit',
+            ];
+            $orderField = $orderMap[$orderColIdx] ?? 'medicines.name';
+
+            $start = (int) $request->input('start', 0);
+            $length = (int) $request->input('length', 10);
+            if ($length < 1) $length = 10;
+
+            $pageMedicines = $query->orderBy($orderField, $orderDir)
+                ->orderBy('medicines.id', $orderDir)
+                ->skip($start)
+                ->take($length)
+                ->get();
+
+            if ($pageMedicines->isEmpty()) {
+                return response()->json([
+                    'draw' => (int) $request->input('draw', 1),
+                    'recordsTotal' => $totalRecords,
+                    'recordsFiltered' => $filteredRecords,
+                    'data' => [],
+                ]);
+            }
+
+            $pageMedicineIds = $pageMedicines->pluck('id')->all();
+
+            // 1. Storage stock (Gudang PMI)
+            $storageStockMap = [];
+            if ($canSeeWarehouse) {
+                $storageStockMap = Batches::whereIn('medicine_id', $pageMedicineIds)
+                    ->where('pharmacy_id', $warehouseId)
+                    ->selectRaw('medicine_id, SUM(stock) as total')
+                    ->groupBy('medicine_id')
+                    ->pluck('total', 'medicine_id')
+                    ->all();
+            }
+
+            // 2. Counter stock (Pelayanan PMI / Etalase Cabang)
+            $counterStockMap = MedicineTransferItems::join('batches', 'batches.id', '=', 'medicine_transfer_items.batches_id')
+                ->whereIn('batches.medicine_id', $pageMedicineIds)
+                ->where('batches.pharmacy_id', $counterPharmacyId)
+                ->where('medicine_transfer_items.status', 1)
+                ->where(function ($q) {
+                    $q->whereNull('medicine_transfer_items.source_type')
+                      ->orWhere('medicine_transfer_items.source_type', '!=', 'retur_gudang');
                 })
-                ->editColumn('qty_orders', fn($m) => (int) ($m->qty_orders ?? 0))
-                ->editColumn('qty_sales', fn($m) => (int) ($m->qty_sales ?? 0))
-                ->addColumn('qty_remaining', function ($m) use ($canSeeWarehouse) {
-                    $storage = $canSeeWarehouse ? (int) ($m->qty_storage ?? 0) : 0;
-                    $counter = (int) ($m->qty_counter ?? 0);
-                    $totalNow = $storage + $counter;
-                    return $totalNow;
-                })
-                ->editColumn('qty_storage', fn($m) => (int) ($m->qty_storage ?? 0))
-                ->editColumn('qty_counter', fn($m) => (int) ($m->qty_counter ?? 0))
-                ->addColumn('qty_now', function ($m) use ($canSeeWarehouse) {
-                    $storage = $canSeeWarehouse ? (int) ($m->qty_storage ?? 0) : 0;
-                    $counter = (int) ($m->qty_counter ?? 0);
-                    return $storage + $counter;
-                })
-                ->addColumn('keterangan', function ($m) {
-                    $p = $m->payment_method ? strtoupper(trim($m->payment_method)) : null;
-                    if ($p === 'TUNAI' || $p === 'CASH') {
-                        return '<span class="px-2 py-0.5 rounded-md text-[11px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">Cash</span>';
-                    } elseif ($p === 'KREDIT') {
-                        return '<span class="px-2 py-0.5 rounded-md text-[11px] font-semibold bg-amber-50 text-amber-700 border border-amber-200">Kredit</span>';
-                    } elseif ($p === 'KONSINYASI') {
-                        return '<span class="px-2 py-0.5 rounded-md text-[11px] font-semibold bg-blue-50 text-blue-700 border border-blue-200">Konsinyasi</span>';
-                    } elseif ($p) {
-                        return '<span class="px-2 py-0.5 rounded-md text-[11px] font-semibold bg-slate-100 text-slate-700 border border-slate-200">' . htmlspecialchars(ucfirst(strtolower($p))) . '</span>';
+                ->selectRaw('batches.medicine_id, SUM(medicine_transfer_items.qty) as total')
+                ->groupBy('batches.medicine_id')
+                ->pluck('total', 'batches.medicine_id')
+                ->all();
+
+            // 3. Latest Opening Balances (SO-SALDO-AWAL)
+            $latestOpeningLogs = DB::table('items_log as il')
+                ->join('batches as b', 'b.id', '=', 'il.batches_id')
+                ->joinSub(
+                    DB::table('items_log as il2')
+                        ->join('batches as b2', 'b2.id', '=', 'il2.batches_id')
+                        ->where('il2.type', 'SO-SALDO-AWAL')
+                        ->whereIn('b2.pharmacy_id', $startPharmacyIds)
+                        ->whereIn('il2.medicine_id', $pageMedicineIds)
+                        ->groupBy('il2.medicine_id')
+                        ->select('il2.medicine_id', DB::raw('MAX(il2.id) as max_id')),
+                    'latest',
+                    'latest.max_id', '=', 'il.id'
+                )
+                ->select('il.medicine_id', 'il.qty_before', DB::raw('DATE(il.date) as op_date'))
+                ->get()
+                ->keyBy('medicine_id');
+
+            // 4. Movements from items_log (Beli, Jual, Retur Beli, Retur Jual, Penyesuaian/Opname)
+            $logsQuery = DB::table('items_log')
+                ->join('batches', 'batches.id', '=', 'items_log.batches_id')
+                ->whereIn('items_log.medicine_id', $pageMedicineIds)
+                ->whereIn('batches.pharmacy_id', $allPharmacyIds)
+                ->whereIn('items_log.status', [1, 2, 3, 4, 5, 6, 7]);
+
+            if ($startDate) {
+                $logsQuery->whereDate('items_log.date', '>=', $startDate);
+            }
+            if ($endDate) {
+                $logsQuery->whereDate('items_log.date', '<=', $endDate);
+            }
+
+            $logs = $logsQuery->select([
+                'items_log.medicine_id',
+                'batches.pharmacy_id',
+                'items_log.status',
+                'items_log.date',
+                'items_log.qty',
+                'items_log.qty_before',
+                'items_log.qty_after',
+                'items_log.total',
+            ])->get();
+
+            $aggOrders = [];
+            $aggSales = [];
+            $aggOrdersRt = [];
+            $aggSalesRt = [];
+            $aggAdjustments = [];
+
+            foreach ($logs as $log) {
+                $mId = $log->medicine_id;
+                $pId = $log->pharmacy_id;
+                $st = (int) $log->status;
+                $logDate = substr($log->date, 0, 10);
+
+                if (!$hasDateFilter) {
+                    $opDate = isset($latestOpeningLogs[$mId]) ? $latestOpeningLogs[$mId]->op_date : '1000-01-01';
+                    if ($logDate <= $opDate) {
+                        continue;
                     }
-                    return '<span class="text-slate-400">-</span>';
+                }
+
+                $qty = (int) $log->qty;
+
+                if ($st === 2 && $pId == $ordersPharmacyId) {
+                    $aggOrders[$mId] = ($aggOrders[$mId] ?? 0) + $qty;
+                } elseif ($st === 1 && $pId == $salesPharmacyId) {
+                    $aggSales[$mId] = ($aggSales[$mId] ?? 0) + $qty;
+                } elseif ($st === 4 && $pId == $ordersPharmacyId) {
+                    $aggOrdersRt[$mId] = ($aggOrdersRt[$mId] ?? 0) + $qty;
+                } elseif ($st === 3 && $pId == $salesPharmacyId) {
+                    $aggSalesRt[$mId] = ($aggSalesRt[$mId] ?? 0) + $qty;
+                } elseif (in_array($st, [5, 6, 7]) && in_array($pId, $startPharmacyIds)) {
+                    if ($st === 5) {
+                        if ($log->total !== null && preg_match('/^[+-]?[0-9]+([.][0-9]+)?([eE][+-]?[0-9]+)?$/', trim($log->total))) {
+                            $diff = (int) $log->total;
+                        } else {
+                            $diff = (int) $log->qty_after - (int) $log->qty_before;
+                        }
+                    } else {
+                        $diff = (int) $log->qty_after - (int) $log->qty_before;
+                    }
+                    $aggAdjustments[$mId] = ($aggAdjustments[$mId] ?? 0) + $diff;
+                }
+            }
+
+            // 5. Transfers / Mutations (Gudang PMI + Sahabat PMI outbound, excluding retur_gudang & dummy init)
+            $pageBatchIds = Batches::whereIn('medicine_id', $pageMedicineIds)->pluck('id')->all();
+            $transferSourcePharmacyIds = $canSeeWarehouse
+                ? [$warehouseId, $pmiPharmacyId]
+                : [$pharmacyId];
+
+            $transferQuery = DB::table('medicine_transfer_items as mti')
+                ->join('medicine_transfers as mt', 'mt.id', '=', 'mti.medicine_transfer_id')
+                ->leftJoin('batches as src_batches', 'src_batches.id', '=', 'mti.source_batches_id')
+                ->leftJoin('batches as dst_batches', 'dst_batches.id', '=', 'mti.batches_id')
+                ->where(function ($q) use ($pageMedicineIds, $pageBatchIds) {
+                    if (!empty($pageBatchIds)) {
+                        $q->whereIn('mti.source_batches_id', $pageBatchIds)
+                          ->orWhereIn('mti.batches_id', $pageBatchIds);
+                    }
+                    $q->orWhereIn('mti.requested_medicine_id', $pageMedicineIds);
                 })
-                ->rawColumns(['keterangan'])
-                ->make(true);
+                ->where(function ($sq) use ($transferSourcePharmacyIds) {
+                    $sq->whereIn('mt.source_pharmacy_id', $transferSourcePharmacyIds)
+                       ->orWhere(function ($sq2) use ($transferSourcePharmacyIds) {
+                           $sq2->whereNull('mt.source_pharmacy_id')
+                               ->whereIn('src_batches.pharmacy_id', $transferSourcePharmacyIds);
+                       });
+                })
+                ->where('mt.status', '!=', 2)
+                ->where(function ($q) {
+                    $q->whereNull('mt.is_request')
+                      ->orWhere('mt.is_request', 0)
+                      ->orWhere('mt.request_status', 1);
+                })
+                ->where('mt.code', 'not like', 'TRF-INIT%')
+                ->where(function ($q) {
+                    $q->whereNull('mti.source_type')
+                      ->orWhere('mti.source_type', '!=', 'retur_gudang');
+                })
+                ->where(DB::raw('COALESCE(mti.original_qty, mti.qty)'), '>', 0);
+
+            if ($canSeeWarehouse) {
+                // Exclude returns from Sahabat PMI back into Gudang PMI (internal warehouse consolidation)
+                $transferQuery->where(function ($q) use ($warehouseId) {
+                    $q->whereNull('mt.destination_pharmacy_id')
+                      ->orWhere('mt.destination_pharmacy_id', '!=', $warehouseId);
+                });
+            }
+
+            $transferQuery->where(function ($q) {
+                $q->whereNull('mt.destination_pharmacy_id')
+                  ->orWhereRaw('COALESCE(mt.source_pharmacy_id, src_batches.pharmacy_id, 0) != mt.destination_pharmacy_id');
+            });
+
+            if ($startDate) {
+                $transferQuery->whereDate('mt.created_at', '>=', $startDate);
+            }
+            if ($endDate) {
+                $transferQuery->whereDate('mt.created_at', '<=', $endDate);
+            }
+
+            $transfers = $transferQuery->select([
+                DB::raw('COALESCE(src_batches.medicine_id, dst_batches.medicine_id, mti.requested_medicine_id) as medicine_id'),
+                DB::raw('DATE(mt.created_at) as transfer_date'),
+                DB::raw('COALESCE(mti.original_qty, mti.qty) as qty'),
+            ])->get();
+
+            $aggTransfers = [];
+            foreach ($transfers as $tr) {
+                $mId = $tr->medicine_id;
+                if (!$mId) continue;
+                if (!$hasDateFilter) {
+                    $opDate = isset($latestOpeningLogs[$mId]) ? $latestOpeningLogs[$mId]->op_date : '1000-01-01';
+                    if ($tr->transfer_date <= $opDate) {
+                        continue;
+                    }
+                }
+                $aggTransfers[$mId] = ($aggTransfers[$mId] ?? 0) + (int) $tr->qty;
+            }
+
+            // 6. Payment methods (Keterangan)
+            $paymentMethods = DB::table('receiving_items as ri')
+                ->join('receiving_details as rd', 'rd.id', '=', 'ri.receiving_details_id')
+                ->join('receiving as r', 'r.id', '=', 'rd.receiving_id')
+                ->leftJoin('batches as b', 'b.id', '=', 'ri.batches_id')
+                ->leftJoin('order_items as oi', 'oi.id', '=', 'ri.order_items_id')
+                ->where(function ($q) use ($pageMedicineIds, $pageBatchIds) {
+                    if (!empty($pageBatchIds)) {
+                        $q->whereIn('ri.batches_id', $pageBatchIds);
+                    }
+                    $q->orWhereIn('oi.medicine_id', $pageMedicineIds);
+                })
+                ->where('r.pharmacy_id', $ordersPharmacyId)
+                ->when($endDate, fn($q) => $q->whereDate('rd.invoice_date', '<=', $endDate))
+                ->select(
+                    DB::raw('COALESCE(b.medicine_id, oi.medicine_id) as medicine_id'),
+                    'rd.invoice_payment'
+                )
+                ->orderBy('rd.invoice_date', 'desc')
+                ->orderBy('rd.id', 'desc')
+                ->get()
+                ->filter(fn($row) => !empty($row->medicine_id))
+                ->unique('medicine_id')
+                ->pluck('invoice_payment', 'medicine_id')
+                ->all();
+
+            // 7. Assemble final response for the 10 rows
+            $data = [];
+            foreach ($pageMedicines as $index => $m) {
+                $mId = $m->id;
+                $qtyStorage = $canSeeWarehouse ? (int) ($storageStockMap[$mId] ?? 0) : 0;
+                $qtyCounter = (int) ($counterStockMap[$mId] ?? 0);
+                $totalStok = $qtyStorage + $qtyCounter;
+
+                $qtyOrders = (int) ($aggOrders[$mId] ?? 0);
+                $qtyOrdersRt = (int) ($aggOrdersRt[$mId] ?? 0);
+                $qtySales = (int) ($aggSales[$mId] ?? 0);
+                $qtySalesRt = (int) ($aggSalesRt[$mId] ?? 0);
+                $qtyTransferred = (int) ($aggTransfers[$mId] ?? 0);
+
+                $netIn = $qtyOrders - $qtyOrdersRt;
+                $netOut = $qtySales - $qtySalesRt;
+                $adjustments = (int) ($aggAdjustments[$mId] ?? 0);
+
+                $opLog = $latestOpeningLogs[$mId] ?? null;
+                $qtyStart = (!$hasDateFilter && $opLog !== null)
+                    ? (int) $opLog->qty_before
+                    : $totalStok - $netIn + $netOut - $adjustments;
+
+                $rawPayment = $paymentMethods[$mId] ?? null;
+                $p = $rawPayment ? strtoupper(trim($rawPayment)) : null;
+                $keterangan = ($p === 'TUNAI' || $p === 'CASH') ? 'Cash' : (($p === 'KREDIT') ? 'Kredit' : (($p === 'KONSINYASI') ? 'Konsinyasi' : ($p ? ucfirst(strtolower($p)) : '-')));
+
+                $data[] = [
+                    'DT_RowIndex' => $start + $index + 1,
+                    'id' => $m->id,
+                    'code' => $m->code,
+                    'name' => $m->name,
+                    'unit' => $m->unit,
+                    'qty_start' => $qtyStart,
+                    'qty_orders' => $qtyOrders,
+                    'qty_sales' => $qtySales,
+                    'qty_transferred' => $qtyTransferred,
+                    'qty_remaining' => $totalStok,
+                    'qty_storage' => $qtyStorage,
+                    'qty_counter' => $qtyCounter,
+                    'qty_now' => $totalStok,
+                    'keterangan' => $keterangan,
+                ];
+            }
+
+            return response()->json([
+                'draw' => (int) $request->input('draw', 1),
+                'recordsTotal' => $totalRecords,
+                'recordsFiltered' => $filteredRecords,
+                'data' => $data,
+            ]);
         }
+    }
+
+    public function stockDataMutationHistory($medicineId, Request $request)
+    {
+        $medicine = Medicines::findOrFail($medicineId);
+        $pharmacyId = getActivePharmacyId();
+        $warehouseId = getWarehousePharmacyId(); // 9 (Gudang PMI)
+        $pmiPharmacyId = 1; // Sahabat PMI
+        $canSeeWarehouse = canAccessWarehouseStock($pharmacyId);
+        $transferSourcePharmacyIds = $canSeeWarehouse ? [$warehouseId, $pmiPharmacyId] : [$pharmacyId];
+
+        $startDate = $request->filled('start_date') ? Carbon::parse($request->start_date)->toDateString() : null;
+        $endDate = $request->filled('end_date') ? Carbon::parse($request->end_date)->toDateString() : null;
+
+        $batchIds = Batches::where('medicine_id', $medicineId)->pluck('id')->all();
+
+        $query = DB::table('medicine_transfer_items as mti')
+            ->join('medicine_transfers as mt', 'mt.id', '=', 'mti.medicine_transfer_id')
+            ->leftJoin('pharmacies as dest_pharmacy', 'dest_pharmacy.id', '=', 'mt.destination_pharmacy_id')
+            ->leftJoin('batches as src_batch', 'src_batch.id', '=', 'mti.source_batches_id')
+            ->leftJoin('batches as dst_batch', 'dst_batch.id', '=', 'mti.batches_id')
+            ->leftJoin('pharmacies as src_pharmacy', 'src_pharmacy.id', '=', DB::raw('COALESCE(mt.source_pharmacy_id, src_batch.pharmacy_id)'))
+            ->leftJoin('users as sender_user', 'sender_user.id', '=', 'mt.sent_by')
+            ->leftJoin('users as creator_user', 'creator_user.id', '=', 'mt.user_id')
+            ->where(function ($q) use ($medicineId, $batchIds) {
+                if (!empty($batchIds)) {
+                    $q->whereIn('mti.source_batches_id', $batchIds)
+                      ->orWhereIn('mti.batches_id', $batchIds);
+                }
+                $q->orWhere('mti.requested_medicine_id', $medicineId);
+            })
+            ->where(function ($sq) use ($transferSourcePharmacyIds) {
+                $sq->whereIn('mt.source_pharmacy_id', $transferSourcePharmacyIds)
+                   ->orWhere(function ($sq2) use ($transferSourcePharmacyIds) {
+                       $sq2->whereNull('mt.source_pharmacy_id')
+                           ->whereIn('src_batch.pharmacy_id', $transferSourcePharmacyIds);
+                   });
+            })
+            ->where('mt.status', '!=', 2)
+            ->where(function ($q) {
+                $q->whereNull('mt.is_request')
+                  ->orWhere('mt.is_request', 0)
+                  ->orWhere('mt.request_status', 1);
+            })
+            ->where('mt.code', 'not like', 'TRF-INIT%')
+            ->where(function ($q) {
+                $q->whereNull('mti.source_type')
+                  ->orWhere('mti.source_type', '!=', 'retur_gudang');
+            })
+            ->where(DB::raw('COALESCE(mti.original_qty, mti.qty)'), '>', 0);
+
+        if ($canSeeWarehouse) {
+            $query->where(function ($q) use ($warehouseId) {
+                $q->whereNull('mt.destination_pharmacy_id')
+                  ->orWhere('mt.destination_pharmacy_id', '!=', $warehouseId);
+            });
+        }
+
+        $query->where(function ($q) {
+            $q->whereNull('mt.destination_pharmacy_id')
+              ->orWhereRaw('COALESCE(mt.source_pharmacy_id, src_batch.pharmacy_id, 0) != mt.destination_pharmacy_id');
+        });
+
+        if ($startDate) {
+            $query->whereDate('mt.created_at', '>=', $startDate);
+        }
+        if ($endDate) {
+            $query->whereDate('mt.created_at', '<=', $endDate);
+        }
+
+        $items = $query->select([
+            'mt.id as transfer_id',
+            'mt.code as transfer_code',
+            'mt.created_at as transfer_date',
+            DB::raw('COALESCE(mt.source_pharmacy_id, src_batch.pharmacy_id) as effective_source_pharmacy_id'),
+            'src_pharmacy.name as source_name',
+            'mt.destination_pharmacy_id',
+            'dest_pharmacy.name as destination_name',
+            DB::raw('COALESCE(src_batch.name, dst_batch.name, "-") as batch_name'),
+            DB::raw('COALESCE(mti.original_qty, mti.qty) as qty'),
+            DB::raw('COALESCE(sender_user.name, creator_user.name, "-") as operator_name'),
+            'mt.status as transfer_status'
+        ])
+        ->orderByDesc('mt.created_at')
+        ->orderByDesc('mt.id')
+        ->get();
+
+        $items = $items->map(function ($row) use ($warehouseId, $pmiPharmacyId) {
+            $srcId = (int) $row->effective_source_pharmacy_id;
+            if ($srcId === (int) $warehouseId) {
+                $row->formatted_source = 'Gudang PMI';
+            } elseif ($srcId === $pmiPharmacyId) {
+                $row->formatted_source = 'Sahabat PMI';
+            } else {
+                $row->formatted_source = $row->source_name ?: '-';
+            }
+
+            $dest = $row->destination_name;
+            if ((int) $row->destination_pharmacy_id === 1) {
+                $dest = 'Pelayanan (PMI)';
+            } elseif (!$dest) {
+                $dest = 'Pelayanan / Cabang';
+            }
+            $row->formatted_destination = $dest;
+            $row->formatted_date = Carbon::parse($row->transfer_date)->format('d/m/Y H:i');
+            $row->qty_number = (int) $row->qty;
+            return $row;
+        });
+
+        // Summary per destination (e.g. Di-mutasi ke Sutomo sebanyak 400, Di-mutasi ke Pelayanan (PMI) sebanyak 100)
+        $summary = $items->groupBy('formatted_destination')->map(function ($group, $destName) {
+            $sum = $group->sum('qty_number');
+            return [
+                'destination' => $destName,
+                'total_qty' => $sum,
+                'label' => "Di-mutasi ke {$destName} sebanyak " . number_format($sum, 0, ',', '.')
+            ];
+        })->values();
+
+        return response()->json([
+            'success' => true,
+            'medicine' => [
+                'id' => $medicine->id,
+                'code' => $medicine->code,
+                'name' => $medicine->name,
+                'unit' => $medicine->unit ? strtoupper($medicine->unit) : '-',
+            ],
+            'total_qty' => $items->sum('qty_number'),
+            'summary' => $summary,
+            'logs' => $items,
+            'period_label' => ($startDate && $endDate)
+                ? (Carbon::parse($startDate)->format('d/m/Y') . ' - ' . Carbon::parse($endDate)->format('d/m/Y'))
+                : 'Semua Waktu',
+        ]);
     }
     public function medicineSelect(Request $request)
     {

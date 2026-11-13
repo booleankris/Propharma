@@ -210,7 +210,8 @@
 
             </div> --}}
             <div style="position: relative; width: 100%;">
-                <div id="searchWrapper" class="flex flex-wrap p-7 rounded-lg bg-white gap-5" style="position: relative; width: 100%;">
+                <div id="searchWrapper" class="flex flex-wrap p-7 rounded-lg bg-white gap-5"
+                    style="position: relative; width: 100%;">
                     <div class="w-[44%]">
                         <div class="flex py-2 gap-1">
                             <div class="relative">
@@ -536,7 +537,9 @@
                     data: function(d) {
                         d.transaction_code = selectedTransactionCode;
                     },
-                    dataSrc: ''
+                    dataSrc: function(json) {
+                        return (json && json.items) ? json.items : (Array.isArray(json) ? json : []);
+                    }
                 },
 
                 columns: [{

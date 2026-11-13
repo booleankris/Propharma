@@ -201,12 +201,17 @@
                 <div class="bg-white border border-gray-100 rounded-xl p-6">
 
                     {{-- Info Banner --}}
-                    <div class="flex items-start gap-2.5 p-3 mb-4 rounded-xl bg-blue-50 border border-blue-200/80 text-blue-900 text-[12px] leading-relaxed">
-                        <svg class="w-4 h-4 text-blue-600 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    <div
+                        class="flex items-start gap-2.5 p-3 mb-4 rounded-xl bg-blue-50 border border-blue-200/80 text-blue-900 text-[12px] leading-relaxed">
+                        <svg class="w-4 h-4 text-blue-600 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24"
+                            stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                         </svg>
                         <div>
-                            <span class="font-semibold text-blue-950">Aturan Retur:</span> Item obat dapat diretur berkali-kali selama tidak melebihi sisa quantity yang dibeli. Item akan <strong>dikunci otomatis</strong> jika seluruh quantity-nya telah selesai diretur.
+                            <span class="font-semibold text-blue-950">Aturan Retur:</span> Item obat dapat diretur
+                            berkali-kali selama tidak melebihi sisa quantity yang dibeli. Item akan <strong>dikunci
+                                otomatis</strong> jika seluruh quantity-nya telah selesai diretur.
                         </div>
                     </div>
 
@@ -321,15 +326,42 @@
                         </div>
                     </div>
 
-                    <div class="mb-5">
+                    <div class="mb-3">
                         <label class="block text-[12px] font-medium text-gray-500 mb-1">Batch & Expired Date</label>
-                        <select id="batch_select" data-nav-enter="submit"
+                        <select id="batch_select" data-nav-enter="account_id"
                             class="nav-input w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-[13px] focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-400">
                             <option value="">— Pilih batch / etalase —</option>
                         </select>
                         <input id="batch" type="hidden">
                         <input id="expired_date" type="hidden">
                         <input id="transfer_id" type="hidden">
+                    </div>
+
+                    {{-- Akun Pengembalian Dana (Kas & Bank) --}}
+                    <div class="mb-5">
+                        <div class="flex items-center justify-between mb-1">
+                            <label class="block text-[12px] font-medium text-gray-700">
+                                Pengembalian Dana Dari (Kas & Bank) <span class="text-rose-500">*</span>
+                            </label>
+                            <span id="origPaymentBadge"
+                                class="hidden text-[10px] font-semibold px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200">
+                                Transaksi Asal: Tunai
+                            </span>
+                        </div>
+                        <select id="account_id" data-nav-enter="submit"
+                            class="nav-input w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-[13px] font-medium text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-400">
+                            @if (isset($accounts) && count($accounts) > 0)
+                                @foreach ($accounts as $acc)
+                                    <option value="{{ $acc->id }}">{{ $acc->name }} ({{ $acc->code }})</option>
+                                @endforeach
+                            @else
+                                <option value="">— Pilih akun kas / bank —</option>
+                            @endif
+                        </select>
+                        <p id="account_hint" class="text-[11px] text-gray-400 mt-1">
+                            Default otomatis sesuai akun/metode bayar saat transaksi dibuat. Anda dapat menggantinya jika
+                            dana dikembalikan dari rekening lain.
+                        </p>
                     </div>
 
                     <div class="flex gap-2">
@@ -358,7 +390,8 @@
                     <div class="flex items-center justify-between mb-4">
                         <div class="flex items-center gap-2">
                             <p class="text-[11px] font-medium text-gray-400 uppercase tracking-widest">Item retur</p>
-                            <span id="transStatusBadge" class="hidden text-[10px] font-semibold bg-red-100 text-red-700 border border-red-200 px-2 py-0.5 rounded-full">
+                            <span id="transStatusBadge"
+                                class="hidden text-[10px] font-semibold bg-red-100 text-red-700 border border-red-200 px-2 py-0.5 rounded-full">
                                 Seluruh Item Telah Diretur
                             </span>
                         </div>
@@ -368,11 +401,15 @@
                     </div>
 
                     {{-- Alert banner saat semua item selesai diretur --}}
-                    <div id="allLockedBanner" class="hidden mb-4 p-3 rounded-xl bg-red-50 border border-red-200 text-red-800 text-[12px] flex items-center gap-2">
-                        <svg class="w-4 h-4 text-red-600 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                    <div id="allLockedBanner"
+                        class="hidden mb-4 p-3 rounded-xl bg-red-50 border border-red-200 text-red-800 text-[12px] flex items-center gap-2">
+                        <svg class="w-4 h-4 text-red-600 shrink-0" fill="none" viewBox="0 0 24 24"
+                            stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
                         </svg>
-                        <span>Semua item pada transaksi ini telah diretur penuh. Transaksi ini telah dikunci untuk retur.</span>
+                        <span>Semua item pada transaksi ini telah diretur penuh. Transaksi ini telah dikunci untuk
+                            retur.</span>
                     </div>
 
                     <table id="medicineTable" class="w-full text-[13px] border-collapse">
@@ -412,6 +449,8 @@
         let medicineTable = null;
 
         // ─── Search ───────────────────────────────────────────────────────────────────
+        let currentTransactionMeta = null;
+
         function searchSalesData(value) {
             keyword = value.trim();
             page = 1;
@@ -591,8 +630,78 @@
             $('#transfer_id').val('');
             $('#batch_select').html('<option value="">— Pilih batch / etalase —</option>');
 
+            // Jaga akun tetap terpilih sesuai transaksi yang sedang aktif
+            if (currentTransactionMeta && currentTransactionMeta.default_account_id) {
+                $('#account_id').val(currentTransactionMeta.default_account_id);
+            }
+
             // Remove active row highlight from table
             $('#medicineTable tbody tr').removeClass('active');
+        }
+
+        // ─── Handle Transaction Metadata Loaded ───────────────────────────────────────
+        function handleTransactionLoaded(trx, accounts) {
+            currentTransactionMeta = trx;
+            if (!trx) return;
+
+            // 1. Tampilkan badge informasi metode pembayaran transaksi asal
+            const badge = document.getElementById('origPaymentBadge');
+            if (badge) {
+                badge.textContent = 'Transaksi Asal: ' + (trx.payment_method_desc || trx.payment_method || 'TUNAI');
+                badge.classList.remove('hidden');
+                if (trx.is_credit) {
+                    badge.className =
+                        'text-[10px] font-semibold px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200';
+                } else {
+                    badge.className =
+                        'text-[10px] font-semibold px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200';
+                }
+            }
+
+            // 2. Render dropdown akun kas & bank
+            const select = document.getElementById('account_id');
+            if (select && accounts && accounts.length) {
+                select.innerHTML = '';
+
+                if (trx.is_credit) {
+                    const optCredit = document.createElement('option');
+                    optCredit.value = 'credit_only';
+                    optCredit.textContent = '📌 Potong Piutang (Tanpa Pengeluaran Kas/Bank)';
+                    select.appendChild(optCredit);
+
+                    const optGroup = document.createElement('optgroup');
+                    optGroup.label = '— Atau Kembalikan Dana via Kas & Bank —';
+                    accounts.forEach(acc => {
+                        const opt = document.createElement('option');
+                        opt.value = acc.id;
+                        opt.textContent = `${acc.name} (${acc.code})`;
+                        select.appendChild(opt);
+                    });
+                } else {
+                    accounts.forEach(acc => {
+                        const opt = document.createElement('option');
+                        opt.value = acc.id;
+                        opt.textContent = `${acc.name} (${acc.code})`;
+                        select.appendChild(opt);
+                    });
+
+                    const optCredit = document.createElement('option');
+                    optCredit.value = 'credit_only';
+                    optCredit.textContent = '— Potong Piutang / Tanpa Pengembalian Kas —';
+                    select.appendChild(optCredit);
+                }
+
+                // Defaultkan pilihan sesuai akun/metode bayar saat transaksi dibuat
+                if (trx.default_account_id) {
+                    select.value = trx.default_account_id;
+                }
+
+                const hint = document.getElementById('account_hint');
+                if (hint) {
+                    hint.innerHTML =
+                        `Default otomatis sesuai transaksi asal: <strong>${trx.default_account_name || 'Kas Apotek'}</strong>. Anda dapat menggantinya jika dana dikembalikan dari akun/rekening lain.`;
+                }
+            }
         }
 
         // ─── AJAX Submit ──────────────────────────────────────────────────────────────
@@ -606,6 +715,8 @@
             const medicine_code = $('#medicine_code').val();
             const medicine_name = $('#medicine_name').val() || 'obat ini';
             const old_qty = $('#old_qty').val();
+            const account_id = $('#account_id').val();
+            const account_name = $('#account_id option:selected').text();
 
             // Basic validation
             if (!medicine_id || !cart_id) {
@@ -637,25 +748,41 @@
                 return;
             }
 
+            if (!account_id) {
+                iziToast.warning({
+                    title: 'Peringatan',
+                    message: 'Pilih akun pengembalian dana (Kas & Bank) terlebih dahulu.',
+                    position: 'topRight'
+                });
+                $('#account_id').focus();
+                return;
+            }
+
             const maxAllowedQty = parseFloat(old_qty) || 0;
             const willBeLocked = (parseFloat(qty_retur) >= maxAllowedQty);
             const remainingAfterRetur = Math.max(0, maxAllowedQty - parseFloat(qty_retur));
+
+            const isCreditAccount = (account_id === 'credit_only');
+            const refundAccountNote = isCreditAccount ?
+                `\nPengembalian Dana: Potong Piutang (Tanpa Pengeluaran Kas/Bank)` :
+                `\nPengembalian Dana Dari: ${account_name}`;
 
             const isFallback = (transfer_id === 'fallback');
             const confirmTitle = isFallback ? 'Konfirmasi Retur (Penyesuaian)' : 'Konfirmasi Retur';
             let confirmText = '';
 
             if (isFallback) {
-                confirmText = `PERHATIAN (PENYESUAIAN NON-BATCH):\nObat "${medicine_name}" diproses sebagai penyesuaian transaksi sebanyak ${qty_retur} item.\n` +
-                    (willBeLocked
-                        ? `Seluruh sisa quantity obat ini akan habis diretur dan akan DIKUNCI.`
-                        : `Sisa ${remainingAfterRetur} item masih dapat diretur kembali nanti jika diperlukan.`) +
+                confirmText =
+                    `PERHATIAN (PENYESUAIAN NON-BATCH):\nObat "${medicine_name}" diproses sebagai penyesuaian transaksi sebanyak ${qty_retur} item.${refundAccountNote}\n` +
+                    (willBeLocked ?
+                        `Seluruh sisa quantity obat ini akan habis diretur dan akan DIKUNCI.` :
+                        `Sisa ${remainingAfterRetur} item masih dapat diretur kembali nanti jika diperlukan.`) +
                     `\n\nLanjutkan proses retur?`;
             } else {
-                confirmText = `Konfirmasi retur obat "${medicine_name}" sebanyak ${qty_retur} item.\n` +
-                    (willBeLocked
-                        ? `Seluruh sisa quantity obat ini akan habis diretur dan akan DIKUNCI pada transaksi ini.`
-                        : `Sisa ${remainingAfterRetur} item masih dapat diretur kembali nanti jika diperlukan.`) +
+                confirmText = `Konfirmasi retur obat "${medicine_name}" sebanyak ${qty_retur} item.${refundAccountNote}\n` +
+                    (willBeLocked ?
+                        `Seluruh sisa quantity obat ini akan habis diretur dan akan DIKUNCI pada transaksi ini.` :
+                        `Sisa ${remainingAfterRetur} item masih dapat diretur kembali nanti jika diperlukan.`) +
                     `\n\nApakah Anda yakin ingin memproses retur ini?`;
             }
 
@@ -702,6 +829,7 @@
                         transfer_id,
                         medicine_code,
                         old_qty,
+                        account_id,
                         _token: '{{ csrf_token() }}'
                     })
                     .then(response => {
@@ -816,7 +944,13 @@
                     data: d => {
                         d.transaction_code = selectedTransactionCode;
                     },
-                    dataSrc: ''
+                    dataSrc: function(json) {
+                        if (json && json.items) {
+                            handleTransactionLoaded(json.transaction, json.accounts);
+                            return json.items;
+                        }
+                        return Array.isArray(json) ? json : [];
+                    }
                 },
 
                 columns: [{
@@ -873,7 +1007,8 @@
                                 return `<span class="text-gray-400">Rp 0</span>`;
                             }
                             const val = (r.returned_qty > 0) ? r.remaining_price : r.final_price;
-                            const formatted = new Intl.NumberFormat('id-ID').format(Math.round(val || 0));
+                            const formatted = new Intl.NumberFormat('id-ID').format(Math.round(
+                                val || 0));
                             return `<span class="font-medium text-gray-800">Rp ${formatted}</span>`;
                         }
                     },
@@ -898,11 +1033,13 @@
                     if (allLocked) {
                         banner?.classList.remove('hidden');
                         badge?.classList.remove('hidden');
-                        $('#submitBtn').prop('disabled', true).addClass('opacity-50 cursor-not-allowed');
+                        $('#submitBtn').prop('disabled', true).addClass(
+                        'opacity-50 cursor-not-allowed');
                     } else {
                         banner?.classList.add('hidden');
                         badge?.classList.add('hidden');
-                        $('#submitBtn').prop('disabled', false).removeClass('opacity-50 cursor-not-allowed');
+                        $('#submitBtn').prop('disabled', false).removeClass(
+                            'opacity-50 cursor-not-allowed');
                     }
                 }
             });
@@ -919,11 +1056,15 @@
                 $('#cart_id').val(data.id);
 
                 // Set input qty limits & hint
-                $('#qty').val('').attr('max', data.remaining_qty).attr('placeholder', 'Maks: ' + data.remaining_qty);
+                $('#qty').val('').attr('max', data.remaining_qty).attr('placeholder', 'Maks: ' + data
+                .remaining_qty);
                 if (data.returned_qty > 0) {
-                    $('#qty_max_hint').html('<span class="text-amber-600 font-medium">Sisa dapat diretur: ' + data.remaining_qty + ' ' + (data.medicine.unit || '') + ' (Sudah diretur: ' + data.returned_qty + ')</span>');
+                    $('#qty_max_hint').html('<span class="text-amber-600 font-medium">Sisa dapat diretur: ' + data
+                        .remaining_qty + ' ' + (data.medicine.unit || '') + ' (Sudah diretur: ' + data
+                        .returned_qty + ')</span>');
                 } else {
-                    $('#qty_max_hint').html('<span class="text-gray-500">Maksimal retur: ' + data.remaining_qty + ' ' + (data.medicine.unit || '') + '</span>');
+                    $('#qty_max_hint').html('<span class="text-gray-500">Maksimal retur: ' + data.remaining_qty +
+                        ' ' + (data.medicine.unit || '') + '</span>');
                 }
 
                 // Load batches
@@ -938,7 +1079,8 @@
                 if (data.is_locked) {
                     iziToast.warning({
                         title: 'Terkunci',
-                        message: 'Seluruh quantity obat "' + (data.medicine?.name || 'ini') + '" pada transaksi ini sudah diretur dan telah dikunci.',
+                        message: 'Seluruh quantity obat "' + (data.medicine?.name || 'ini') +
+                            '" pada transaksi ini sudah diretur dan telah dikunci.',
                         position: 'topRight'
                     });
                     return;
@@ -979,7 +1121,8 @@
                 return;
             }
 
-            const url = `{{ route('returdata.batches') }}?medicine_id=${encodeURIComponent(medicine_id)}&transaction_id=${encodeURIComponent(transaction_id)}`;
+            const url =
+                `{{ route('returdata.batches') }}?medicine_id=${encodeURIComponent(medicine_id)}&transaction_id=${encodeURIComponent(transaction_id)}`;
 
             fetch(url, {
                     headers: {
@@ -1046,7 +1189,8 @@
 
                     iziToast.warning({
                         title: 'Batch gagal dimuat',
-                        message: 'Data batch tidak dapat dimuat (' + (err?.message || 'error') + '). Anda tetap bisa memilih opsi PENYESUAIAN.',
+                        message: 'Data batch tidak dapat dimuat (' + (err?.message || 'error') +
+                            '). Anda tetap bisa memilih opsi PENYESUAIAN.',
                         position: 'topRight'
                     });
                 });
