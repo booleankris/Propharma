@@ -3748,7 +3748,7 @@ class FinanceController extends Controller
 
         if ($selectedMonth > 1) {
             for ($m = 1; $m < $selectedMonth; $m++) {
-                $cacheKey = 'finance_monthly_sum_' . implode('_', $pharmacyIds) . "_{$selectedYear}_{$m}";
+                $cacheKey = 'finance_monthly_sum_v2_' . implode('_', $pharmacyIds) . "_{$selectedYear}_{$m}";
                 $pastTotals = Cache::remember($cacheKey, 86400, function () use ($pharmacyIds, $selectedYear, $m) {
                     $mStart = sprintf('%04d-%02d-01', $selectedYear, $m);
                     $mEnd = \Carbon\Carbon::createFromDate($selectedYear, $m, 1)->endOfMonth()->toDateString();
@@ -3856,7 +3856,7 @@ class FinanceController extends Controller
     }
 
     /**
-     * Helper: Hitung nilai stok aktual.
+     * Helper: Hitung nilai stok aktual (tidak termasuk barang titipan / Konsinyasi).
      * Cabang lain: stok etalase (medicine_transfer_items)
      * PMI: stok etalase (medicine_transfer_items) + stok gudang (batches)
      * Formula: Nilai stok = (raw_price * 1.11) * stok
@@ -3864,15 +3864,15 @@ class FinanceController extends Controller
     protected function getStockValuation(): array
     {
         $activePharmacyId = (int) getActivePharmacyId();
-        $cacheKey = 'finance_stock_valuation_' . $activePharmacyId;
+        $cacheKey = 'finance_stock_valuation_v2_' . $activePharmacyId;
 
         return Cache::remember($cacheKey, 60, function () use ($activePharmacyId) {
             $isPmi = ($activePharmacyId <= 0 || $activePharmacyId === 1 || $activePharmacyId === 9);
             $counterPharmacyId = $isPmi ? 1 : $activePharmacyId;
             $warehouseId = function_exists('getWarehousePharmacyId') ? (int) getWarehousePharmacyId() : 9;
 
-            // 1. Nilai Stok Etalase (medicine_transfer_items)
-            $counterRow = DB::table('medicine_transfer_items as mti')
+            // 1. Nilai Stok Etalase (medicine_transfer_items, kecualikan Konsinyasi)
+            $counterQuery = DB::table('medicine_transfer_items as mti')
                 ->join('batches as b', 'b.id', '=', 'mti.batches_id')
                 ->join('medicines as m', 'm.id', '=', 'b.medicine_id')
                 ->where('b.pharmacy_id', $counterPharmacyId)
@@ -3880,7 +3880,11 @@ class FinanceController extends Controller
                 ->where('mti.qty', '>', 0)
                 ->where(function ($q) {
                     $q->whereNull('mti.source_type')->orWhere('mti.source_type', '!=', 'retur_gudang');
-                })
+                });
+
+            ConsignmentService::excludeConsignmentFromTransferItemsQuery($counterQuery, 'mti', 'b');
+
+            $counterRow = $counterQuery
                 ->selectRaw('
                     COALESCE(SUM(mti.qty * CAST(REPLACE(COALESCE(NULLIF(m.raw_price, ""), NULLIF(m.pharmacy_net_price, ""), "0"), ",", ".") AS DECIMAL(15, 4)) * 1.11), 0) as total_val,
                     COALESCE(SUM(mti.qty), 0) as total_qty,
@@ -3892,16 +3896,20 @@ class FinanceController extends Controller
             $counterQty = (float) ($counterRow->total_qty ?? 0);
             $counterItems = (int) ($counterRow->total_items ?? 0);
 
-            // 2. Nilai Stok Gudang (hanya jika PMI)
+            // 2. Nilai Stok Gudang (hanya jika PMI, kecualikan Konsinyasi)
             $storageVal = 0.0;
             $storageQty = 0.0;
             $storageItems = 0;
 
             if ($isPmi) {
-                $storageRow = DB::table('batches as b')
+                $storageQuery = DB::table('batches as b')
                     ->join('medicines as m', 'm.id', '=', 'b.medicine_id')
                     ->where('b.pharmacy_id', $warehouseId)
-                    ->whereRaw('CAST(REPLACE(COALESCE(NULLIF(b.stock, ""), "0"), ",", ".") AS DECIMAL(15, 2)) > 0')
+                    ->whereRaw('CAST(REPLACE(COALESCE(NULLIF(b.stock, ""), "0"), ",", ".") AS DECIMAL(15, 2)) > 0');
+
+                ConsignmentService::excludeConsignmentFromBatchesQuery($storageQuery, 'b');
+
+                $storageRow = $storageQuery
                     ->selectRaw('
                         COALESCE(SUM(CAST(REPLACE(COALESCE(NULLIF(b.stock, ""), "0"), ",", ".") AS DECIMAL(15, 2)) * CAST(REPLACE(COALESCE(NULLIF(m.raw_price, ""), NULLIF(m.pharmacy_net_price, ""), "0"), ",", ".") AS DECIMAL(15, 4)) * 1.11), 0) as total_val,
                         COALESCE(SUM(CAST(REPLACE(COALESCE(NULLIF(b.stock, ""), "0"), ",", ".") AS DECIMAL(15, 2))), 0) as total_qty,
@@ -3939,7 +3947,7 @@ class FinanceController extends Controller
     protected function getStats($hutang = null, $cash = null, $piutang = null)
     {
         $targetPharmacyIds = $this->getTargetPharmacyIds();
-        $cacheKey = 'finance_stats_summary_branch_' . getActivePharmacyId() . '_' . implode('_', $targetPharmacyIds);
+        $cacheKey = 'finance_stats_summary_branch_v2_' . getActivePharmacyId() . '_' . implode('_', $targetPharmacyIds);
 
         // Jika data lengkap tidak disediakan, gunakan cache agar angka badge dan ringkasan selalu konsisten di semua halaman
         $isFullData = ($hutang !== null && $cash !== null && $piutang !== null);
@@ -4171,11 +4179,20 @@ class FinanceController extends Controller
     {
         Cache::forget('finance_stats_summary');
         $targetPharmacyIds = $this->getTargetPharmacyIds();
-        Cache::forget('finance_stats_summary_branch_' . getActivePharmacyId() . '_' . implode('_', $targetPharmacyIds));
-        $branches = [1, 2, 3, 4, 5, 6, 9];
+        $activeId = getActivePharmacyId();
+        Cache::forget('finance_stats_summary_branch_' . $activeId . '_' . implode('_', $targetPharmacyIds));
+        Cache::forget('finance_stats_summary_branch_v2_' . $activeId . '_' . implode('_', $targetPharmacyIds));
+        $branches = [0, 1, 2, 3, 4, 5, 6, 9];
         foreach ($branches as $b) {
             Cache::forget('finance_stats_summary_' . $b);
             Cache::forget('finance_stock_valuation_' . $b);
+            Cache::forget('finance_stock_valuation_v2_' . $b);
+        }
+        $currentYear = (int) now()->year;
+        $pharmKey = implode('_', $targetPharmacyIds);
+        for ($m = 1; $m <= 12; $m++) {
+            Cache::forget("finance_monthly_sum_{$pharmKey}_{$currentYear}_{$m}");
+            Cache::forget("finance_monthly_sum_v2_{$pharmKey}_{$currentYear}_{$m}");
         }
         Cache::forget('finance_stats_summary_1_9');
     }

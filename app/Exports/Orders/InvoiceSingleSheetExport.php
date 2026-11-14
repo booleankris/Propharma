@@ -141,6 +141,8 @@ class InvoiceSingleSheetExport implements FromArray, WithStyles, WithColumnWidth
             if (!isset($daily[$date])) {
                 $daily[$date] = [
                     'pbf'         => 0.0,
+                    'pbf_ppn'     => 0.0,
+                    'pbf_dpp'     => 0.0,
                     'consignment' => 0.0,
                     'cash'        => 0.0,
                     'ppn'         => 0.0,
@@ -157,6 +159,10 @@ class InvoiceSingleSheetExport implements FromArray, WithStyles, WithColumnWidth
             };
 
             $daily[$date][$kind] += (float) $jumlah;
+            if ($kind === 'pbf') {
+                $daily[$date]['pbf_ppn'] += (float) $ppn;
+                $daily[$date]['pbf_dpp'] += (float) $dpp;
+            }
             $daily[$date]['ppn'] += (float) $ppn;
             $daily[$date]['dpp'] += (float) $dpp;
             $daily[$date]['total'] += (float) $jumlah;

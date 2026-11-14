@@ -6,6 +6,7 @@ use App\Models\FinanceAccount;
 use App\Models\FinancePayment;
 use App\Models\MedicineTransactions;
 use App\Models\ReceivingDetails;
+use App\Services\ConsignmentService;
 use App\Support\FinanceShift;
 use App\Support\LiphTransactionScope;
 use App\Support\ReceivingInvoiceTotals;
@@ -412,40 +413,47 @@ class NeracaReportService
         $canSeeWarehouse = function_exists('canAccessWarehouseStock') ? canAccessWarehouseStock($targetPharmacyId) : in_array($targetPharmacyId, [1, 9, 6], true);
         $counterPharmacyId = (function_exists('isWarehousePharmacy') && isWarehousePharmacy($targetPharmacyId)) ? 1 : $targetPharmacyId;
 
-        // Current counter stock valuation
-        $counterValuation = (float) DB::table('medicine_transfer_items as mti')
+        // Current counter stock valuation (exclude consignment)
+        $counterQuery = DB::table('medicine_transfer_items as mti')
             ->join('batches as b', 'b.id', '=', 'mti.batches_id')
             ->join('medicines as m', 'm.id', '=', 'b.medicine_id')
             ->where('b.pharmacy_id', $counterPharmacyId)
             ->where('mti.status', 1)
             ->where(function ($q) {
                 $q->whereNull('mti.source_type')->orWhere('mti.source_type', '!=', 'retur_gudang');
-            })
+            });
+        ConsignmentService::excludeConsignmentFromTransferItemsQuery($counterQuery, 'mti', 'b');
+        $counterValuation = (float) $counterQuery
             ->selectRaw('SUM(mti.qty * COALESCE(NULLIF(m.raw_price, 0), 0)) as total_val')
             ->value('total_val');
 
-        // Storage / warehouse valuation if applicable
+        // Storage / warehouse valuation if applicable (exclude consignment)
         $storageValuation = 0.0;
         if ($canSeeWarehouse) {
-            $storageValuation = (float) DB::table('batches as b')
+            $storageQuery = DB::table('batches as b')
                 ->join('medicines as m', 'm.id', '=', 'b.medicine_id')
                 ->where('b.pharmacy_id', $warehouseId)
-                ->where('b.stock', '>', 0)
+                ->where('b.stock', '>', 0);
+            ConsignmentService::excludeConsignmentFromBatchesQuery($storageQuery, 'b');
+            $storageValuation = (float) $storageQuery
                 ->selectRaw('SUM(b.stock * COALESCE(NULLIF(m.raw_price, 0), 0)) as total_val')
                 ->value('total_val');
         }
 
         $currentTotalValuation = $counterValuation + $storageValuation;
 
-        // Reconcile backwards from today to $asOfDate using items_log movements
+        // Reconcile backwards from today to $asOfDate using items_log movements (exclude consignment)
         $trackedPharmacies = $canSeeWarehouse ? array_unique([$counterPharmacyId, $warehouseId]) : [$counterPharmacyId];
         $cutoff = Carbon::parse($asOfDate)->endOfDay()->toDateTimeString();
 
-        $deltaSinceCutoff = (float) DB::table('items_log as il')
+        $deltaQuery = DB::table('items_log as il')
             ->join('batches as b', 'b.id', '=', 'il.batches_id')
             ->join('medicines as m', 'm.id', '=', 'il.medicine_id')
             ->whereIn('b.pharmacy_id', $trackedPharmacies)
-            ->where('il.date', '>', $cutoff)
+            ->where('il.date', '>', $cutoff);
+        ConsignmentService::excludeConsignmentFromBatchesQuery($deltaQuery, 'b');
+
+        $deltaSinceCutoff = (float) $deltaQuery
             ->selectRaw('SUM(
                 CASE 
                     WHEN il.status IN (1, 4) THEN -il.qty * COALESCE(NULLIF(m.raw_price, 0), 0)

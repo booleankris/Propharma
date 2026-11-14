@@ -302,4 +302,146 @@ class ConsignmentService
 
         return $quantity * $content;
     }
+
+    /**
+     * Identifikasi batch & obat konsinyasi agar dapat dikecualikan dari perhitungan Nilai Stok (barang titipan).
+     *
+     * @return array{consignment_batch_ids: list<int>, non_consignment_batch_ids: list<int>, consignment_medicine_ids: list<int>}
+     */
+    public static function getConsignmentStockFilter(): array
+    {
+        static $cached = null;
+        if ($cached !== null) {
+            return $cached;
+        }
+
+        $rows = DB::table('receiving_items as ri')
+            ->join('receiving_details as rd', 'rd.id', '=', 'ri.receiving_details_id')
+            ->join('receiving as r', 'r.id', '=', 'rd.receiving_id')
+            ->leftJoin('batches as b', 'b.id', '=', 'ri.batches_id')
+            ->leftJoin('order_items as oi', 'oi.id', '=', 'ri.order_items_id')
+            ->whereIn('r.status', [1, 2, 3])
+            ->select([
+                'ri.batches_id',
+                DB::raw('COALESCE(b.medicine_id, oi.medicine_id) as medicine_id'),
+                DB::raw('UPPER(TRIM(COALESCE(rd.invoice_payment, ""))) as invoice_payment'),
+            ])
+            ->orderByDesc('rd.invoice_date')
+            ->orderByDesc('rd.id')
+            ->orderByDesc('ri.id')
+            ->get();
+
+        $latestByBatch = [];
+        $batchMedicineMap = [];
+        $latestByMedicine = [];
+
+        foreach ($rows as $row) {
+            $payment = (string) $row->invoice_payment;
+            if ($payment === '') {
+                continue;
+            }
+            $bId = $row->batches_id ? (int) $row->batches_id : 0;
+            $mId = $row->medicine_id ? (int) $row->medicine_id : 0;
+
+            if ($bId > 0 && !isset($latestByBatch[$bId])) {
+                $latestByBatch[$bId] = $payment;
+                $batchMedicineMap[$bId] = $mId;
+            }
+            if ($mId > 0 && !isset($latestByMedicine[$mId])) {
+                $latestByMedicine[$mId] = $payment;
+            }
+        }
+
+        $consignmentMedMap = [];
+        foreach ($latestByMedicine as $mId => $payment) {
+            if ($payment === 'KONSINYASI') {
+                $consignmentMedMap[$mId] = true;
+            }
+        }
+
+        $consignmentBatchMap = [];
+        $nonConsignmentBatchMap = [];
+        foreach ($latestByBatch as $bId => $payment) {
+            if ($payment === 'KONSINYASI') {
+                $consignmentBatchMap[$bId] = true;
+            } else {
+                $mId = $batchMedicineMap[$bId] ?? 0;
+                if (isset($consignmentMedMap[$mId])) {
+                    $nonConsignmentBatchMap[$bId] = true;
+                }
+            }
+        }
+
+        // Propagasi batch konsinyasi ke batch tujuan mutasi (medicine_transfer_items)
+        $frontier = array_keys($consignmentBatchMap);
+        while (!empty($frontier)) {
+            $edges = DB::table('medicine_transfer_items')
+                ->whereIn('source_batches_id', $frontier)
+                ->whereNotNull('batches_id')
+                ->pluck('batches_id')
+                ->all();
+
+            $next = [];
+            foreach ($edges as $dstBatchId) {
+                $dstId = (int) $dstBatchId;
+                if ($dstId > 0 && !isset($consignmentBatchMap[$dstId]) && !isset($nonConsignmentBatchMap[$dstId])) {
+                    $consignmentBatchMap[$dstId] = true;
+                    $next[] = $dstId;
+                }
+            }
+            $frontier = array_values(array_unique($next));
+        }
+
+        return $cached = [
+            'consignment_batch_ids' => array_keys($consignmentBatchMap),
+            'non_consignment_batch_ids' => array_keys($nonConsignmentBatchMap),
+            'consignment_medicine_ids' => array_keys($consignmentMedMap),
+        ];
+    }
+
+    public static function excludeConsignmentFromTransferItemsQuery($query, string $mtiAlias = 'mti', string $batchAlias = 'b'): void
+    {
+        $filter = self::getConsignmentStockFilter();
+        $consBatchIds = $filter['consignment_batch_ids'];
+        $nonConsBatchIds = $filter['non_consignment_batch_ids'];
+        $consMedIds = $filter['consignment_medicine_ids'];
+
+        if (!empty($consBatchIds)) {
+            $query->whereNotIn("{$mtiAlias}.batches_id", $consBatchIds)
+                ->where(function ($q) use ($mtiAlias, $consBatchIds) {
+                    $q->whereNull("{$mtiAlias}.source_batches_id")
+                        ->orWhereNotIn("{$mtiAlias}.source_batches_id", $consBatchIds);
+                });
+        }
+
+        if (!empty($consMedIds)) {
+            $query->where(function ($q) use ($batchAlias, $consMedIds, $nonConsBatchIds) {
+                $q->whereNotIn("{$batchAlias}.medicine_id", $consMedIds);
+                if (!empty($nonConsBatchIds)) {
+                    $q->orWhereIn("{$batchAlias}.id", $nonConsBatchIds);
+                }
+            });
+        }
+    }
+
+    public static function excludeConsignmentFromBatchesQuery($query, string $batchAlias = 'b'): void
+    {
+        $filter = self::getConsignmentStockFilter();
+        $consBatchIds = $filter['consignment_batch_ids'];
+        $nonConsBatchIds = $filter['non_consignment_batch_ids'];
+        $consMedIds = $filter['consignment_medicine_ids'];
+
+        if (!empty($consBatchIds)) {
+            $query->whereNotIn("{$batchAlias}.id", $consBatchIds);
+        }
+
+        if (!empty($consMedIds)) {
+            $query->where(function ($q) use ($batchAlias, $consMedIds, $nonConsBatchIds) {
+                $q->whereNotIn("{$batchAlias}.medicine_id", $consMedIds);
+                if (!empty($nonConsBatchIds)) {
+                    $q->orWhereIn("{$batchAlias}.id", $nonConsBatchIds);
+                }
+            });
+        }
+    }
 }

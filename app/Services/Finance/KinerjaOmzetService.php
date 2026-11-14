@@ -151,19 +151,62 @@ class KinerjaOmzetService
         $dailyInvoices = \App\Exports\Orders\InvoiceSingleSheetExport::queryDailyInvoices($purchasePharmacyIds, $startDate, $endDate);
         foreach ($dailyInvoices as $date => $invSummary) {
             if (isset($days[$date])) {
-                $days[$date]['purchases']['pbf'] = (float) $invSummary['pbf'];
-                $days[$date]['purchases']['consignment'] = (float) $invSummary['consignment'];
-                $days[$date]['purchases']['cash'] = (float) $invSummary['cash'];
-                $days[$date]['purchases']['ppn'] = (float) $invSummary['ppn'];
-                $days[$date]['purchases']['total'] = (float) $invSummary['total'];
-                $days[$date]['purchases']['exVat'] = (float) $invSummary['dpp'];
+                // Hanya faktur KREDIT (PBF) yang langsung dihitung dari faktur penerimaan
+                $days[$date]['purchases']['pbf'] = (float) ($invSummary['pbf'] ?? 0);
+                $days[$date]['purchases']['ppn'] = (float) ($invSummary['pbf_ppn'] ?? 0);
             }
+        }
+
+        // Pembelian Konsinyasi (saat dibayar di menu Konsinyasi) & Pembelian Cash (saat sudah pilih akun Kas & Bank)
+        $paidCashAndConsignment = DB::table('finance_payments as fp')
+            ->leftJoin('receiving_details as rd', 'rd.id', '=', 'fp.receiving_detail_id')
+            ->leftJoin('receiving as r', 'r.id', '=', 'fp.receiving_id')
+            ->leftJoin('creditors as c', 'c.code', '=', 'rd.creditor_code')
+            ->whereIn('fp.payment_type', ['CASH', 'KONSINYASI'])
+            ->whereNotNull('fp.account_id')
+            ->where(function ($q) use ($purchasePharmacyIds) {
+                $q->whereIn('fp.pharmacy_id', $purchasePharmacyIds)
+                    ->orWhereIn('r.pharmacy_id', $purchasePharmacyIds);
+                if (in_array(1, $purchasePharmacyIds, true)) {
+                    $q->orWhereNull('fp.pharmacy_id');
+                }
+            })
+            ->whereBetween('fp.payment_date', [$startDate, $endDate])
+            ->selectRaw('
+                DATE(fp.payment_date) as payment_dt,
+                fp.payment_type,
+                UPPER(TRIM(COALESCE(rd.invoice_ppn, c.ppn_type, "TANPA"))) as invoice_ppn,
+                SUM(fp.amount) as amount
+            ')
+            ->groupByRaw('DATE(fp.payment_date), fp.payment_type, UPPER(TRIM(COALESCE(rd.invoice_ppn, c.ppn_type, "TANPA")))')
+            ->get();
+
+        foreach ($paidCashAndConsignment as $paidRow) {
+            $date = (string) $paidRow->payment_dt;
+            if (!isset($days[$date])) {
+                continue;
+            }
+            $kind = $paidRow->payment_type === 'KONSINYASI' ? 'consignment' : 'cash';
+            $this->addPurchase($days[$date], $kind, (float) $paidRow->amount, (string) $paidRow->invoice_ppn);
         }
 
         $returnInvoiceMeta = DB::table('receiving_items as ri')
             ->join('receiving_details as rd', 'rd.id', '=', 'ri.receiving_details_id')
             ->leftJoin('creditors as c', 'c.code', '=', 'rd.creditor_code')
             ->whereNotNull('ri.batches_id')
+            ->where(function ($q) {
+                $q->whereRaw('UPPER(TRIM(COALESCE(rd.invoice_payment, ""))) = ?', ['KREDIT'])
+                    ->orWhere(function ($cashQ) {
+                        $cashQ->whereIn(DB::raw('UPPER(TRIM(COALESCE(rd.invoice_payment, "")))'), ['TUNAI', 'CASH'])
+                            ->whereExists(function ($fp) {
+                                $fp->select(DB::raw(1))
+                                    ->from('finance_payments')
+                                    ->whereColumn('finance_payments.receiving_detail_id', 'rd.id')
+                                    ->where('finance_payments.payment_type', 'CASH')
+                                    ->whereNotNull('finance_payments.account_id');
+                            });
+                    });
+            })
             ->select('rd.receiving_id', 'ri.batches_id')
             ->selectRaw('MAX(rd.invoice_payment) as invoice_payment, MAX(COALESCE(rd.invoice_ppn, c.ppn_type, "TANPA")) as invoice_ppn')
             ->groupBy('rd.receiving_id', 'ri.batches_id');
