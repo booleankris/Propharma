@@ -167,14 +167,15 @@ class ReceivingRincianCalculationTest extends TestCase
             'updated_at' => $now,
         ]);
 
-        // Replikasi tepat 6 item faktur 0018337; ROVASTAR disimulasikan menyimpan total DB lama tanpa PPN (373237.5)
+        // Replikasi tepat 6 item faktur 0018337; kolom total per baris = QTY * HNA - DISC (tanpa PPN),
+        // meski sebagian DB total sebelumnya menyimpan angka + PPN.
         $items = [
-            ['id' => 1, 'name' => 'CENDO LYTEERS 0.6ML MD', 'qty' => 5, 'price' => 20213, 'disc' => 5, 'db_total' => 106573, 'expected_total' => 106573],
-            ['id' => 2, 'name' => 'COTEN KAPS 100 MG @30', 'qty' => 1, 'price' => 535000, 'disc' => 10, 'db_total' => 534465, 'expected_total' => 534465],
-            ['id' => 3, 'name' => 'FOLAMIL GOLD KAPS @30', 'qty' => 1, 'price' => 150000, 'disc' => 2, 'db_total' => 163170, 'expected_total' => 163170],
-            ['id' => 4, 'name' => '-PARACETAMOL KAPL 500 MG @100 TRIFA', 'qty' => 2, 'price' => 26700, 'disc' => 20, 'db_total' => 47419, 'expected_total' => 47419],
-            ['id' => 5, 'name' => 'ROVASTAR TAB 10 MG @30', 'qty' => 1, 'price' => 403500, 'disc' => 7.5, 'db_total' => 373237.5, 'expected_total' => 414293],
-            ['id' => 6, 'name' => 'VENTOLIN INH 100MCG/SPRAY', 'qty' => 1, 'price' => 146074, 'disc' => 0, 'db_total' => 162142, 'expected_total' => 162142],
+            ['id' => 1, 'name' => 'CENDO LYTEERS 0.6ML MD', 'qty' => 5, 'price' => 20213, 'disc' => 5, 'db_total' => 106573, 'expected_total' => 96011.75],
+            ['id' => 2, 'name' => 'COTEN KAPS 100 MG @30', 'qty' => 1, 'price' => 535000, 'disc' => 10, 'db_total' => 534465, 'expected_total' => 481500],
+            ['id' => 3, 'name' => 'FOLAMIL GOLD KAPS @30', 'qty' => 1, 'price' => 150000, 'disc' => 2, 'db_total' => 163170, 'expected_total' => 147000],
+            ['id' => 4, 'name' => '-PARACETAMOL KAPL 500 MG @100 TRIFA', 'qty' => 2, 'price' => 26700, 'disc' => 20, 'db_total' => 47419, 'expected_total' => 42720],
+            ['id' => 5, 'name' => 'ROVASTAR TAB 10 MG @30', 'qty' => 1, 'price' => 403500, 'disc' => 7.5, 'db_total' => 373237.5, 'expected_total' => 373237.5],
+            ['id' => 6, 'name' => 'VENTOLIN INH 100MCG/SPRAY', 'qty' => 1, 'price' => 146074, 'disc' => 0, 'db_total' => 162142, 'expected_total' => 146074],
         ];
 
         foreach ($items as $item) {
@@ -228,7 +229,8 @@ class ReceivingRincianCalculationTest extends TestCase
             $this->assertEquals('EXCLUDE', $row['ppn_type']);
         }
 
-        // Hitung footer sesuai rumus printReceiving pada data orderRincian
+        // Total baris = QTY * HNA - DISC (tanpa PPN), sehingga jumlah seluruh baris = DPP faktur
+        $this->assertEquals(1286543.25, (float) $itemsData->sum('total'));
         $subtotal = $itemsData->sum('gross');
         $discount = $itemsData->sum('discount_nominal');
         $fakturSummary = ReceivingController::computeInvoiceSummaryFromTotals($subtotal, $discount, 'EXCLUDE');
@@ -259,12 +261,12 @@ class ReceivingRincianCalculationTest extends TestCase
         $this->assertEquals(0.0, $tanpa['ppn']);
         $this->assertEquals(95000.0, $tanpa['grand_total']);
 
-        // Diskon nominal > 100 diperlakukan sebagai potongan rupiah langsung
+        // Diskon nominal > 100 diperlakukan sebagai potongan rupiah langsung; per baris tetap QTY * HNA - DISC
         $nominalLine = ReceivingController::computeReceivingLineAmounts(2, 50000, 5000, 0, 'EXCLUDE');
         $this->assertEquals(100000.0, $nominalLine['gross']);
         $this->assertEquals(5000.0, $nominalLine['discount_nominal']);
         $this->assertEquals(95000.0, $nominalLine['net']);
-        $this->assertEquals(105450.0, $nominalLine['total']);
+        $this->assertEquals(95000.0, $nominalLine['total']);
     }
 
     public function test_rincian_mixed_faktur_ppn_groups_independently(): void
@@ -298,9 +300,9 @@ class ReceivingRincianCalculationTest extends TestCase
         $view = (new ReceivingController())->orderRincian(1);
         $itemsData = collect($view->getData()['itemsData']);
 
-        // INV-EX: DPP = 20.000, PPN = 2.200, Total = 22.200 (meski DB total tersimpan 20.000)
+        // INV-EX: total baris = QTY * HNA - DISC (20.000), PPN dihitung di ringkasan akhir faktur (2.200 -> 22.200)
         $rowEx = $itemsData->firstWhere('medicine_name', 'OBAT A');
-        $this->assertEquals(22200.0, (float) $rowEx['total']);
+        $this->assertEquals(20000.0, (float) $rowEx['total']);
 
         // INV-IN: GrandTotal = 11.100, DPP = 10.000, PPN = 1.100
         $rowIn = $itemsData->firstWhere('medicine_name', 'OBAT B');

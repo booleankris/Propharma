@@ -956,8 +956,8 @@
             let discVal = parseFloat(discountInput.value.replace(',', '.')) || 0;
             let extraDiscVal = parseFloat(extraDiscountInput.value.replace(',', '.')) || 0;
 
-            let nomDisc = discVal <= 100 && discVal > 0 ? Math.round(grossTotal * discVal / 100) : discVal;
-            let nomExtraDisc = extraDiscVal <= 100 && extraDiscVal > 0 ? Math.round(grossTotal * extraDiscVal / 100) : extraDiscVal;
+            let nomDisc = discVal <= 100 && discVal > 0 ? (grossTotal * discVal / 100) : discVal;
+            let nomExtraDisc = extraDiscVal <= 100 && extraDiscVal > 0 ? (grossTotal * extraDiscVal / 100) : extraDiscVal;
 
             let discInfo = document.getElementById('discount_info');
             let extraDiscInfo = document.getElementById('extra_discount_info');
@@ -969,20 +969,10 @@
                 extraDiscInfo.textContent = extraDiscVal <= 100 && extraDiscVal > 0 ? `(Rp ${formatRupiah(nomExtraDisc)})` : '';
             }
 
-            let netBeforePpn = Math.max(0, grossTotal - nomDisc - nomExtraDisc);
-            let ppnType = (invoice_ppn && invoice_ppn.value) ? invoice_ppn.value.toUpperCase().trim() : 'TANPA';
-            let finalSubtotal = netBeforePpn;
+            // Total per baris = QTY * HNA - DISC; PPN ditotalkan terakhir pada ringkasan faktur.
+            let finalSubtotal = Math.max(0, grossTotal - nomDisc - nomExtraDisc);
 
-            if (ppnType === 'EXCLUDE') {
-                let ppnNominal = Math.round(netBeforePpn * 0.11);
-                finalSubtotal = netBeforePpn + ppnNominal;
-            } else if (ppnType === 'INCLUDE') {
-                finalSubtotal = netBeforePpn;
-            } else { // TANPA
-                finalSubtotal = netBeforePpn;
-            }
-
-            document.getElementById('total_price').value = formatRupiah(Math.max(0, finalSubtotal));
+            document.getElementById('total_price').value = formatRupiah(finalSubtotal);
             return finalSubtotal;
         }
 

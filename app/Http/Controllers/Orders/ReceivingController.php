@@ -4065,16 +4065,16 @@ class ReceivingController extends Controller
         if ($normalizedPpn === 'EXCLUDE') {
             $priceHna = $activePrice;
             $pricePpn = floor($activePrice * 1.11);
-            $itemTotal = floor($net * 1.11);
         } elseif ($normalizedPpn === 'INCLUDE') {
             $priceHna = floor($activePrice / 1.11);
             $pricePpn = $activePrice;
-            $itemTotal = $net;
         } else {
             $priceHna = $activePrice;
             $pricePpn = $activePrice;
-            $itemTotal = $net;
         }
+
+        // Total per baris = QTY * HNA - DISC; PPN ditotalkan di akhir per faktur.
+        $itemTotal = $net;
 
         return [
             'ppn_type' => $normalizedPpn,
