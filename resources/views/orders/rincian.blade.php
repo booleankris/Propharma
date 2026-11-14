@@ -568,6 +568,7 @@
             let sumHna = 0;
             let sumPpn = 0;
             let sumTotal = 0;
+            const fakturGroups = {};
 
             if (filtered.length === 0) {
                 tbody.innerHTML = `
@@ -579,12 +580,37 @@
                 `;
             } else {
                 filtered.forEach(item => {
-                    const hnaVal = Number(item.hna || 0);
-                    const ppnVal = Number(item.harga_ppn || 0);
-                    const totalVal = Number(item.total || 0);
+                    const qtyUsed = item.status === 'Diterima'
+                        ? Number(item.quantity_received || 0)
+                        : Number(item.quantity_ordered || 0);
+                    const rawPrice = Number(item.raw_price ?? item.hna ?? 0);
+                    const itemGross = item.gross !== undefined ? Number(item.gross || 0) : (qtyUsed * rawPrice);
 
-                    sumHna += (hnaVal * Number(item.quantity_received || item.quantity_ordered || 0));
-                    sumTotal += totalVal;
+                    let itemDiscount = 0;
+                    if (item.discount_nominal !== undefined) {
+                        itemDiscount = Number(item.discount_nominal || 0);
+                    } else {
+                        const disc = Number(item.discount || 0);
+                        const extraDisc = Number(item.extra_discount || 0);
+                        const nomDisc = (disc > 0 && disc <= 100) ? (itemGross * disc / 100) : disc;
+                        const nomExtraDisc = (extraDisc > 0 && extraDisc <= 100) ? (itemGross * extraDisc / 100) : extraDisc;
+                        itemDiscount = nomDisc + nomExtraDisc;
+                    }
+
+                    const ppnType = String(item.ppn_type || 'TANPA').toUpperCase().trim();
+                    const fakturKey = item.receiving_details_id
+                        ? `rd_${item.receiving_details_id}`
+                        : `draft_${item.creditor_code || ''}_${ppnType}`;
+
+                    if (!fakturGroups[fakturKey]) {
+                        fakturGroups[fakturKey] = {
+                            ppnType,
+                            subtotal: 0,
+                            discount: 0,
+                        };
+                    }
+                    fakturGroups[fakturKey].subtotal += itemGross;
+                    fakturGroups[fakturKey].discount += itemDiscount;
 
                     const batchEdHtml = item.batch !== '-' || item.expired_date !== '-' ?
                         `<div class="flex flex-col items-center gap-0.5">
@@ -592,6 +618,12 @@
                              <span class="text-[10px] text-slate-400">ED: ${item.expired_date}</span>
                            </div>` :
                         `<span class="text-slate-400">-</span>`;
+
+                    const formatDiscountCell = (val) => {
+                        const num = Number(val || 0);
+                        if (num <= 0) return '0%';
+                        return num <= 100 ? `${num}%` : formatRupiah(num);
+                    };
 
                     const rowHtml = `
                         <tr>
@@ -604,8 +636,8 @@
                             <td class="text-center">${batchEdHtml}</td>
                             <td class="text-right font-medium text-slate-700">${formatRupiah(item.hna)}</td>
                             <td class="text-right font-semibold text-slate-900">${formatRupiah(item.harga_ppn)}</td>
-                            <td class="text-center text-slate-600">${item.discount || 0}%</td>
-                            <td class="text-center text-slate-600">${item.extra_discount || 0}%</td>
+                            <td class="text-center text-slate-600">${formatDiscountCell(item.discount)}</td>
+                            <td class="text-center text-slate-600">${formatDiscountCell(item.extra_discount)}</td>
                             <td class="text-center text-slate-600">${item.pbf_discount || '0%'}</td>
                             <td class="text-right font-bold text-slate-900">${formatRupiah(item.total)}</td>
                             <td class="text-center">
@@ -619,7 +651,26 @@
                 });
             }
 
-            sumPpn = Math.max(0, sumTotal - sumHna);
+            Object.values(fakturGroups).forEach(group => {
+                const detailDpp = Math.max(0, group.subtotal - group.discount);
+                let detailHna = detailDpp;
+                let detailPpn = 0;
+                let detailGrandTotal = detailDpp;
+
+                if (group.ppnType === 'EXCLUDE') {
+                    detailPpn = Math.floor(detailDpp * 0.11);
+                    detailGrandTotal = detailDpp + detailPpn;
+                    detailHna = detailDpp;
+                } else if (group.ppnType === 'INCLUDE') {
+                    detailGrandTotal = detailDpp;
+                    detailHna = Math.floor(detailDpp / 1.11);
+                    detailPpn = detailGrandTotal - detailHna;
+                }
+
+                sumHna += detailHna;
+                sumPpn += detailPpn;
+                sumTotal += detailGrandTotal;
+            });
 
             document.getElementById('summaryTotalHna').innerText = formatRupiah(sumHna);
             document.getElementById('summaryTotalPpn').innerText = formatRupiah(sumPpn);
