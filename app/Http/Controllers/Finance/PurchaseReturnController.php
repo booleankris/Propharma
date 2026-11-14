@@ -9,6 +9,7 @@ use App\Models\FinanceAccount;
 use App\Models\FinancePayment;
 use App\Models\ItemsLog;
 use App\Models\Medicines;
+use App\Models\MedicineTransferItems;
 use App\Models\Pharmacies;
 use App\Models\PurchaseReturn;
 use App\Models\PurchaseReturnItem;
@@ -743,9 +744,7 @@ class PurchaseReturnController extends Controller
 
         $activePharmacyId = function_exists('getActivePharmacyId') ? getActivePharmacyId() : 1;
         $yearMonth = date('ym');
-        $latest = PurchaseReturn::where('return_no', 'LIKE', "RET-{$yearMonth}/%")->count();
-        $nextSeq = str_pad($latest + 1, 4, '0', STR_PAD_LEFT);
-        $returnNo = "RET-{$yearMonth}/{$nextSeq}";
+        $returnNo = $this->generateReturnNo($yearMonth);
         $todayDate = now()->toDateString();
 
         // Setiap retur pembelian yang diinput langsung berstatus 'dikonfirmasi', tanggal konfirmasi terisi hari ini, dan stok langsung dipotong
@@ -844,6 +843,40 @@ class PurchaseReturnController extends Controller
     }
 
     /**
+     * Generate nomor retur pembelian yang aman dari duplikasi meskipun ada retur yang dihapus.
+     */
+    protected function generateReturnNo(string $yearMonth): string
+    {
+        $prefix = "RET-{$yearMonth}/";
+        $maxSeq = 0;
+
+        $existingReturnNos = PurchaseReturn::where('return_no', 'LIKE', "{$prefix}%")
+            ->pluck('return_no')
+            ->merge(
+                ItemsLog::where('transaction_code', 'LIKE', "{$prefix}%")
+                    ->where('status', 4)
+                    ->pluck('transaction_code')
+            );
+
+        foreach ($existingReturnNos as $code) {
+            if (preg_match('/^RET-' . preg_quote($yearMonth, '/') . '\/(\d+)/', (string) $code, $matches)) {
+                $seq = (int) $matches[1];
+                if ($seq > $maxSeq) {
+                    $maxSeq = $seq;
+                }
+            }
+        }
+
+        $next = $maxSeq + 1;
+        do {
+            $candidate = $prefix . str_pad($next, 4, '0', STR_PAD_LEFT);
+            $next++;
+        } while (PurchaseReturn::where('return_no', $candidate)->exists());
+
+        return $candidate;
+    }
+
+    /**
      * Generate Kode Items Log (Kartu Stok)
      */
     protected function generateItemsLogCode(): string
@@ -908,8 +941,36 @@ class PurchaseReturnController extends Controller
     }
 
     /**
+     * Sesuaikan stok etalase (MedicineTransferItems) untuk farmasi outlet non-gudang.
+     */
+    protected function adjustOutletTransferStock(?Batches $batch, int $pharmacyId, float $delta): void
+    {
+        if (!$batch || abs($delta) < 0.0001) {
+            return;
+        }
+
+        if (function_exists('isWarehousePharmacy') && isWarehousePharmacy($pharmacyId)) {
+            return;
+        }
+
+        $transferItem = MedicineTransferItems::where('batches_id', $batch->id)->first();
+        if (!$transferItem) {
+            return;
+        }
+
+        if ($delta < 0) {
+            $deduct = abs($delta);
+            if ((float) $transferItem->qty >= $deduct) {
+                $transferItem->decrement('qty', $deduct);
+            }
+        } else {
+            $transferItem->increment('qty', $delta);
+        }
+    }
+
+    /**
      * Potong stok obat dan catat ItemsLog (Kartu Stok) saat retur dikonfirmasi.
-     * Dijamin memotong stok batch fisik di cabang terkait (auto-fallback FIFO jika batch tidak ditentukan).
+     * Dijamin memotong stok batch fisik di cabang terkait (auto-fallback FIFO hanya jika batch tidak ditentukan).
      */
     protected function deductStockForItem(PurchaseReturnItem $item, string $actionDate): void
     {
@@ -942,10 +1003,9 @@ class PurchaseReturnController extends Controller
 
                 if ($batch) {
                     $batch->decrement('stock', $qtyDeduct);
+                    $this->adjustOutletTransferStock($batch, $pharmacyId, -$qtyDeduct);
                     $item->batch_id = $batch->id;
-                    if (empty($item->batch_number) || $item->batch_number === '-') {
-                        $item->batch_number = $batch->name;
-                    }
+                    $item->batch_number = $batch->name;
                     if (empty($item->expired_date) && $batch->expired_date) {
                         $item->expired_date = $batch->expired_date;
                     }
@@ -1002,6 +1062,9 @@ class PurchaseReturnController extends Controller
 
                 if ($batch) {
                     $batch->increment('stock', $qtyRestore);
+                    $this->adjustOutletTransferStock($batch, $pharmacyId, $qtyRestore);
+                    $item->batch_id = $batch->id;
+                    $item->batch_number = $batch->name;
                 }
 
                 ItemsLog::create([
@@ -1028,24 +1091,31 @@ class PurchaseReturnController extends Controller
 
     /**
      * Cari atau tentukan batch yang tepat untuk item retur di cabang terkait.
-     * 1. Berdasarkan batch_id langsung jika ada
-     * 2. Berdasarkan nomor batch di cabang ini (atau cabang lain sebagai fallback)
-     * 3. AUTO-FALLBACK: Batch dengan stok > 0 di cabang ini (prioritas ED terdekat / FIFO)
-     * 4. AUTO-FALLBACK: Batch terbaru di cabang ini
+     * 1. Berdasarkan batch_id langsung jika ada DAN sesuai dengan batch_number (jika batch_number diisi)
+     * 2. Berdasarkan nomor batch eksplisit di cabang ini (atau tanpa pharmacy_id, atau buat batch baru di cabang ini)
+     * 3. AUTO-FALLBACK (hanya jika batch_number kosong / '-'): Batch dengan stok > 0 di cabang ini (prioritas ED terdekat / FIFO)
+     * 4. AUTO-FALLBACK (hanya jika batch_number kosong / '-'): Batch terbaru di cabang ini
      * 5. AUTO-FALLBACK: Buat batch default jika sama sekali belum ada
      */
     protected function resolveBatchForItem(PurchaseReturnItem $item, Medicines $med, int $pharmacyId): Batches
     {
         $batch = null;
+        $batchName = (!empty($item->batch_number) && trim((string) $item->batch_number) !== '-')
+            ? trim((string) $item->batch_number)
+            : '';
 
-        // 1. Berdasarkan batch_id langsung jika ada
+        // 1. Berdasarkan batch_id langsung jika ada (dan cocok dengan batch_number jika diisi)
         if (!empty($item->batch_id)) {
-            $batch = Batches::find($item->batch_id);
+            $candidate = Batches::find($item->batch_id);
+            if ($candidate && (int) $candidate->medicine_id === (int) $med->id) {
+                if ($batchName === '' || strcasecmp(trim((string) $candidate->name), $batchName) === 0) {
+                    $batch = $candidate;
+                }
+            }
         }
 
-        // 2. Berdasarkan nomor batch di farmasi cabang ini
-        if (!$batch && !empty($item->batch_number) && $item->batch_number !== '-') {
-            $batchName = trim($item->batch_number);
+        // 2. Berdasarkan nomor batch eksplisit di cabang terkait
+        if (!$batch && $batchName !== '') {
             $batch = Batches::where('medicine_id', $med->id)
                 ->where('pharmacy_id', $pharmacyId)
                 ->where(function ($q) use ($batchName) {
@@ -1054,15 +1124,32 @@ class PurchaseReturnController extends Controller
                 })
                 ->first();
 
-            // Fallback cari batch dengan nama sama di farmasi manapun
+            // Fallback cari batch legacy yang pharmacy_id-nya NULL
             if (!$batch) {
                 $batch = Batches::where('medicine_id', $med->id)
-                    ->where('name', $batchName)
+                    ->whereNull('pharmacy_id')
+                    ->where(function ($q) use ($batchName) {
+                        $q->where('name', $batchName)
+                          ->orWhereRaw('TRIM(name) = ?', [$batchName]);
+                    })
                     ->first();
+            }
+
+            // Jika nomor batch sudah diisi secara eksplisit tetapi belum ada di tabel batches cabang ini,
+            // buat batch sesuai nomor yang diinput (JANGAN jatuh ke batch FIFO lain seperti LWJ24215!)
+            if (!$batch) {
+                $batch = Batches::create([
+                    'medicine_id' => $med->id,
+                    'pharmacy_id' => $pharmacyId,
+                    'name' => $batchName,
+                    'expired_date' => $item->expired_date ?: now()->addYears(2)->toDateString(),
+                    'stock' => 0,
+                    'status' => 1,
+                ]);
             }
         }
 
-        // 3. AUTO-FALLBACK: Ambil batch yang punya stok > 0 di farmasi ini (prioritas FIFO / ED terdekat)
+        // 3. AUTO-FALLBACK (hanya jika nomor batch kosong): Ambil batch yang punya stok > 0 di farmasi ini (prioritas FIFO / ED terdekat)
         if (!$batch) {
             $batch = Batches::where('medicine_id', $med->id)
                 ->where('pharmacy_id', $pharmacyId)
@@ -1085,7 +1172,7 @@ class PurchaseReturnController extends Controller
             $batch = Batches::create([
                 'medicine_id' => $med->id,
                 'pharmacy_id' => $pharmacyId,
-                'name' => (!empty($item->batch_number) && $item->batch_number !== '-') ? trim($item->batch_number) : ('RET-' . date('ymd')),
+                'name' => $batchName !== '' ? $batchName : ('RET-' . date('ymd')),
                 'expired_date' => $item->expired_date ?: now()->addYears(2)->toDateString(),
                 'stock' => 0,
                 'status' => 1,
@@ -1314,11 +1401,12 @@ class PurchaseReturnController extends Controller
     }
 
     /**
-     * Update status item retur (misal update tanggal diambil atau potong tagihan langsung di tabel)
+     * Update status item retur (misal update tanggal diambil, qty, harga, batch, atau potong tagihan langsung di tabel)
+     * serta menyelaraskan stok fisik (medicines & batches), Kartu Stok (ItemsLog), dan potongan tagihan (FinancePayment).
      */
     public function updateItem(Request $request, $id)
     {
-        $item = PurchaseReturnItem::findOrFail($id);
+        $item = PurchaseReturnItem::with(['purchaseReturn', 'medicine'])->findOrFail($id);
 
         $validated = $request->validate([
             'pickup_date' => 'nullable|date',
@@ -1326,33 +1414,182 @@ class PurchaseReturnController extends Controller
             'reason' => 'nullable|string|max:100',
             'qty' => 'nullable|numeric|min:0.01',
             'unit_price' => 'nullable|numeric|min:0',
+            'batch_number' => 'nullable|string|max:100',
+            'batch_id' => 'nullable|integer',
+            'expired_date' => 'nullable|date',
         ]);
 
-        if (isset($validated['qty']) || isset($validated['unit_price'])) {
-            $qty = $validated['qty'] ?? $item->qty;
-            $unitPrice = $validated['unit_price'] ?? $item->unit_price;
-            $validated['subtotal'] = (float)$qty * (float)$unitPrice;
-        }
+        DB::transaction(function () use ($item, $validated) {
+            $parent = $item->purchaseReturn;
+            $med = $item->medicine ?: ($item->medicine_id ? Medicines::find($item->medicine_id) : null);
+            $pharmacyId = (int) ($parent?->pharmacy_id ?: (function_exists('getActivePharmacyId') ? getActivePharmacyId() : 9));
 
-        if (!empty($validated['pickup_date'])) {
-            // Jika tanggal diambil diisi, pastikan status dan tanggal konsisten
-            if (in_array($item->status, ['diajukan', 'dikonfirmasi'])) {
-                $validated['status'] = 'sudah_diambil';
-                $validated['status_date'] = $validated['pickup_date'];
-                $this->deductStockForItem($item, $validated['pickup_date']);
-            } elseif ($item->status === 'sudah_diambil') {
-                $validated['status_date'] = $validated['pickup_date'];
+            $wasDeducted = (bool) $item->stock_deducted;
+            $oldBatchId = $item->batch_id ? (int) $item->batch_id : null;
+            $oldFactor = $med ? $this->resolveStockFactor($item, $med) : 1;
+            $oldDeductedQty = (float) $item->qty * $oldFactor;
+
+            if (isset($validated['qty']) || isset($validated['unit_price'])) {
+                $qty = $validated['qty'] ?? $item->qty;
+                $unitPrice = $validated['unit_price'] ?? $item->unit_price;
+                $validated['subtotal'] = (float) $qty * (float) $unitPrice;
             }
-        }
 
-        $item->update($validated);
+            if (array_key_exists('batch_number', $validated) && !array_key_exists('batch_id', $validated)) {
+                $newBatchNo = trim((string) ($validated['batch_number'] ?? ''));
+                if ($newBatchNo !== '' && strcasecmp($newBatchNo, trim((string) $item->batch_number)) !== 0) {
+                    $validated['batch_id'] = null;
+                }
+            }
 
-        // Recalculate total header amount
-        $parent = $item->purchaseReturn;
-        if ($parent) {
-            $newTotal = $parent->items()->sum('subtotal');
-            $parent->update(['total_amount' => $newTotal]);
-        }
+            // Terapkan perubahan data item terlebih dahulu sebelum kalkulasi/potong stok
+            $item->fill($validated);
+
+            if (!empty($validated['pickup_date'])) {
+                // Jika tanggal diambil diisi, pastikan status dan tanggal konsisten
+                if (in_array($item->status, ['diajukan', 'dikonfirmasi'])) {
+                    $item->status = 'sudah_diambil';
+                    $item->status_date = $validated['pickup_date'];
+                    if (!$item->confirmed_date) {
+                        $item->confirmed_date = $validated['pickup_date'];
+                    }
+                    if (!$wasDeducted) {
+                        $this->deductStockForItem($item, $validated['pickup_date']);
+                    }
+                } elseif ($item->status === 'sudah_diambil') {
+                    $item->status_date = $validated['pickup_date'];
+                }
+            }
+
+            // Jika stok sebelumnya sudah dipotong, selaraskan perubahan qty / batch / subtotal ke stok fisik & ItemsLog
+            if ($wasDeducted && $med) {
+                $newFactor = $this->resolveStockFactor($item, $med);
+                if ($newFactor > 1) {
+                    $item->retur_type = 'packaging';
+                    $item->stock_unit_factor = $newFactor;
+                }
+                $newDeductedQty = (float) $item->qty * $newFactor;
+                $newBatch = $this->resolveBatchForItem($item, $med, $pharmacyId);
+                $newBatchId = (int) $newBatch->id;
+
+                $returnNo = $parent?->return_no ?? ('RET-' . date('ymd'));
+                $candidateLogs = ItemsLog::where('transaction_code', $returnNo)
+                    ->where('medicine_id', $med->id)
+                    ->where('status', 4)
+                    ->orderBy('id', 'asc')
+                    ->get();
+
+                // Kecualikan log yang sudah terpasang persis ke item saudara pada retur yang sama (multi-batch)
+                $claimedSiblingLogIds = [];
+                if ($parent) {
+                    $siblingItems = PurchaseReturnItem::whereHas('purchaseReturn', fn($q) => $q->where('return_no', $returnNo))
+                        ->where('medicine_id', $med->id)
+                        ->where('id', '!=', $item->id)
+                        ->get();
+
+                    foreach ($siblingItems as $sib) {
+                        $sibQty = (float) $sib->qty * $this->resolveStockFactor($sib, $med);
+                        $sibLog = $candidateLogs->first(function ($log) use ($sib, $sibQty, $claimedSiblingLogIds) {
+                            return !in_array($log->id, $claimedSiblingLogIds, true)
+                                && $sib->batch_id
+                                && (int) $log->batches_id === (int) $sib->batch_id
+                                && abs((float) $log->qty - $sibQty) < 0.001;
+                        });
+                        if ($sibLog) {
+                            $claimedSiblingLogIds[] = $sibLog->id;
+                        }
+                    }
+                }
+
+                $unclaimedLogs = $candidateLogs->reject(fn($log) => in_array($log->id, $claimedSiblingLogIds, true));
+
+                $matchingLog = $unclaimedLogs->first(function ($log) use ($oldBatchId, $oldDeductedQty) {
+                    return $oldBatchId
+                        && (int) $log->batches_id === $oldBatchId
+                        && abs((float) $log->qty - $oldDeductedQty) < 0.001;
+                }) ?? $unclaimedLogs->first(function ($log) use ($oldBatchId) {
+                    return $oldBatchId && (int) $log->batches_id === $oldBatchId;
+                }) ?? $unclaimedLogs->first(function ($log) use ($oldDeductedQty) {
+                    return abs((float) $log->qty - $oldDeductedQty) < 0.001;
+                }) ?? $unclaimedLogs->first();
+
+                $loggedOldBatchId = $matchingLog?->batches_id ? (int) $matchingLog->batches_id : $oldBatchId;
+                $loggedOldQty = $matchingLog ? (float) $matchingLog->qty : $oldDeductedQty;
+                $deltaQty = $newDeductedQty - $loggedOldQty;
+
+                if ($loggedOldBatchId && $loggedOldBatchId !== $newBatchId) {
+                    $oldBatch = Batches::find($loggedOldBatchId);
+                    if ($oldBatch) {
+                        $oldBatch->increment('stock', $loggedOldQty);
+                        $this->adjustOutletTransferStock($oldBatch, $pharmacyId, $loggedOldQty);
+                    }
+                    $newBatch->decrement('stock', $newDeductedQty);
+                    $this->adjustOutletTransferStock($newBatch, $pharmacyId, -$newDeductedQty);
+                } elseif (abs($deltaQty) >= 0.0001) {
+                    if ($deltaQty > 0) {
+                        $newBatch->decrement('stock', $deltaQty);
+                    } else {
+                        $newBatch->increment('stock', abs($deltaQty));
+                    }
+                    $this->adjustOutletTransferStock($newBatch, $pharmacyId, -$deltaQty);
+                }
+
+                if (abs($deltaQty) >= 0.0001) {
+                    if ($deltaQty > 0) {
+                        $med->decrement('stock', $deltaQty);
+                    } else {
+                        $med->increment('stock', abs($deltaQty));
+                    }
+                }
+
+                $item->batch_id = $newBatch->id;
+                $item->batch_number = $newBatch->name;
+                if (empty($item->expired_date) && $newBatch->expired_date) {
+                    $item->expired_date = $newBatch->expired_date;
+                }
+
+                if ($matchingLog) {
+                    $matchingLog->update([
+                        'batches_id' => $newBatch->id,
+                        'qty' => $newDeductedQty,
+                        'qty_after' => (float) $matchingLog->qty_before - $newDeductedQty,
+                        'total' => $item->subtotal,
+                    ]);
+                } else {
+                    $med->refresh();
+                    ItemsLog::create([
+                        'transaction_code' => $returnNo,
+                        'code' => $this->generateItemsLogCode(),
+                        'type' => 'RT',
+                        'medicine_id' => $med->id,
+                        'qty' => $newDeductedQty,
+                        'qty_before' => (float) $med->stock + $newDeductedQty,
+                        'qty_after' => (float) $med->stock,
+                        'total' => $item->subtotal,
+                        'date' => $item->confirmed_date ?: ($item->status_date ?: now()->toDateString()),
+                        'status' => 4,
+                        'batches_id' => $newBatch->id,
+                        'user_id' => auth()->id() ?: 1,
+                    ]);
+                }
+            }
+
+            $item->save();
+
+            // Jika status sudah_potong, perbarui nominal potongan tagihan FinancePayment agar tetap sinkron
+            if ($item->status === 'sudah_potong' && $parent) {
+                $refNo = $parent->return_no . '-ITEM-' . $item->id;
+                FinancePayment::where('reference_number', $refNo)->update([
+                    'amount' => (float) $item->subtotal,
+                ]);
+            }
+
+            // Recalculate total header amount
+            if ($parent) {
+                $newTotal = $parent->items()->sum('subtotal');
+                $parent->update(['total_amount' => $newTotal]);
+            }
+        });
 
         $msg = 'Item retur berhasil diperbarui.';
 

@@ -317,6 +317,8 @@ class SuppliesController extends Controller
                 'medicines',
                 'batches',                              // Fetch batches for batch name display
                 'receiving.receiving_details.creditor', // Fetch creditor through receiving details
+                'receiving.receiving_details.receiving_items.order_items.creditors',
+                'purchaseReturn.creditor',              // Fetch creditor for purchase returns (RET-*)
                 'medicine_transaction.user',            // Fetch cashier user through transactions
                 'users'                                 // Fetch user for creator display
             ]);
@@ -405,20 +407,7 @@ class SuppliesController extends Controller
                     return '-';
                 })
                 ->addColumn('transaction_code', function ($row) {
-                    if (in_array($row->status, [2, 4])) {
-                        $detail = $row->receiving?->receiving_details?->first();
-                        $codeStr = $detail?->receiving_details_code ?: ($detail?->invoice_number ?: $row->transaction_code);
-                    } elseif (in_array($row->status, [8, 9])) {
-                        if (preg_match('/REV-(?:ADD-|DEL-)?(\d+)/', (string) $row->transaction_code, $matches)) {
-                            $rItem = \App\Models\ReceivingItems::with('receiving_details')->find($matches[1]);
-                            $inv = $rItem?->receiving_details?->invoice_number ?: $rItem?->receiving_details?->receiving_details_code;
-                            $codeStr = $inv ? $row->transaction_code . ' (' . $inv . ')' : $row->transaction_code;
-                        } else {
-                            $codeStr = $row->transaction_code;
-                        }
-                    } else {
-                        $codeStr = $row->transaction_code;
-                    }
+                    $codeStr = $row->resolvePurchaseTransactionCode();
 
                     if (!$codeStr)
                         return '-';
@@ -439,23 +428,9 @@ class SuppliesController extends Controller
                 })
                 // ----- UPDATED 'NAME' COLUMN LOGIC -----
                 ->addColumn('name', function ($row) {
-                    // Case 1: Purchase (Status = 2) or Retur Beli (Status = 4) -> Show Creditor / PBF Name
-                    if (in_array($row->status, [2, 4])) {
-                        $creditorName = $row->receiving?->receiving_details?->first()?->creditor?->name;
-                        if ($creditorName) {
-                            return $creditorName;
-                        }
-                    }
-
-                    // Case 1b: Revisi Faktur (Status = 8) or Hapus Terima (Status = 9) -> Find PBF from related receiving item
-                    if (in_array($row->status, [8, 9])) {
-                        if (preg_match('/REV-(?:ADD-|DEL-)?(\d+)/', (string) $row->transaction_code, $matches)) {
-                            $rItem = \App\Models\ReceivingItems::with(['receiving_details.creditor', 'order_items.creditors'])->find($matches[1]);
-                            $pbfName = $rItem?->receiving_details?->creditor?->name ?? $rItem?->order_items?->creditors?->name;
-                            if ($pbfName) {
-                                return $pbfName;
-                            }
-                        }
+                    $creditorName = $row->resolveCreditorName();
+                    if ($creditorName) {
+                        return $creditorName;
                     }
 
                     // Case 2: From medicine transaction cashier user
@@ -642,7 +617,14 @@ class SuppliesController extends Controller
                 }
             }
 
-            $items = $baseQuery()->with(['medicines', 'batches', 'users']);
+            $items = $baseQuery()->with([
+                'medicines',
+                'batches',
+                'users',
+                'receiving.receiving_details.creditor',
+                'receiving.receiving_details.receiving_items.order_items.creditors',
+                'purchaseReturn.creditor',
+            ]);
 
             if ($request->filled('start_date')) {
                 $items->whereDate('date', '>=', $request->start_date);
@@ -716,17 +698,9 @@ class SuppliesController extends Controller
                     return '<span class="font-bold text-slate-800 text-xs">' . number_format($val) . '</span>';
                 })
                 ->addColumn('operator_info', function ($r) {
-                    // PBF if purchase/retur beli/revisi faktur
-                    if (in_array((int) $r->status, [2, 4])) {
-                        $pbf = $r->receiving?->receiving_details?->first()?->creditor?->name;
-                        if ($pbf) return '<span class="text-xs font-medium text-blue-700 truncate max-w-[130px] block" title="' . e($pbf) . '">' . e($pbf) . '</span>';
-                    }
-                    if (in_array((int) $r->status, [8, 9])) {
-                        if (preg_match('/REV-(?:ADD-|DEL-)?(\d+)/', (string) $r->transaction_code, $matches)) {
-                            $rItem = \App\Models\ReceivingItems::with(['receiving_details.creditor', 'order_items.creditors'])->find($matches[1]);
-                            $pbf = $rItem?->receiving_details?->creditor?->name ?? $rItem?->order_items?->creditors?->name;
-                            if ($pbf) return '<span class="text-xs font-medium text-blue-700 truncate max-w-[130px] block" title="' . e($pbf) . '">' . e($pbf) . '</span>';
-                        }
+                    $pbf = $r->resolveCreditorName();
+                    if ($pbf) {
+                        return '<span class="text-xs font-medium text-blue-700 truncate max-w-[130px] block" title="' . e($pbf) . '">' . e($pbf) . '</span>';
                     }
                     // User / Operator
                     $name = $r->users?->name;

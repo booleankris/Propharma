@@ -65,6 +65,10 @@ class StorageStockHistoryExport implements WithMultipleSheets
                 'batches:id,name,expired_date',
                 'users:id,name',
                 'receiving.receiving_details.creditor:id,code,name',
+                'receiving.receiving_details.receiving_items:id,receiving_details_id,order_items_id,batches_id,qty_received,stock_unit_factor',
+                'receiving.receiving_details.receiving_items.order_items:id,medicine_id,creditor_code',
+                'receiving.receiving_details.receiving_items.order_items.creditors:id,code,name',
+                'purchaseReturn.creditor:id,code,name',
             ])
             ->get();
 

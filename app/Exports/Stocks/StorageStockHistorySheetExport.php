@@ -213,30 +213,13 @@ class StorageStockHistorySheetExport extends DefaultValueBinder implements FromA
 
     private function resolveOperator($log): string
     {
-        if (in_array((int) $log->status, [2, 4], true)) {
-            try {
-                $receiving = $log->relationLoaded('receiving') ? $log->getRelation('receiving') : $log->receiving;
-                $pbf = $receiving?->receiving_details?->first()?->creditor?->name;
-                if ($pbf) {
-                    return $pbf;
-                }
-            } catch (\Throwable $e) {
-                // Fallback to user if receiving relation cannot be resolved
+        try {
+            $pbf = $log->resolveCreditorName();
+            if ($pbf) {
+                return $pbf;
             }
-        }
-
-        if (in_array((int) $log->status, [8, 9], true)) {
-            if (preg_match('/REV-(?:ADD-|DEL-)?(\d+)/', (string) $log->transaction_code, $matches)) {
-                try {
-                    $rItem = \App\Models\ReceivingItems::with(['receiving_details.creditor', 'order_items.creditors'])->find($matches[1]);
-                    $pbf = $rItem?->receiving_details?->creditor?->name ?? $rItem?->order_items?->creditors?->name;
-                    if ($pbf) {
-                        return $pbf;
-                    }
-                } catch (\Throwable $e) {
-                    // Fallback to user
-                }
-            }
+        } catch (\Throwable $e) {
+            // Fallback to user if receiving relation cannot be resolved
         }
 
         return $log->users?->name ?: '-';

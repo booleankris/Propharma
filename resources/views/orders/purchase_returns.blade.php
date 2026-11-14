@@ -1324,6 +1324,8 @@
                 }
             } else {
                 it.batch_id = null;
+                it.batch_number = '';
+                it.expired_date = '';
             }
             renderReturnItemsTable();
         };
@@ -1399,6 +1401,7 @@
                                 ` : ''}
                                 ${(!it.available_batches || it.available_batches.length === 0 || !it.batch_id) ? `
                                     <input type="text" value="${escapeHtml(it.batch_number)}" placeholder="No Batch"
+                                           oninput="updateItemField(${idx}, 'batch_number', this.value)"
                                            onchange="updateItemField(${idx}, 'batch_number', this.value)"
                                            class="h-7 text-xs w-28 rounded-lg border border-slate-300 px-2 font-mono">
                                     <input type="date" value="${it.expired_date ? it.expired_date.split('T')[0] : ''}"
@@ -1488,6 +1491,19 @@
 
         window.updateItemField = function(idx, field, val) {
             returnItemsData[idx][field] = val;
+            if (field === 'batch_number') {
+                const trimmed = String(val || '').trim().toUpperCase();
+                const batches = returnItemsData[idx].available_batches || [];
+                const matched = batches.find(b => String(b.name || '').trim().toUpperCase() === trimmed);
+                if (matched) {
+                    returnItemsData[idx].batch_id = matched.id;
+                    if (matched.expired_date) {
+                        returnItemsData[idx].expired_date = matched.expired_date;
+                    }
+                } else {
+                    returnItemsData[idx].batch_id = null;
+                }
+            }
         };
 
         window.removeReturnItemRow = function(idx) {

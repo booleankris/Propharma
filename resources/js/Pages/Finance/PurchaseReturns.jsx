@@ -427,6 +427,19 @@ export default function PurchaseReturns({
     const updateItemRow = (index, field, value) => {
         const updated = [...formData.items];
         updated[index][field] = value;
+        if (field === 'batch_number') {
+            const trimmed = String(value || '').trim().toUpperCase();
+            const batches = updated[index].available_batches || [];
+            const matched = batches.find(b => String(b.name || '').trim().toUpperCase() === trimmed);
+            if (matched) {
+                updated[index].batch_id = matched.id;
+                if (matched.expired_date) {
+                    updated[index].expired_date = matched.expired_date;
+                }
+            } else {
+                updated[index].batch_id = null;
+            }
+        }
         setFormData({ ...formData, items: updated });
     };
 

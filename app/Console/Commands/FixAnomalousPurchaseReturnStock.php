@@ -83,11 +83,16 @@ class FixAnomalousPurchaseReturnStock extends Command
                 continue;
             }
 
-            // Ambil catatan log kartu stok untuk item retur ini
+            // Ambil catatan log kartu stok untuk item retur ini (prioritaskan batch_id yang sesuai)
             $log = ItemsLog::where('transaction_code', $p->return_no)
                 ->where('medicine_id', $med->id)
                 ->where('status', 4)
-                ->first();
+                ->when($item->batch_id, fn($q) => $q->where('batches_id', $item->batch_id))
+                ->first()
+                ?: ItemsLog::where('transaction_code', $p->return_no)
+                    ->where('medicine_id', $med->id)
+                    ->where('status', 4)
+                    ->first();
 
             $loggedQty = (float) ($log ? $log->qty : 0);
 
