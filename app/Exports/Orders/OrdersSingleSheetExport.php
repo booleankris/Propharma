@@ -105,14 +105,26 @@ class OrdersSingleSheetExport implements FromArray, WithStyles, WithColumnWidths
             $jatuhTempo = $item->invoice_due ? Carbon::parse($item->invoice_due)->format('d/m/Y') : '-';
             $expired = $item->expired_date ? Carbon::parse($item->expired_date)->format('d/m/Y') : '-';
             $batch = !empty($item->receiving_batch) ? (string) $item->receiving_batch : (!empty($item->batch_name) ? (string) $item->batch_name : '-');
-            $packaging = $item->medicine_packaging ?: ($item->medicine_unit ?: '-');
+            $isReceivedPack = $item->receipt_is_pack !== null
+                ? (int) ((bool) $item->receipt_is_pack)
+                : ($item->order_pack !== null ? (int) ((bool) $item->order_pack) : null);
+
+            if ($isReceivedPack === 1) {
+                $packaging = $item->medicine_packaging ?: ($item->medicine_unit ?: '-');
+            } elseif ($isReceivedPack === 0) {
+                $packaging = $item->medicine_unit ?: ($item->medicine_packaging ?: '-');
+            } else {
+                $packaging = $item->medicine_packaging ?: ($item->medicine_unit ?: '-');
+            }
+
+            $utuh = $isReceivedPack !== null ? $isReceivedPack : '-';
 
             $rows[] = [
                 $item->id, $item->receiving_details_code ?? '-', $tglTerima, $item->creditor_name ?? '-',
                 $item->creditor_code ?? '-', $item->invoice_number ?? '-', $tglFaktur, $dpp, $ppn, $jatuhTempo,
                 $item->invoice_times ?? '-', $item->invoice_payment ?? '-', $item->medicine_code ?? '-',
                 $item->medicine_name ?? '-', $item->factory_name ?? '-', (int) $qty, $packaging,
-                $item->order_pack ?? '-', $rawPrice, $gross, $hargaPpn, $item->discount ?? 0, round($nomDisc, 2),
+                $utuh, $rawPrice, $gross, $hargaPpn, $item->discount ?? 0, round($nomDisc, 2),
                 $item->extra_discount ?? 0, round($nomExtraDisc, 2), $persenDisc, $jumlah, $batch, $expired,
             ];
             $grandDpp += $dpp;
@@ -184,6 +196,7 @@ class OrdersSingleSheetExport implements FromArray, WithStyles, WithColumnWidths
                 'receiving_items.id',
                 'receiving_items.qty_received',
                 'receiving_items.qty',
+                'receiving_items.receipt_is_pack',
                 'receiving_items.discount',
                 'receiving_items.extra_discount',
                 'receiving_items.total',
