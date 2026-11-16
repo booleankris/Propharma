@@ -27,6 +27,33 @@ export default function PurchaseReturns({
     const [statusFilter, setStatusFilter] = useState(filters.status || '');
     const [reasonFilter, setReasonFilter] = useState(filters.reason || '');
 
+    // Filter cabang (hanya HO/Admin/GM/Koordinator yang bisa memilih)
+    const canSwitchBranch = Boolean(branchContext?.canSwitchBranch);
+    const branchOptions = branchContext?.branches || [];
+    const [branchFilter, setBranchFilter] = useState(
+        filters.branch || String(branchContext?.activePharmacy?.id || 'all')
+    );
+    const branchParam = canSwitchBranch ? { branch: branchFilter } : {};
+    const exportUrl = `/finance/purchase-returns/export?${new URLSearchParams({
+        search,
+        creditor_code: creditorFilter,
+        status: statusFilter,
+        reason: reasonFilter,
+        ...branchParam,
+    }).toString()}`;
+
+    const handleBranchChange = (value) => {
+        setBranchFilter(value);
+        router.get('/finance/purchase-returns', {
+            tab: currentTab,
+            search,
+            creditor_code: creditorFilter,
+            status: statusFilter,
+            reason: reasonFilter,
+            branch: value,
+        }, { preserveState: true });
+    };
+
     // Approaching filters
     const [approachingSearch, setApproachingSearch] = useState(approachingFilters.search || '');
     const [approachingCreditor, setApproachingCreditor] = useState(approachingFilters.creditor_code || '');
@@ -180,6 +207,7 @@ export default function PurchaseReturns({
             creditor_code: creditorFilter,
             status: statusFilter,
             reason: reasonFilter,
+            ...branchParam,
         }, { preserveState: true });
     };
 
@@ -190,6 +218,7 @@ export default function PurchaseReturns({
             creditor_code: creditor,
             status,
             reason,
+            ...branchParam,
         }, { preserveState: true });
     };
 
@@ -207,6 +236,7 @@ export default function PurchaseReturns({
             approaching_search: approachingSearch,
             approaching_creditor: approachingCreditor,
             approaching_urgency: approachingUrgency,
+            ...branchParam,
         }, { preserveState: true });
     };
 
@@ -216,6 +246,7 @@ export default function PurchaseReturns({
             approaching_search: approachingSearch,
             approaching_creditor: cred,
             approaching_urgency: urg,
+            ...branchParam,
         }, { preserveState: true });
     };
 
@@ -544,8 +575,25 @@ export default function PurchaseReturns({
                         </div>
                     </div>
                     <div className="flex items-center gap-2.5">
+                        {canSwitchBranch ? (
+                            <select
+                                value={branchFilter}
+                                onChange={(e) => handleBranchChange(e.target.value)}
+                                className="text-xs font-semibold border border-slate-200 rounded-xl px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                title="Filter cabang"
+                            >
+                                <option value="all">Semua Cabang</option>
+                                {branchOptions.map((b) => (
+                                    <option key={b.id} value={String(b.id)}>{b.name}</option>
+                                ))}
+                            </select>
+                        ) : (
+                            <span className="inline-flex items-center px-3 py-2 text-xs font-semibold text-slate-700 bg-slate-50 border border-slate-200 rounded-xl">
+                                {branchContext?.activePharmacy?.name || 'Cabang'}
+                            </span>
+                        )}
                         <a
-                            href="/finance/purchase-returns/export"
+                            href={exportUrl}
                             className="inline-flex items-center gap-2 px-3.5 py-2 text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-xl transition-all"
                         >
                             <Download className="w-4 h-4 text-slate-500" /> Export Excel
@@ -716,6 +764,7 @@ export default function PurchaseReturns({
                                     <th className="py-3 px-2 text-center w-20">Qty</th>
                                     <th className="py-3 px-3 text-center min-w-[110px]">Batch & ED</th>
                                     <th className="py-3 px-3 min-w-[150px]">No Faktur & PBF</th>
+                                    <th className="py-3 px-3 whitespace-nowrap">Cabang</th>
                                     <th className="py-3 px-2 text-center min-w-[120px]">Ketentuan Retur</th>
                                     <th className="py-3 px-2 text-center whitespace-nowrap">Tgl Faktur</th>
                                     <th className="py-3 px-3 text-center whitespace-nowrap">Keterangan</th>
@@ -726,7 +775,7 @@ export default function PurchaseReturns({
                             <tbody className="divide-y divide-slate-100">
                                 {items.data.length === 0 ? (
                                     <tr>
-                                        <td colSpan="10" className="text-center py-12 text-slate-400">
+                                        <td colSpan="11" className="text-center py-12 text-slate-400">
                                             Belum ada data monitoring retur beli. Klik tombol <strong>Input Retur Baru</strong> untuk memulai.
                                         </td>
                                     </tr>
@@ -784,6 +833,11 @@ export default function PurchaseReturns({
                                                     <div className="text-[11px] font-semibold text-blue-800 mt-0.5 break-words line-clamp-1" title={pbfName}>
                                                         {pbfName}
                                                     </div>
+                                                </td>
+                                                <td className="py-2.5 px-3 whitespace-nowrap">
+                                                    <span className="inline-block px-2 py-0.5 rounded-md text-[10px] font-semibold bg-slate-100 text-slate-700 border border-slate-200">
+                                                        {p?.pharmacy?.name || '-'}
+                                                    </span>
                                                 </td>
                                                 <td className="py-2.5 px-2 text-center">
                                                     {policyInfo ? (

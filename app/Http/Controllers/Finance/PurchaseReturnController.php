@@ -70,6 +70,31 @@ class PurchaseReturnController extends Controller
     }
 
     /**
+     * Tentukan filter cabang untuk monitoring / export retur beli.
+     * - User HO/Admin/GM/Koordinator boleh memilih cabang via ?branch=<id> atau ?branch=all.
+     * - User lain selalu dikunci ke cabang aktifnya.
+     * Return null berarti semua cabang.
+     */
+    protected function resolveBranchFilter(Request $request, ?array $branchContext = null): ?int
+    {
+        $branchContext = $branchContext ?? $this->getBranchContext();
+        $activeId = (int) ($branchContext['activePharmacy']['id'] ?? 0);
+
+        if (!empty($branchContext['canSwitchBranch']) && $request->filled('branch')) {
+            $branch = (string) $request->input('branch');
+            if ($branch === 'all') {
+                return null;
+            }
+            $allowedIds = collect($branchContext['branches'] ?? [])->pluck('id')->map(fn ($id) => (int) $id)->all();
+            if (in_array((int) $branch, $allowedIds, true)) {
+                return (int) $branch;
+            }
+        }
+
+        return $activeId > 0 ? $activeId : null;
+    }
+
+    /**
      * Normalisasi nama pabrik untuk pencocokan toleran terhadap simbol/spasi/tanda kurung
      */
     protected function normalizeFactoryName(?string $str): string
@@ -237,12 +262,19 @@ class PurchaseReturnController extends Controller
         $reasonFilter = $request->input('reason');
         $perPage = (int) $request->input('per_page', 25);
 
+        $branchContext = $this->getBranchContext();
+        $branchFilter = $this->resolveBranchFilter($request, $branchContext);
+
         // Query item-level rows to match exact format in Excel monitoring
-        $itemsQuery = PurchaseReturnItem::with(['purchaseReturn.creditor', 'medicine.factory'])
+        $itemsQuery = PurchaseReturnItem::with(['purchaseReturn.creditor', 'purchaseReturn.pharmacy:id,name', 'medicine.factory'])
             ->join('purchase_returns', 'purchase_return_items.purchase_return_id', '=', 'purchase_returns.id')
             ->select('purchase_return_items.*')
             ->orderBy('purchase_returns.created_at', 'desc')
             ->orderBy('purchase_return_items.id', 'desc');
+
+        if ($branchFilter) {
+            $itemsQuery->where('purchase_returns.pharmacy_id', $branchFilter);
+        }
 
         if ($search !== '') {
             $itemsQuery->where(function ($q) use ($search) {
@@ -324,15 +356,17 @@ class PurchaseReturnController extends Controller
         });
 
         // Metrik Monitoring (Dioptimalkan dalam 1 query agregasi tunggal untuk efisiensi jutaan data)
-        $metrics = PurchaseReturnItem::selectRaw('
-            COUNT(*) as total_items,
-            COALESCE(SUM(subtotal), 0) as total_value,
-            COUNT(CASE WHEN status = "diajukan" OR status IS NULL THEN 1 END) as diajukan_count,
-            COUNT(CASE WHEN status = "dikonfirmasi" THEN 1 END) as dikonfirmasi_count,
-            COUNT(CASE WHEN status = "sudah_diambil" THEN 1 END) as sudah_diambil_count,
-            COUNT(CASE WHEN status = "sudah_potong" THEN 1 END) as sudah_potong_count,
-            COUNT(CASE WHEN status = "barang_kembali_pmi" THEN 1 END) as pmi_count
-        ')->first();
+        $metrics = PurchaseReturnItem::join('purchase_returns', 'purchase_return_items.purchase_return_id', '=', 'purchase_returns.id')
+            ->when($branchFilter, fn ($q) => $q->where('purchase_returns.pharmacy_id', $branchFilter))
+            ->selectRaw('
+                COUNT(*) as total_items,
+                COALESCE(SUM(purchase_return_items.subtotal), 0) as total_value,
+                COUNT(CASE WHEN purchase_return_items.status = "diajukan" OR purchase_return_items.status IS NULL THEN 1 END) as diajukan_count,
+                COUNT(CASE WHEN purchase_return_items.status = "dikonfirmasi" THEN 1 END) as dikonfirmasi_count,
+                COUNT(CASE WHEN purchase_return_items.status = "sudah_diambil" THEN 1 END) as sudah_diambil_count,
+                COUNT(CASE WHEN purchase_return_items.status = "sudah_potong" THEN 1 END) as sudah_potong_count,
+                COUNT(CASE WHEN purchase_return_items.status = "barang_kembali_pmi" THEN 1 END) as pmi_count
+            ')->first();
 
         $totalItemsCount = (int) ($metrics->total_items ?? 0);
         $totalReturValue = (float) ($metrics->total_value ?? 0);
@@ -357,9 +391,7 @@ class PurchaseReturnController extends Controller
         ];
 
         $alertService = new \App\Services\Finance\PurchaseReturnAlertService();
-        $branchContext = $this->getBranchContext();
-        $pharmacyId = $branchContext['activePharmacy']['id'] ?? null;
-        $approachingResult = $alertService->getApproachingReturns($pharmacyId, $approachingFilters, 25);
+        $approachingResult = $alertService->getApproachingReturns($branchFilter ?? 0, $approachingFilters, 25);
 
         $viewData = [
             'activeTab' => $activeTab,
@@ -370,6 +402,7 @@ class PurchaseReturnController extends Controller
                 'status' => $statusFilter,
                 'reason' => $reasonFilter,
                 'per_page' => $perPage,
+                'branch' => $branchFilter ? (string) $branchFilter : 'all',
             ],
             'stats' => [
                 'total_items' => $totalItemsCount,
@@ -406,9 +439,14 @@ class PurchaseReturnController extends Controller
             return response()->json([]);
         }
 
+        $activePharmacyId = function_exists('getActivePharmacyId') ? getActivePharmacyId() : 0;
+
         $invoices = ReceivingDetails::with(['creditor'])
             ->whereNotNull('invoice_number')
             ->where('invoice_number', '!=', '')
+            ->when($activePharmacyId > 0, function ($query) use ($activePharmacyId) {
+                $query->whereHas('receiving', fn ($rq) => $rq->where('pharmacy_id', $activePharmacyId));
+            })
             ->where(function ($query) use ($q) {
                 $query->where('invoice_number', 'LIKE', "%{$q}%")
                     ->orWhere('receiving_details_code', 'LIKE', "%{$q}%")
@@ -1657,12 +1695,17 @@ class PurchaseReturnController extends Controller
         $creditorFilter = $request->input('creditor_code');
         $statusFilter = $request->input('status');
         $reasonFilter = $request->input('reason');
+        $branchFilter = $this->resolveBranchFilter($request);
 
-        $itemsQuery = PurchaseReturnItem::with(['purchaseReturn.creditor', 'medicine.factory'])
+        $itemsQuery = PurchaseReturnItem::with(['purchaseReturn.creditor', 'purchaseReturn.pharmacy:id,name', 'medicine.factory'])
             ->join('purchase_returns', 'purchase_return_items.purchase_return_id', '=', 'purchase_returns.id')
             ->select('purchase_return_items.*')
             ->orderBy('purchase_returns.created_at', 'desc')
             ->orderBy('purchase_return_items.id', 'desc');
+
+        if ($branchFilter) {
+            $itemsQuery->where('purchase_returns.pharmacy_id', $branchFilter);
+        }
 
         if ($search !== '') {
             $itemsQuery->where(function ($q) use ($search) {
@@ -1726,7 +1769,7 @@ class PurchaseReturnController extends Controller
         $sheet->setTitle('Monitoring Retur Beli');
 
         $headers = [
-            'NO', 'NAMA OBAT', 'JUMLAH', 'SATUAN', 'BATCH', 'NO FAKTUR',
+            'NO', 'CABANG', 'NAMA OBAT', 'JUMLAH', 'SATUAN', 'BATCH', 'NO FAKTUR',
             'ED', 'KETENTUAN RETUR', 'PBF', 'TANGGAL ENTRI / FAKTUR', 'KETERANGAN', 'TGL BRG DI AMBIL', 'STATUS POTONG TAGIHAN', 'TOTAL HARGA'
         ];
         $sheet->fromArray($headers, null, 'A1');
@@ -1747,6 +1790,7 @@ class PurchaseReturnController extends Controller
 
             $rows[] = [
                 $idx + 1,
+                $p && $p->pharmacy ? $p->pharmacy->name : '-',
                 $it->medicine_name . ($factoryName ? " ({$factoryName})" : ''),
                 (float) $it->qty,
                 $it->unit,
