@@ -398,11 +398,14 @@ Route::middleware(['auth', 'role:General Manager|Kasir|Gudang PMI|HO|administrat
     Route::get('/transfers/requests/medicines', [TransfersController::class, 'searchRequestMedicines'])->name('transfers.requests.medicines');
     Route::post('/transfers/requests/{transfer}/approve', [TransfersController::class, 'approveTransferRequest'])->name('transfers.requests.approve');
     Route::post('/transfers/requests/{transfer}/deny', [TransfersController::class, 'denyTransferRequest'])->name('transfers.requests.deny');
+    Route::post('/transfers/verify-pin', [TransfersController::class, 'verifyTransferPin'])->name('transfers.verifypin');
     Route::post('/transfer', [TransfersController::class, 'transfer'])->name('transfer');
     Route::get('/search/getbatches', [TransfersController::class, 'searchBatches'])->name('search.getbatches');
     Route::get('/etalases', [TransfersController::class, 'index'])->name('etalases.index');
     Route::post('/etalases', [TransfersController::class, 'store'])->name('etalases.store');
-    Route::put('/etalases/{etalase}', [TransfersController::class, 'update']);
+    Route::put('/etalases/{etalase}', [TransfersController::class, 'update'])->name('etalases.update');
+    Route::delete('/etalases/{etalase}', [TransfersController::class, 'destroy'])->name('etalases.destroy');
+    Route::post('/transfers/items/{item}/etalase', [TransfersController::class, 'updateItemEtalase'])->name('transfers.updateItemEtalase');
     Route::get('/transfers/export', [TransfersController::class, 'exportTransfers'])->name('transfers.export');
     Route::get('/transfers/export/status/{id}', [TransfersController::class, 'exportStatus'])->name('transfers.export.status');
     Route::get('/transfers/incoming', [TransfersController::class, 'incomingTransfers'])->name('transfers.incoming');

@@ -156,8 +156,8 @@
                                 </div>
                             </details>
                             <div class="flex flex-wrap gap-2 px-3 sm:px-4 pb-3 sm:pb-4">
-                                <form method="POST" action="{{ route('transfers.requests.approve', $requestTransfer) }}" onsubmit="return confirm('Setujui permintaan ini? Stok akan dikurangi sekarang.')">@csrf<button class="rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white px-3.5 py-2.5 text-xs font-semibold">Setujui & Mutasi Keluar</button></form>
-                                <form method="POST" action="{{ route('transfers.requests.deny', $requestTransfer) }}" onsubmit="return confirm('Tolak permintaan ini?')">@csrf<button class="rounded-lg bg-white border border-rose-200 text-rose-700 hover:bg-rose-50 px-3.5 py-2.5 text-xs font-semibold">Tolak</button></form>
+                                <form method="POST" action="{{ route('transfers.requests.approve', $requestTransfer) }}" class="pin-required" data-confirm="Setujui permintaan ini? Stok akan dikurangi sekarang." data-pin-title="PIN Mutasi Keluar" data-pin-subtitle="Masukkan PIN pribadi Anda untuk menyetujui & mengeluarkan stok.">@csrf<button type="submit" class="rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white px-3.5 py-2.5 text-xs font-semibold">Setujui & Mutasi Keluar</button></form>
+                                <form method="POST" action="{{ route('transfers.requests.deny', $requestTransfer) }}" data-modern-confirm="Tolak permintaan mutasi {{ $requestTransfer->code }}? Stok tidak berubah." data-confirm-title="Tolak Permintaan Mutasi" data-confirm-ok="Ya, Tolak">@csrf<button type="submit" class="rounded-lg bg-white border border-rose-200 text-rose-700 hover:bg-rose-50 px-3.5 py-2.5 text-xs font-semibold">Tolak</button></form>
                             </div>
                         </article>
                     @empty
@@ -249,7 +249,14 @@
                 </div>
             </form>
 
-            <div class="flex items-center">
+            <div class="flex flex-wrap items-center gap-2">
+                <button type="button" onclick="window.openManageEtalaseModal()"
+                    class="inline-flex items-center gap-1.5 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 px-3.5 py-2 rounded-xl text-xs font-semibold transition shadow-sm">
+                    <svg class="w-4 h-4 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h7" />
+                    </svg>
+                    <span>Kelola Etalase</span>
+                </button>
                 <a href="{{ route('transfers.export', request()->all()) }}" id="export-excel-btn" class="inline-flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-xl text-xs font-semibold transition shadow-sm">
                     <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
                         <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
@@ -324,7 +331,17 @@
                                 const html = await response.text();
                                 container.innerHTML = html;
                                 container.dataset.loaded = 'true';
-                                // Re-bind form submits if necessary
+                                const firstSelect = container.querySelector('.item-etalase-select');
+                                const transferId = firstSelect?.dataset.transferId;
+                                const bulkSelect = transferId ? document.querySelector(`.transfer-bulk-etalase-select[data-transfer-id="${transferId}"]`) : null;
+                                if (bulkSelect && bulkSelect.value) {
+                                    container.querySelectorAll('.item-etalase-select').forEach((sel) => {
+                                        if (!sel.value && String(sel.dataset.itemStatus || '0') === '0') {
+                                            sel.value = bulkSelect.value;
+                                        }
+                                    });
+                                }
+                                window.initEtalaseSearchableSelects?.(container);
                             } else {
                                 container.innerHTML = '<div class="text-rose-500 p-4 text-center">Gagal memuat item mutasi.</div>';
                             }
@@ -339,13 +356,13 @@
             };
 
             // Global delegation for ajax forms inside dynamically loaded content
-            document.addEventListener('submit', function(e) {
+            document.addEventListener('submit', async function(e) {
                 if (e.target && e.target.classList.contains('ajax-form')) {
-                    // Let normal form submission happen, just disable button
                     const btn = e.target.querySelector('button[type="button"], button[type="submit"]');
                     if (btn && btn.dataset.confirm) {
                         e.preventDefault();
-                        if (confirm(btn.dataset.confirm)) {
+                        const ok = await window.confirmTransferAction({ message: btn.dataset.confirm });
+                        if (ok) {
                             btn.innerHTML = 'Memproses...';
                             btn.classList.add('opacity-50', 'pointer-events-none');
                             e.target.submit();
@@ -357,13 +374,14 @@
                 }
             });
 
-            document.addEventListener('click', function(e) {
+            document.addEventListener('click', async function(e) {
                 const btn = e.target.closest('.ajax-submit-btn');
                 if (btn) {
                     e.preventDefault();
                     const form = btn.closest('form');
                     if (btn.dataset.confirm) {
-                        if (confirm(btn.dataset.confirm)) {
+                        const ok = await window.confirmTransferAction({ message: btn.dataset.confirm });
+                        if (ok) {
                             btn.innerHTML = 'Memproses...';
                             btn.classList.add('opacity-50', 'pointer-events-none');
                             form.submit();
@@ -469,15 +487,25 @@
                                 <span class="font-bold text-indigo-700">{{ $toName }}</span>
                             </div>
 
-                            {{-- Creator User --}}
-                            @if($transfer->users)
+                            {{-- Pelaku Mutasi (PIN pribadi; fallback akun login) --}}
+                            @if($transfer->sender_display_name)
                                 <div class="flex items-center gap-1.5 text-xs text-slate-500 bg-slate-100/70 px-2.5 py-1 rounded-lg">
                                     <svg class="w-3.5 h-3.5 text-slate-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                         <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
                                         <path d="M8 7a4 4 0 1 0 8 0a4 4 0 0 0 -8 0" />
                                         <path d="M6 21v-2a4 4 0 0 1 4 -4h4a4 4 0 0 1 4 4v2" />
                                     </svg>
-                                    <span>Oleh: <strong class="font-semibold text-slate-700">{{ $transfer->users->name }}</strong></span>
+                                    <span>Dikirim oleh: <strong class="font-semibold text-slate-700">{{ $transfer->sender_display_name }}</strong></span>
+                                </div>
+                            @endif
+                            @if($transfer->receiver_display_name)
+                                <div class="flex items-center gap-1.5 text-xs text-emerald-700 bg-emerald-50 border border-emerald-100 px-2.5 py-1 rounded-lg">
+                                    <svg class="w-3.5 h-3.5 text-emerald-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                        <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+                                        <path d="M8 7a4 4 0 1 0 8 0a4 4 0 0 0 -8 0" />
+                                        <path d="M6 21v-2a4 4 0 0 1 4 -4h4a4 4 0 0 1 4 4v2" />
+                                    </svg>
+                                    <span>Diterima: <strong class="font-semibold text-emerald-800">{{ $transfer->receiver_display_name }}</strong></span>
                                 </div>
                             @endif
                         </div>
@@ -491,9 +519,12 @@
 
                             {{-- Batalkan Mutasi (Sender Cancel) --}}
                             @if ($hasPendingItems)
-                                <form method="POST" action="{{ route('transfers.deny', $transfer) }}" class="inline">
+                                <form method="POST" action="{{ route('transfers.deny', $transfer) }}" class="inline"
+                                    data-modern-confirm="Apakah Anda yakin ingin membatalkan pengiriman mutasi ini? Stok obat akan dikembalikan."
+                                    data-confirm-title="Batalkan Mutasi"
+                                    data-confirm-ok="Ya, Batalkan">
                                     @csrf
-                                    <button type="submit" class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 text-xs font-semibold rounded-lg transition shadow-sm" onclick="return confirm('Apakah Anda yakin ingin membatalkan pengiriman mutasi ini? Stok obat akan dikembalikan.')">
+                                    <button type="submit" class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 text-xs font-semibold rounded-lg transition shadow-sm">
                                         <svg class="w-3.5 h-3.5 text-rose-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5">
                                             <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
                                         </svg>
@@ -600,15 +631,25 @@
                                 <span class="font-bold text-emerald-800">{{ $toName }}</span>
                             </div>
 
-                            {{-- Creator User --}}
-                            @if($transfer->users)
+                            {{-- Pelaku Mutasi (PIN pribadi; fallback akun login) --}}
+                            @if($transfer->sender_display_name)
                                 <div class="flex items-center gap-1.5 text-xs text-slate-500 bg-slate-100/70 px-2.5 py-1 rounded-lg">
                                     <svg class="w-3.5 h-3.5 text-slate-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                         <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
                                         <path d="M8 7a4 4 0 1 0 8 0a4 4 0 0 0 -8 0" />
                                         <path d="M6 21v-2a4 4 0 0 1 4 -4h4a4 4 0 0 1 4 4v2" />
                                     </svg>
-                                    <span>Dikirim: <strong class="font-semibold text-slate-700">{{ $transfer->users->name }}</strong></span>
+                                    <span>Dikirim oleh: <strong class="font-semibold text-slate-700">{{ $transfer->sender_display_name }}</strong></span>
+                                </div>
+                            @endif
+                            @if($transfer->receiver_display_name)
+                                <div class="flex items-center gap-1.5 text-xs text-emerald-700 bg-emerald-50 border border-emerald-100 px-2.5 py-1 rounded-lg">
+                                    <svg class="w-3.5 h-3.5 text-emerald-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                        <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+                                        <path d="M8 7a4 4 0 1 0 8 0a4 4 0 0 0 -8 0" />
+                                        <path d="M6 21v-2a4 4 0 0 1 4 -4h4a4 4 0 0 1 4 4v2" />
+                                    </svg>
+                                    <span>Diterima: <strong class="font-semibold text-emerald-800">{{ $transfer->receiver_display_name }}</strong></span>
                                 </div>
                             @endif
                         </div>
@@ -622,18 +663,43 @@
 
                             {{-- Terima Semua & Tolak Semua Button --}}
                             @if ($hasPendingItems)
-                                <form method="POST" action="{{ route('transfers.accept', $transfer) }}" class="inline" onsubmit="const btn = this.querySelector('button[type=submit]'); if (btn.dataset.submitting) return false; btn.dataset.submitting = '1'; btn.disabled = true; btn.classList.add('opacity-50', 'cursor-not-allowed');">
+                                <div class="inline-flex items-center gap-1.5">
+                                    <select class="transfer-bulk-etalase-select text-xs bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 text-slate-700 outline-none focus:border-emerald-500 max-w-[170px] transition"
+                                        data-transfer-id="{{ $transfer->id }}" title="Pilih etalase tujuan penerima">
+                                        <option value="">— Pilih Etalase —</option>
+                                        @foreach ($etalases ?? [] as $et)
+                                            <option value="{{ $et->id }}">{{ $et->name }}</option>
+                                        @endforeach
+                                    </select>
+                                    <button type="button" onclick="window.openManageEtalaseModal(this)"
+                                        title="Tambah / ubah / hapus etalase cabang"
+                                        class="inline-flex items-center gap-1 px-2.5 py-1.5 text-[11px] font-semibold bg-white border border-slate-200 hover:bg-indigo-50 hover:border-indigo-200 hover:text-indigo-700 text-slate-600 rounded-lg transition">
+                                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+                                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" />
+                                        </svg>
+                                        <span>Etalase</span>
+                                    </button>
+                                </div>
+                                <form method="POST" action="{{ route('transfers.accept', $transfer) }}" class="inline pin-required"
+                                    data-accept-transfer-id="{{ $transfer->id }}"
+                                    data-require-etalase="{{ isWarehousePharmacy() ? '0' : '1' }}"
+                                    data-confirm="Apakah Anda yakin ingin menerima semua obat yang masih pending pada mutasi ini?"
+                                    data-pin-title="PIN Terima Mutasi"
+                                    data-pin-subtitle="Masukkan PIN pribadi Anda untuk menerima mutasi {{ $transfer->code }}.">
                                     @csrf
-                                    <button type="submit" class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold rounded-lg transition shadow-sm" onclick="return confirm('Apakah Anda yakin ingin menerima semua obat yang masih pending pada mutasi ini?')">
+                                    <button type="submit" class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold rounded-lg transition shadow-sm">
                                         <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5">
                                             <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
                                         </svg>
                                         Terima Semua
                                     </button>
                                 </form>
-                                <form method="POST" action="{{ route('transfers.deny', $transfer) }}" class="inline" onsubmit="const btn = this.querySelector('button[type=submit]'); if (btn.dataset.submitting) return false; btn.dataset.submitting = '1'; btn.disabled = true; btn.classList.add('opacity-50', 'cursor-not-allowed');">
+                                <form method="POST" action="{{ route('transfers.deny', $transfer) }}" class="inline"
+                                    data-modern-confirm="Apakah Anda yakin ingin menolak semua obat pada mutasi ini?"
+                                    data-confirm-title="Tolak Semua Item"
+                                    data-confirm-ok="Ya, Tolak Semua">
                                     @csrf
-                                    <button type="submit" class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white text-xs font-semibold rounded-lg transition shadow-sm" onclick="return confirm('Apakah Anda yakin ingin menolak semua obat pada mutasi ini?')">
+                                    <button type="submit" class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white text-xs font-semibold rounded-lg transition shadow-sm">
                                         <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5">
                                             <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
                                         </svg>
@@ -738,15 +804,25 @@
                                 <span class="font-bold text-rose-700">{{ $toName }}</span>
                             </div>
 
-                            {{-- Creator User --}}
-                            @if($transfer->users)
+                            {{-- Pelaku Mutasi (PIN pribadi; fallback akun login) --}}
+                            @if($transfer->sender_display_name)
                                 <div class="flex items-center gap-1.5 text-xs text-slate-500 bg-slate-100/70 px-2.5 py-1 rounded-lg">
                                     <svg class="w-3.5 h-3.5 text-slate-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                         <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
                                         <path d="M8 7a4 4 0 1 0 8 0a4 4 0 0 0 -8 0" />
                                         <path d="M6 21v-2a4 4 0 0 1 4 -4h4a4 4 0 0 1 4 4v2" />
                                     </svg>
-                                    <span>Oleh: <strong class="font-semibold text-slate-700">{{ $transfer->users->name }}</strong></span>
+                                    <span>Dikirim oleh: <strong class="font-semibold text-slate-700">{{ $transfer->sender_display_name }}</strong></span>
+                                </div>
+                            @endif
+                            @if($transfer->receiver_display_name)
+                                <div class="flex items-center gap-1.5 text-xs text-emerald-700 bg-emerald-50 border border-emerald-100 px-2.5 py-1 rounded-lg">
+                                    <svg class="w-3.5 h-3.5 text-emerald-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                        <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+                                        <path d="M8 7a4 4 0 1 0 8 0a4 4 0 0 0 -8 0" />
+                                        <path d="M6 21v-2a4 4 0 0 1 4 -4h4a4 4 0 0 1 4 4v2" />
+                                    </svg>
+                                    <span>Diterima: <strong class="font-semibold text-emerald-800">{{ $transfer->receiver_display_name }}</strong></span>
                                 </div>
                             @endif
                         </div>
@@ -824,7 +900,7 @@
 
     </div>
 
-
+    @include('kasir.transfers.partials.pin_modal')
 
 @endsection
 

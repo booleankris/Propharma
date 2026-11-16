@@ -182,40 +182,18 @@
                         </div>
                     </div>
 
-                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                        <div>
-                            <label class="block text-[11px] font-semibold text-slate-600 uppercase tracking-wider mb-1">Qty
-                                Transfer</label>
-                            <div class="relative">
-                                <input type="number" id="stageQty"
-                                    class="w-full px-3 py-3 sm:py-2 bg-white border border-slate-200 rounded-lg text-base sm:text-sm font-mono text-slate-800 outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/10"
-                                    placeholder="0" min="1" oninput="handleStageQtyInput(this)">
-                                <span
-                                    class="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-mono text-slate-400 pointer-events-none"
-                                    id="stageQtyMax"></span>
-                            </div>
-                            <div class="text-xs text-rose-500 mt-1 hidden" id="stageQtyError">Melebihi stok yang tersedia
-                            </div>
+                    <div>
+                        <label class="block text-[11px] font-semibold text-slate-600 uppercase tracking-wider mb-1">Qty
+                            Transfer</label>
+                        <div class="relative">
+                            <input type="number" id="stageQty"
+                                class="w-full px-3 py-3 sm:py-2 bg-white border border-slate-200 rounded-lg text-base sm:text-sm font-mono text-slate-800 outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/10"
+                                placeholder="0" min="1" oninput="handleStageQtyInput(this)">
+                            <span
+                                class="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-mono text-slate-400 pointer-events-none"
+                                id="stageQtyMax"></span>
                         </div>
-
-                        <div>
-                            <label
-                                class="block text-[11px] font-semibold text-slate-600 uppercase tracking-wider mb-1">Tujuan
-                                Etalase</label>
-                            <div class="flex items-center gap-2">
-                                <select id="stageEtalase"
-                                    class="w-full px-3 py-3 sm:py-2 bg-white border border-slate-200 rounded-lg text-base sm:text-sm text-slate-800 outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/10">
-                                    <option value="">— Pilih etalase —</option>
-                                </select>
-                                <button type="button" onclick="openEtalaseModal('create')" title="Tambah etalase"
-                                    class="shrink-0 w-11 h-11 sm:w-9 sm:h-9 rounded-lg border border-slate-200 bg-white text-slate-500 hover:bg-slate-50 hover:text-sky-600 flex items-center justify-center transition">
-                                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none"
-                                        stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
-                                        <line x1="12" y1="5" x2="12" y2="19" />
-                                        <line x1="5" y1="12" x2="19" y2="12" />
-                                    </svg>
-                                </button>
-                            </div>
+                        <div class="text-xs text-rose-500 mt-1 hidden" id="stageQtyError">Melebihi stok yang tersedia
                         </div>
                     </div>
 
@@ -257,13 +235,12 @@
                                 <th class="py-3 px-4">Satuan</th>
                                 <th class="py-3 px-4">Stok</th>
                                 <th class="py-3 px-4 w-28">Qty</th>
-                                <th class="py-3 px-4 w-48">Etalase</th>
                                 <th class="py-3 px-4 w-12 text-center"></th>
                             </tr>
                         </thead>
                         <tbody id="cartBody" class="divide-y divide-slate-100 text-slate-700">
                             <tr id="cartEmptyRow">
-                                <td colspan="7" class="py-10 text-center text-slate-400 text-xs">Belum ada item
+                                <td colspan="6" class="py-10 text-center text-slate-400 text-xs">Belum ada item
                                     ditambahkan</td>
                             </tr>
                         </tbody>
@@ -322,6 +299,7 @@
             </div>
         </div>
     </div>
+    @include('kasir.transfers.partials.pin_modal')
 @endsection
 
 @section('scripts')
@@ -460,8 +438,6 @@
             document.getElementById('stageQtyMax').textContent = `/ ${stagedBatch.stock}`;
             document.getElementById('stageQtyError').classList.add('hidden');
 
-            renderEtalaseOptions(document.getElementById('stageEtalase'), '');
-
             const stagingCard = document.getElementById('stagingCard');
             stagingCard.classList.remove('hidden');
 
@@ -488,8 +464,7 @@
 
         function checkAddItemBtn() {
             const qty = parseInt(document.getElementById('stageQty').value) || 0;
-            const etId = document.getElementById('stageEtalase').value;
-            const valid = stagedBatch !== null && qty > 0 && qty <= stagedBatch.stock && etId !== '';
+            const valid = stagedBatch !== null && qty > 0 && qty <= stagedBatch.stock;
             document.getElementById('addItemBtn').disabled = !valid;
         }
 
@@ -508,13 +483,10 @@
 
         function addItemToCart() {
             const qty = parseInt(document.getElementById('stageQty').value) || 0;
-            const etSelect = document.getElementById('stageEtalase');
-            const etId = etSelect.value;
-            const etName = etSelect.options[etSelect.selectedIndex]?.textContent ?? '—';
 
-            if (!stagedBatch || qty <= 0 || qty > stagedBatch.stock || !etId) {
+            if (!stagedBatch || qty <= 0 || qty > stagedBatch.stock) {
                 iziToast.warning({
-                    message: 'Periksa kembali qty dan etalase.'
+                    message: 'Periksa kembali qty transfer.'
                 });
                 return;
             }
@@ -529,8 +501,6 @@
                     return;
                 }
                 cartItems[existingIdx].qty = combinedQty;
-                cartItems[existingIdx].etalases_id = etId;
-                cartItems[existingIdx].etalasesName = etName;
             } else {
                 cartItems.push({
                     batches_id: stagedBatch.batches_id,
@@ -539,8 +509,6 @@
                     unit: stagedBatch.unit,
                     stock: stagedBatch.stock,
                     qty: qty,
-                    etalases_id: etId,
-                    etalasesName: etName,
                     source_type: stagedBatch.source_type || 'gudang',
                 });
             }
@@ -560,7 +528,7 @@
 
             if (cartItems.length === 0) {
                 body.innerHTML =
-                    `<tr id="cartEmptyRow"><td colspan="7" class="py-10 text-center text-slate-400 text-xs">Belum ada item ditambahkan</td></tr>`;
+                    `<tr id="cartEmptyRow"><td colspan="6" class="py-10 text-center text-slate-400 text-xs">Belum ada item ditambahkan</td></tr>`;
                 return;
             }
 
@@ -584,9 +552,6 @@
                     <td class="py-3 px-4">
                         <input type="number" class="w-20 px-2 py-1 bg-white border border-slate-200 rounded text-xs font-mono text-slate-800 outline-none focus:border-sky-500" min="1" max="${it.stock}" value="${it.qty}" data-idx="${idx}" onchange="updateCartQty(this)">
                     </td>
-                    <td class="py-3 px-4">
-                        <select class="cart-etalase-select w-full px-2 py-1 bg-white border border-slate-200 rounded text-xs text-slate-800 outline-none focus:border-sky-500" data-idx="${idx}" onchange="updateCartEtalase(this)"></select>
-                    </td>
                     <td class="py-3 px-4 text-center">
                         <button type="button" class="text-slate-400 hover:text-rose-500 transition p-1" onclick="removeCartItem(${idx})" title="Hapus">
                             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -597,7 +562,6 @@
                     </td>
                 `;
                 body.appendChild(tr);
-                renderEtalaseOptions(tr.querySelector('.cart-etalase-select'), it.etalases_id);
             });
         }
 
@@ -653,7 +617,6 @@
         $(document).ready(function() {
             const searchInputEl = document.getElementById('searchInput');
             const stageQtyEl = document.getElementById('stageQty');
-            const stageEtalaseEl = document.getElementById('stageEtalase');
 
             // Search input: Arrow/Enter for dropdown nav, Enter to jump to qty if batch staged & dropdown closed
             searchInputEl.addEventListener('keydown', function(e) {
@@ -686,16 +649,8 @@
                 }
             });
 
-            // stageQty: Enter → jump to etalase select
+            // stageQty: Enter → trigger addItemToCart if valid
             stageQtyEl.addEventListener('keydown', function(e) {
-                if (e.key === 'Enter') {
-                    e.preventDefault();
-                    stageEtalaseEl.focus();
-                }
-            });
-
-            // stageEtalase: Enter → trigger addItemToCart if valid
-            stageEtalaseEl.addEventListener('keydown', function(e) {
                 if (e.key === 'Enter') {
                     e.preventDefault();
                     const addBtn = document.getElementById('addItemBtn');
@@ -714,8 +669,6 @@
                     });
                 }
             }
-
-            document.getElementById('stageEtalase').addEventListener('change', checkAddItemBtn);
 
             document.addEventListener('click', function(e) {
                 const inp = document.getElementById('searchInput');
@@ -837,26 +790,20 @@
 
         renderCart();
         checkSubmit();
-        loadEtalases();
 
         // ── Submit ────────────────────────────────────────────────────────
         function onPharmacyChange() {
-            loadEtalases();
             checkSubmit();
-            if (stagedBatch) {
-                renderEtalaseOptions(document.getElementById('stageEtalase'), '');
-                checkAddItemBtn();
-            }
         }
 
         function checkSubmit() {
             const pharmacy = document.getElementById('pharmacySelect').value;
             const valid = cartItems.length > 0 && pharmacy !== '' &&
-                cartItems.every(it => it.qty > 0 && it.qty <= it.stock && it.etalases_id);
+                cartItems.every(it => it.qty > 0 && it.qty <= it.stock);
             document.getElementById('submitBtn').disabled = !valid;
         }
 
-        function submitTransfer() {
+        async function submitTransfer() {
             if (transferSubmitting) return;
             const pharmacy = document.getElementById('pharmacySelect').value;
 
@@ -867,15 +814,24 @@
                 return;
             }
 
+            // Wajib PIN pribadi sebelum mutasi keluar
+            const pinResult = await window.requestTransferPin({
+                title: 'PIN Mutasi Keluar',
+                subtitle: 'Masukkan PIN pribadi Anda untuk mengirim mutasi ini.',
+            });
+            if (!pinResult) return;
+            if (transferSubmitting) return;
+
             const payload = {
                 _token: '{{ csrf_token() }}',
+                pin: pinResult.pin,
                 code: document.getElementById('code_hidden').value,
                 submission_key: submissionKey,
                 pharmacy: pharmacy,
                 items: cartItems.map(it => ({
                     batches_id: it.batches_id,
                     qty: it.qty,
-                    etalases_id: it.etalases_id,
+                    etalases_id: it.etalases_id || null,
                     source_type: it.source_type || 'gudang',
                 })),
             };
@@ -888,9 +844,10 @@
                 .then(res => {
                     localStorage.removeItem(CART_KEY); // Clear cart on success
                     localStorage.removeItem(SUBMISSION_KEY);
+                    const actorName = pinResult.user?.name ? ` (oleh ${pinResult.user.name})` : '';
                     iziToast.success({
                         title: 'Berhasil',
-                        message: res.data.message ?? 'Transfer disimpan.'
+                        message: (res.data.message ?? 'Transfer disimpan.') + actorName
                     });
                     setTimeout(() => window.location.reload(), 1200);
                 })

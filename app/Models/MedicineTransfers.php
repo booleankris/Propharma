@@ -55,6 +55,27 @@ class MedicineTransfers extends Model
         return $this->belongsTo(User::class, 'requested_by');
     }
 
+    /**
+     * Nama pelaku mutasi keluar (user PIN / sent_by).
+     * Fallback ke akun login pembuat mutasi (user_id) untuk data lama.
+     */
+    public function getSenderDisplayNameAttribute(): ?string
+    {
+        $user = $this->sender ?: $this->users;
+
+        return $user ? ($user->name ?: ($user->username ?? null)) : null;
+    }
+
+    /**
+     * Nama penerima mutasi (user PIN / received_by). Null jika belum diterima.
+     */
+    public function getReceiverDisplayNameAttribute(): ?string
+    {
+        $user = $this->receiver;
+
+        return $user ? ($user->name ?: ($user->username ?? null)) : null;
+    }
+
     public function sourcePharmacy()
     {
         return $this->belongsTo(Pharmacies::class, 'source_pharmacy_id');

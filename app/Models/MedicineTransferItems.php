@@ -16,6 +16,8 @@ class MedicineTransferItems extends Model
         'source_batches_id',
         'source_type',
         'etalases_id',
+        'etalase_updated_by',
+        'etalase_updated_at',
         'qty',
         'original_qty',
         'status',
@@ -24,6 +26,7 @@ class MedicineTransferItems extends Model
 
     protected $casts = [
         'stock_deducted_at' => 'datetime',
+        'etalase_updated_at' => 'datetime',
     ];
 
     protected static function booted(): void
@@ -71,5 +74,9 @@ class MedicineTransferItems extends Model
     public function etalase()
     {
         return $this->etalases();
+    }
+    public function etalaseUpdater()
+    {
+        return $this->belongsTo(User::class, 'etalase_updated_by');
     }
 }

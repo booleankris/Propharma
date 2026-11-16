@@ -11,6 +11,10 @@
         </thead>
         <tbody class="divide-y divide-slate-100 bg-white">
             @forelse($transfer->items as $item)
+                @php
+                    $currentPharmacyId = getActivePharmacyId();
+                    $isDestinationPharmacy = ($item->batches?->pharmacy_id == $currentPharmacyId);
+                @endphp
                 <tr class="hover:bg-slate-50/80 transition-colors">
                     <td class="py-4 px-6">
                         <div class="font-bold text-slate-800 text-sm">
@@ -28,12 +32,48 @@
                                 </svg>
                                 {{ $item->batches?->expired_date ? \Carbon\Carbon::parse($item->batches->expired_date)->format('d M Y') : '—' }}
                             </span>
-                            <span class="inline-flex items-center gap-2 text-xs font-medium text-slate-500">
-                                <svg class="w-4 h-4 text-slate-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/>
-                                </svg>
-                                {{ $item->etalases?->name ?? '—' }}
-                            </span>
+                            @php
+                                $auditUserName = $item->etalaseUpdater?->name
+                                    ?? $item->etalaseUpdater?->username
+                                    ?? ($item->etalases_id ? ($transfer->receiver_display_name ?? null) : null);
+                                $auditTime = $item->etalase_updated_at?->format('d M Y H:i');
+                            @endphp
+                            @if ($isDestinationPharmacy && (int) $item->status !== 2)
+                                <div class="inline-flex flex-wrap items-center gap-1.5">
+                                    <select class="item-etalase-select text-xs bg-white border border-slate-200 rounded-lg px-2 py-1 text-slate-700 outline-none focus:border-emerald-500 max-w-[180px] transition"
+                                        data-transfer-id="{{ $transfer->id }}"
+                                        data-item-id="{{ $item->id }}"
+                                        data-item-status="{{ $item->status }}"
+                                        data-current-etalase-id="{{ $item->etalases_id ?? '' }}">
+                                        <option value="">— Tanpa / Pilih Etalase —</option>
+                                        @foreach ($etalases ?? [] as $et)
+                                            <option value="{{ $et->id }}" @selected($item->etalases_id == $et->id)>{{ $et->name }}</option>
+                                        @endforeach
+                                    </select>
+                                    <button type="button" onclick="window.openManageEtalaseModal(this)"
+                                        title="Tambah / ubah / hapus etalase cabang"
+                                        class="inline-flex items-center gap-1 px-2 py-1 text-[11px] font-semibold bg-white border border-slate-200 hover:bg-indigo-50 hover:border-indigo-200 hover:text-indigo-700 text-slate-600 rounded-lg transition">
+                                        + / Kelola
+                                    </button>
+                                </div>
+                                <span class="item-etalase-audit text-[10px] text-slate-400 {{ $auditUserName ? '' : 'hidden' }}" data-item-id="{{ $item->id }}">
+                                    @if ($auditUserName)
+                                        Diubah oleh: <strong class="font-medium text-slate-600">{{ $auditUserName }}</strong>@if ($auditTime) ({{ $auditTime }})@endif
+                                    @endif
+                                </span>
+                            @else
+                                <span class="inline-flex items-center gap-2 text-xs font-medium text-slate-500">
+                                    <svg class="w-4 h-4 text-slate-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/>
+                                    </svg>
+                                    {{ $item->etalases?->name ?? 'Belum dipilih' }}
+                                </span>
+                                @if ($auditUserName)
+                                    <span class="item-etalase-audit text-[10px] text-slate-400" data-item-id="{{ $item->id }}">
+                                        Diubah oleh: <strong class="font-medium text-slate-600">{{ $auditUserName }}</strong>@if ($auditTime) ({{ $auditTime }})@endif
+                                    </span>
+                                @endif
+                            @endif
                         </div>
                     </td>
                     <td class="py-4 px-6 text-center whitespace-nowrap">
@@ -48,29 +88,31 @@
                         </span>
                     </td>
                     <td class="py-4 px-6 text-center whitespace-nowrap">
-                        @php
-                            $currentPharmacyId = getActivePharmacyId();
-                            $isDestinationPharmacy = ($item->batches?->pharmacy_id == $currentPharmacyId);
-                        @endphp
-
                         @if ($item->status === 0 && $isDestinationPharmacy)
                             <div class="flex items-center justify-center gap-2">
-                                <form method="POST" action="{{ route('transfers.acceptItem', $item) }}" onsubmit="const btn = this.querySelector('button[type=submit]'); if (btn.dataset.submitting) return false; btn.dataset.submitting = '1'; btn.disabled = true; btn.classList.add('opacity-50', 'cursor-not-allowed');">
+                                <form method="POST" action="{{ route('transfers.acceptItem', $item) }}" class="pin-required"
+                                    data-accept-item-id="{{ $item->id }}"
+                                    data-transfer-id="{{ $transfer->id }}"
+                                    data-require-etalase="{{ isWarehousePharmacy() ? '0' : '1' }}"
+                                    data-confirm="Terima obat {{ $item->batches?->medicines?->name }} (Qty: {{ rtrim(rtrim(number_format((float) ($item->original_qty ?? $item->qty), 2, ',', '.'), '0'), ',') }})?"
+                                    data-pin-title="PIN Terima Mutasi"
+                                    data-pin-subtitle="Masukkan PIN pribadi Anda untuk menerima item ini.">
                                     @csrf
                                     <button type="submit"
-                                        class="inline-flex items-center gap-1 px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white text-[11px] font-semibold rounded-lg transition shadow-sm"
-                                        onclick="return confirm('Terima obat {{ $item->batches?->medicines?->name }} (Qty: {{ rtrim(rtrim(number_format((float) ($item->original_qty ?? $item->qty), 2, ',', '.'), '0'), ',') }})?')">
+                                        class="inline-flex items-center gap-1 px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white text-[11px] font-semibold rounded-lg transition shadow-sm">
                                         <svg class="w-3.5 h-3.5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5">
                                             <polyline points="20 6 9 17 4 12" />
                                         </svg>
                                         Terima
                                     </button>
                                 </form>
-                                <form method="POST" action="{{ route('transfers.denyItem', $item) }}" onsubmit="const btn = this.querySelector('button[type=submit]'); if (btn.dataset.submitting) return false; btn.dataset.submitting = '1'; btn.disabled = true; btn.classList.add('opacity-50', 'cursor-not-allowed');">
+                                <form method="POST" action="{{ route('transfers.denyItem', $item) }}"
+                                    data-modern-confirm="Tolak mutasi {{ $item->batches?->medicines?->name }} (Qty: {{ rtrim(rtrim(number_format((float) ($item->original_qty ?? $item->qty), 2, ',', '.'), '0'), ',') }})?"
+                                    data-confirm-title="Tolak Item Mutasi"
+                                    data-confirm-ok="Ya, Tolak">
                                     @csrf
                                     <button type="submit"
-                                        class="inline-flex items-center gap-1 px-3 py-1.5 bg-white border border-slate-200 hover:bg-rose-50 hover:border-rose-200 hover:text-rose-600 text-slate-600 text-[11px] font-semibold rounded-lg transition shadow-sm"
-                                        onclick="return confirm('Tolak mutasi {{ $item->batches?->medicines?->name }} (Qty: {{ rtrim(rtrim(number_format((float) ($item->original_qty ?? $item->qty), 2, ',', '.'), '0'), ',') }})?')">
+                                        class="inline-flex items-center gap-1 px-3 py-1.5 bg-white border border-slate-200 hover:bg-rose-50 hover:border-rose-200 hover:text-rose-600 text-slate-600 text-[11px] font-semibold rounded-lg transition shadow-sm">
                                         <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
                                             <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
                                         </svg>

@@ -4,7 +4,11 @@ namespace App\Http\Controllers\Master;
 
 use App\Http\Controllers\Controller;
 use App\Models\Items;
+use App\Models\MedicineTransferItems;
+use App\Models\User;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Form;
 use DataTables;
 
@@ -15,11 +19,43 @@ class ItemsController extends Controller
         $this->middleware('auth');
     }
 
+    protected function hasAuditColumns(): bool
+    {
+        static $cached = null;
+        if ($cached === null) {
+            $cached = Schema::hasColumn('etalases', 'created_by') && Schema::hasColumn('etalases', 'updated_by');
+        }
+
+        return $cached;
+    }
+
+    protected function resolveActorId(Request $request, ?bool &$pinInvalid = null): ?int
+    {
+        $pinInvalid = false;
+        if ($request->filled('pin')) {
+            $pin = trim((string) $request->input('pin'));
+            $user = preg_match('/^\d{4}$/', $pin) ? User::where('secret_pin', $pin)->first() : null;
+            if (!$user) {
+                $pinInvalid = true;
+                return null;
+            }
+            return (int) $user->id;
+        }
+
+        return auth()->id();
+    }
+
     public function index(Request $request)
     {
         if ($request->ajax()) {
             $pharmacyId = $request->query('pharmacy_id') ?: getActivePharmacyId();
-            $items = Items::with('pharmacy')->select('id', 'name', 'pharmacy_id', 'status', 'created_at');
+            $hasAudit = $this->hasAuditColumns();
+            $relations = $hasAudit ? ['pharmacy', 'creator:id,name,username', 'updater:id,name,username'] : ['pharmacy'];
+            $select = $hasAudit
+                ? ['id', 'name', 'pharmacy_id', 'status', 'created_by', 'updated_by', 'created_at', 'updated_at']
+                : ['id', 'name', 'pharmacy_id', 'status', 'created_at', 'updated_at'];
+
+            $items = Items::with($relations)->select($select);
 
             if ($pharmacyId) {
                 $items = $items->where(function ($q) use ($pharmacyId) {
@@ -36,6 +72,12 @@ class ItemsController extends Controller
                 ->addIndexColumn()
                 ->addColumn('pharmacy_name', function ($item) {
                     return $item->pharmacy?->name ?? 'Semua Cabang';
+                })
+                ->addColumn('updated_by_name', function ($item) use ($hasAudit) {
+                    return $hasAudit ? ($item->updated_by_name ?? '-') : '-';
+                })
+                ->addColumn('updated_at_formatted', function ($item) {
+                    return $item->updated_at ? $item->updated_at->format('d M Y, H:i') : '-';
                 })
                 ->addColumn('action', function ($item) {
 
@@ -93,15 +135,30 @@ class ItemsController extends Controller
         $validated = $request->validate([
             'name'        => 'required|string|max:255',
             'pharmacy_id' => 'nullable|integer',
+            'pin'         => 'nullable|string',
         ]);
+
+        $pinInvalid = false;
+        $actorId = $this->resolveActorId($request, $pinInvalid);
+        if ($pinInvalid) {
+            return $request->ajax()
+                ? response()->json(['success' => false, 'message' => 'PIN pribadi salah.'], 422)
+                : back()->withErrors(['pin' => 'PIN pribadi salah.']);
+        }
 
         $pharmacyId = !empty($validated['pharmacy_id']) ? $validated['pharmacy_id'] : (getActivePharmacyId() ?: null);
 
-        $item = Items::create([
-            'name'        => $validated['name'],
+        $createData = [
+            'name'        => trim($validated['name']),
             'pharmacy_id' => $pharmacyId,
             'status'      => $request->status ?? 0,
-        ]);
+        ];
+        if ($this->hasAuditColumns()) {
+            $createData['created_by'] = $actorId;
+            $createData['updated_by'] = $actorId;
+        }
+
+        $item = Items::create($createData);
 
         if ($request->ajax()) {
             return response()->json([
@@ -126,15 +183,27 @@ class ItemsController extends Controller
         $validated = $request->validate([
             'name'        => 'required|string|max:255',
             'pharmacy_id' => 'nullable|integer',
+            'pin'         => 'nullable|string',
         ]);
 
+        $pinInvalid = false;
+        $actorId = $this->resolveActorId($request, $pinInvalid);
+        if ($pinInvalid) {
+            return $request->ajax()
+                ? response()->json(['success' => false, 'message' => 'PIN pribadi salah.'], 422)
+                : back()->withErrors(['pin' => 'PIN pribadi salah.']);
+        }
+
         $updateData = [
-            'name'   => $validated['name'],
+            'name'   => trim($validated['name']),
             'status' => $request->status ?? 0,
         ];
 
         if ($request->has('pharmacy_id')) {
             $updateData['pharmacy_id'] = $request->pharmacy_id ?: null;
+        }
+        if ($this->hasAuditColumns()) {
+            $updateData['updated_by'] = $actorId;
         }
 
         $item->update($updateData);
@@ -176,10 +245,21 @@ class ItemsController extends Controller
         return response()->json($result);
     }
 
-    public function destroy($id)
+    public function destroy(Request $request, $id)
     {
         $item = Items::findOrFail($id);
-        $item->delete();
+        $actorId = $this->resolveActorId($request);
+
+        DB::transaction(function () use ($item, $actorId) {
+            $itemUpdate = ['etalases_id' => null];
+            if (Schema::hasColumn('medicine_transfer_items', 'etalase_updated_by')
+                && Schema::hasColumn('medicine_transfer_items', 'etalase_updated_at')) {
+                $itemUpdate['etalase_updated_by'] = $actorId;
+                $itemUpdate['etalase_updated_at'] = now();
+            }
+            MedicineTransferItems::where('etalases_id', $item->id)->update($itemUpdate);
+            $item->delete();
+        });
 
         return response()->json([
             'status'  => true,

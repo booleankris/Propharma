@@ -47,6 +47,8 @@
                                     <th class="px-4 py-3">#</th>
                                     <th class="px-4 py-3">Cabang</th>
                                     <th class="px-4 py-3">Name</th>
+                                    <th class="px-4 py-3">Diubah Oleh</th>
+                                    <th class="px-4 py-3">Terakhir Diubah</th>
                                 </tr>
                             </thead>
                             <tbody class="divide-y divide-gray-100"></tbody>
@@ -60,18 +62,12 @@
                         <input type="hidden" id="items_id" name="id">
 
                         <div>
-                            <label class="block text-[14px] font-semibold text-gray-800 mb-1">Code</label>
-                            <input id="code" name="code" readonly
-                                class="w-full rounded-lg border border-gray-300 bg-gray-100 px-4 py-2.5 text-[13px] focus:outline-none focus:ring-2 focus:ring-blue-200">
-                        </div>
-
-                        <div>
                             <label class="block text-[14px] font-semibold text-gray-800 mb-1">Cabang</label>
                             <select id="pharmacy_id" name="pharmacy_id"
                                 class="w-full rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-[13px] focus:outline-none focus:ring-2 focus:ring-blue-200">
                                 <option value="">-- Pilih Cabang --</option>
                                 @foreach($pharmacies as $p)
-                                    <option value="{{ $p->id }}">{{ $p->name }}</option>
+                                    <option value="{{ $p->id }}" {{ getActivePharmacyId() == $p->id ? 'selected' : '' }}>{{ $p->name }}</option>
                                 @endforeach
                             </select>
                         </div>
@@ -162,6 +158,15 @@
                         data: 'name',
                         name: 'name'
                     },
+                    {
+                        data: 'updated_by_name',
+                        orderable: false,
+                        searchable: false
+                    },
+                    {
+                        data: 'updated_at_formatted',
+                        name: 'updated_at'
+                    },
                 ],
             });
 
@@ -178,7 +183,6 @@
                 $(this).addClass('bg-blue-100');
 
                 $('#items_id').val(selectedData.id);
-                $('#code').val(selectedData.code);
                 $('#name').val(selectedData.name);
                 $('#pharmacy_id').val(selectedData.pharmacy_id || '');
             });
@@ -190,7 +194,7 @@
             $('#cancelEdit').click(function() {
                 form.reset();
                 $('#items_id').val('');
-                $('#pharmacy_id').val('');
+                $('#pharmacy_id').val('{{ getActivePharmacyId() ?: '' }}');
                 $('#table-data tbody tr').removeClass('bg-blue-100');
             });
 
