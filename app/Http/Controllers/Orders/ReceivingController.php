@@ -298,7 +298,7 @@ class ReceivingController extends Controller
 
     public function buyPriceHistory(Request $request)
     {
-        $canUpdateMaster = auth()->user() && auth()->user()->hasAnyRole(['General Manager', 'operator', 'Operator', 'administrator', 'HO']);
+        $canUpdateMaster = auth()->user() && hasFeatureAccess('receiving.update_master_price', ['General Manager', 'operator', 'Operator', 'administrator', 'HO']);
 
         $pharmacies = \App\Models\Pharmacies::all(['id', 'name']);
 
@@ -1009,7 +1009,7 @@ class ReceivingController extends Controller
 
     public function getBuyPriceHistory(Request $request)
     {
-        $canUpdateMaster = auth()->user() && auth()->user()->hasAnyRole(['General Manager', 'operator', 'Operator', 'administrator', 'HO']);
+        $canUpdateMaster = auth()->user() && hasFeatureAccess('receiving.update_master_price', ['General Manager', 'operator', 'Operator', 'administrator', 'HO']);
 
         $query = $this->buildBuyPriceHistoryQuery($request);
 
@@ -1254,10 +1254,10 @@ class ReceivingController extends Controller
     public function updateMasterPrice(Request $request)
     {
         $user = auth()->user();
-        if (!$user || !$user->hasAnyRole(['General Manager', 'operator', 'Operator', 'administrator', 'HO'])) {
+        if (!$user || !hasFeatureAccess('receiving.update_master_price', ['General Manager', 'operator', 'Operator', 'administrator', 'HO'], $user)) {
             return response()->json([
                 'success' => false,
-                'message' => 'Akses ditolak: Hanya role General Manager atau Operator yang dapat memperbarui master harga.',
+                'message' => 'Akses ditolak: Anda tidak memiliki izin untuk memperbarui master harga.',
             ], 403);
         }
 

@@ -171,7 +171,7 @@
         @endif
 
         {{-- HO Banner --}}
-        @role('HO')
+        @if (hasFeatureAccess('ho.analytics', 'HO|administrator'))
             <div
                 class="p-5 rounded-2xl bg-gradient-to-r from-indigo-950 via-slate-900 to-blue-950 text-white shadow-md border border-indigo-900/60 flex flex-col sm:flex-row items-center justify-between gap-4 relative overflow-hidden">
                 <div
@@ -218,7 +218,7 @@
                     </svg>
                 </a>
             </div>
-        @endrole
+        @endif
 
         {{-- ======================================================== --}}
         {{-- 2. METRIC CARDS (DIPINDAHKAN KE ATAS)                   --}}
@@ -823,8 +823,8 @@
                                 Pembelian</span>
                         </a>
 
-                        {{-- Pareto (Khusus Finance, General Manager, & Koordinator) --}}
-                        @hasanyrole('Finance|General Manager|administrator|HO|Koordinator')
+                        {{-- Pareto (Khusus Finance, General Manager, & Koordinator / Permission reports.pareto) --}}
+                        @if (hasFeatureAccess('reports.pareto', 'Finance|General Manager|administrator|HO|Koordinator|koordinator'))
                         <a href="{{ route('pareto.index') }}"
                             class="menu-tile group flex flex-col items-center gap-2 rounded-2xl border border-slate-200/70 bg-slate-50/60 p-4 text-center hover:bg-white hover:border-pink-200 hover:shadow-md hover:shadow-pink-500/5 cursor-pointer">
                             <div
@@ -839,7 +839,7 @@
                             </div>
                             <span class="text-xs font-bold text-slate-700 group-hover:text-pink-600">Analisis Pareto</span>
                         </a>
-                        @endhasanyrole
+                        @endif
                     @endif
                 </div>
             </div>
@@ -866,8 +866,8 @@
 
                     <div
                         class="grid grid-cols-2 sm:grid-cols-3 {{ auth()->user()->hasRole('HO') ? 'lg:grid-cols-3' : 'lg:grid-cols-4' }} gap-3">
-                        {{-- Master Data (Khusus HO) --}}
-                        @role('HO')
+                        {{-- Master Data --}}
+                        @if (hasFeatureAccess('master.data', 'HO|operator|Operator|administrator|Koordinator|koordinator|General Manager'))
                             <a onclick="openModal('masterModal')"
                                 class="menu-tile group flex flex-col items-center gap-2 rounded-2xl border border-slate-200/70 bg-slate-50/60 p-4 text-center hover:bg-white hover:border-teal-200 hover:shadow-md hover:shadow-teal-500/5 cursor-pointer">
                                 <div
@@ -883,7 +883,7 @@
                                 </div>
                                 <span class="text-xs font-bold text-slate-700 group-hover:text-teal-600">Master Data</span>
                             </a>
-                        @endrole
+                        @endif
 
                         {{-- Persediaan --}}
                         <a onclick="openModal('logModal')"
@@ -920,6 +920,24 @@
                             </div>
                             <span class="text-xs font-bold text-slate-700 group-hover:text-cyan-600">Mutasi Stok</span>
                         </a>
+
+                        {{-- Manager Access --}}
+                        @if (hasFeatureAccess(['manager.access', 'users.manage', 'roles.manage', 'pharmacies.manage'], 'General Manager|manager|Manager|administrator'))
+                            <a onclick="openModal('managerAccessModal')"
+                                class="menu-tile group flex flex-col items-center gap-2 rounded-2xl border border-indigo-200/70 bg-indigo-50/50 p-4 text-center hover:bg-white hover:border-indigo-300 hover:shadow-md hover:shadow-indigo-500/10 cursor-pointer">
+                                <div
+                                    class="flex h-11 w-11 items-center justify-center rounded-xl bg-indigo-100/90 text-indigo-600 transition-transform duration-200 group-hover:scale-110">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" viewBox="0 0 24 24"
+                                        fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"
+                                        stroke-linejoin="round">
+                                        <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+                                        <path d="M12 3a12 12 0 0 0 8.5 3a12 12 0 0 1 -8.5 15a12 12 0 0 1 -8.5 -15a12 12 0 0 0 8.5 -3" />
+                                        <path d="M9 12l2 2l4 -4" />
+                                    </svg>
+                                </div>
+                                <span class="text-xs font-bold text-indigo-700 group-hover:text-indigo-800">Manager Access</span>
+                            </a>
+                        @endif
 
                         {{-- Klaim Tagihan (Dihilangkan sementara) --}}
                         {{--

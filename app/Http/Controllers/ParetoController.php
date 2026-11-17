@@ -22,8 +22,8 @@ class ParetoController extends Controller
         $this->middleware('auth');
         $this->middleware(function ($request, $next) {
             $user = auth()->user();
-            if (!$user || (!$user->hasRole('Finance') && !$user->hasRole('General Manager') && !$user->hasRole('administrator') && !$user->hasRole('Koordinator') && !$user->hasRole('HO'))) {
-                abort(403, 'Akses ditolak: Menu ini hanya dapat diakses oleh role Finance, General Manager, dan Koordinator.');
+            if (!$user || !hasFeatureAccess('reports.pareto', ['Finance', 'General Manager', 'administrator', 'Koordinator', 'koordinator', 'HO'], $user)) {
+                abort(403, 'Akses ditolak: Menu Analisis Pareto hanya dapat diakses oleh role yang memiliki izin Pareto.');
             }
             return $next($request);
         });

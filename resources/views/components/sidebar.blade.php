@@ -10,73 +10,67 @@
 
             <li class="menu-header">Dashboard</li>
             <li class="{{ request()->routeIs('home') == true ? 'active' : null }}">
-                <a class="nav-link"
-                    href="{{ url('/home') }}"><i class="fas fa-home"></i> <span>Dashboard</span></a>
+                <a class="nav-link" href="{{ url('/home') }}"><i class="fas fa-home"></i> <span>Dashboard</span></a>
             </li>
 
             @role('administrator')
-            <li class="menu-header">Data</li>
-           
-            <li class="{{ request()->routeIs('adminitems*') == true ? 'active' : null }}">
-                <a class="nav-link" href="{{ route('adminitems.index') }}">
-                    <i class="fas fa-box"></i>
-                    <span>Produk</span>
-                </a>
-            </li>
-            
-    
-            <li class="{{ request()->routeIs('report*') == true ? 'active' : null }}">
-                <a class="nav-link" href="{{ route('report.index') }}">
-                    <i class="fas fa-money-check"></i>
-                    <span>Laporan Transaksi</span>
-                </a>
-            </li>
-            
+                <li class="menu-header">Data</li>
+
+                <li class="{{ request()->routeIs('adminitems*') == true ? 'active' : null }}">
+                    <a class="nav-link" href="{{ route('adminitems.index') }}">
+                        <i class="fas fa-box"></i>
+                        <span>Produk</span>
+                    </a>
+                </li>
 
 
+                <li class="{{ request()->routeIs('report*') == true ? 'active' : null }}">
+                    <a class="nav-link" href="{{ route('report.index') }}">
+                        <i class="fas fa-money-check"></i>
+                        <span>Laporan Transaksi</span>
+                    </a>
+                </li>
             @endrole
 
-            @if (Auth::user()->hasRole('administrator'))
-            <li 
-                class="nav-item dropdown 
+            @if (Auth::user()->hasAnyRole(['administrator', 'General Manager', 'manager', 'Manager']))
+                <li
+                    class="nav-item dropdown 
                 {{ request()->routeIs('users*') == true ? 'active' : null }}
                 {{ request()->routeIs('roles*') == true ? 'active' : null }}
-                ">                
-                <a href="#"
-                    class="nav-link has-dropdown"
-                    data-toggle="dropdown">
-                    <i class="fas fa-columns"></i> 
-                    <span>Manajeman Data</span>
-                </a>
-                <ul class="dropdown-menu">
+                {{ request()->routeIs('pharmacies*') == true ? 'active' : null }}
+                ">
+                    <a href="#" class="nav-link has-dropdown" data-toggle="dropdown">
+                        <i class="fas fa-columns"></i>
+                        <span>Manajeman Data</span>
+                    </a>
+                    <ul class="dropdown-menu">
 
-                    @role('administrator')
-                    <li class="">
-                        <a class="nav-link"
-                            href="{{ route('pharmacies.index') }}">Manage Apotek</a>
-                    </li>
-                    @endrole
+                        @hasanyrole('administrator|General Manager|manager|Manager')
+                            <li class="">
+                                <a class="nav-link" href="{{ route('pharmacies.index') }}">Manage Apotek</a>
+                            </li>
+                        @endhasanyrole
 
 
-                    <li class="">
-                        <a class="nav-link"
-                            href="{{ route('users.index') }}">Manage Pengguna Apotek</a>
-                    </li>
+                        <li class="">
+                            <a class="nav-link" href="{{ route('users.index') }}">Manage Pengguna Apotek</a>
+                        </li>
 
-                   
-                    <li class="">
-                        <a class="nav-link"
-                            href="{{ route('roles.index') }}">Level User</a>
-                    </li>
 
-                </ul>
-            </li>
+                        <li class="">
+                            <a class="nav-link" href="{{ route('roles.index') }}">Level User</a>
+                        </li>
+
+                    </ul>
+                </li>
             @endif
 
         </ul>
-        
+
         <div class="hide-sidebar-mini mt-4 mb-4 p-3">
-            <a href="{{ route('logout') }}" onclick="event.preventDefault(); document.getElementById('logout-form').submit();" class="btn btn-danger btn-lg btn-block btn-icon-split">
+            <a href="{{ route('logout') }}"
+                onclick="event.preventDefault(); document.getElementById('logout-form').submit();"
+                class="btn btn-danger btn-lg btn-block btn-icon-split">
                 <i class="fas fa-sign-out-alt"></i> Logout
             </a>
         </div>

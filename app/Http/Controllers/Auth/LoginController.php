@@ -22,11 +22,11 @@ class LoginController extends Controller
             return redirect()->route('home');
         }
 
-        if ($user->hasRole('General Manager')) {
+        if ($user->hasAnyRole(['General Manager', 'Manager', 'manager', 'Koordinator', 'koordinator'])) {
             return redirect()->route('home');
         }
 
-        if ($user->hasRole('administrator') || $user->hasRole('Manager')) {
+        if ($user->hasRole('administrator')) {
             return redirect()->route('dashboard');
         }
         if (

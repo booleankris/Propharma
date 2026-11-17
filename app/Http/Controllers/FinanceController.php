@@ -54,8 +54,8 @@ class FinanceController extends Controller
         $this->middleware('auth');
         $this->middleware(function ($request, $next) {
             $user = auth()->user();
-            if (!$user || (!$user->hasRole('Finance') && !$user->hasRole('General Manager') && !$user->hasRole('administrator') && !$user->hasRole('HO'))) {
-                abort(403, 'Akses ditolak: Modul SAHABAT Finances hanya dapat diakses oleh role Finance, General Manager, dan Administrator.');
+            if (!$user || !hasFeatureAccess('finance.manage', ['Finance', 'General Manager', 'administrator', 'HO'], $user)) {
+                abort(403, 'Akses ditolak: Modul SAHABAT Finances hanya dapat diakses oleh role yang memiliki izin Finance.');
             }
             return $next($request);
         });
@@ -969,9 +969,11 @@ class FinanceController extends Controller
                 ->whereRaw("UPPER(COALESCE(transaction_type, '')) NOT LIKE 'RETUR%'")
                 ->whereBetween(DB::raw('DATE(created_at)'), [$validated['from_date'], $validated['to_date']])
                 ->where(function ($q) {
-                    $q->whereRaw('UPPER(TRIM(COALESCE(payment_method, ""))) IN (?, ?, ?, ?)', ['QRIS', 'DEBIT', 'TRANSFER', 'EDC'])
+                    $q
+                        ->whereRaw('UPPER(TRIM(COALESCE(payment_method, ""))) IN (?, ?, ?, ?)', ['QRIS', 'DEBIT', 'TRANSFER', 'EDC'])
                         ->orWhere(function ($ship) {
-                            $ship->where('has_doctor_shipping_fee', 1)
+                            $ship
+                                ->where('has_doctor_shipping_fee', 1)
                                 ->where('doctor_shipping_fee', '>', 0)
                                 ->whereRaw('UPPER(TRIM(COALESCE(doctor_shipping_payment_method, ""))) IN (?, ?, ?, ?)', ['QRIS', 'DEBIT', 'TRANSFER', 'EDC']);
                         });
@@ -990,7 +992,8 @@ class FinanceController extends Controller
                                 $alreadyRecorded = FinancePayment::where('medicine_transaction_id', $transaction->id)
                                     ->where('payment_type', 'PENJUALAN NON TUNAI')
                                     ->where(function ($q) {
-                                        $q->whereNull('notes')
+                                        $q
+                                            ->whereNull('notes')
                                             ->orWhere('notes', 'not like', 'Penerimaan talangan ongkir%');
                                     })
                                     ->exists();
@@ -1366,7 +1369,8 @@ class FinanceController extends Controller
             ->where('pr.status', '!=', 'dibatalkan')
             ->whereIn('pr.pharmacy_id', $pharmacyIds)
             ->where(function ($dateQ) use ($asOfDate) {
-                $dateQ->whereDate('pr.created_at', '<=', $asOfDate)
+                $dateQ
+                    ->whereDate('pr.created_at', '<=', $asOfDate)
                     ->orWhereDate('pri.status_date', '<=', $asOfDate)
                     ->orWhereDate('pri.deduction_date', '<=', $asOfDate);
             })
@@ -1552,13 +1556,15 @@ class FinanceController extends Controller
         if ($request->filled('search')) {
             $search = trim($request->query('search'));
             $baseQuery->where(function ($q) use ($search) {
-                $q->where('borrower_name', 'like', "%{$search}%")
-                  ->orWhere('purpose', 'like', "%{$search}%")
-                  ->orWhere('settlement_notes', 'like', "%{$search}%")
-                  ->orWhereHas('account', function ($sub) use ($search) {
-                      $sub->where('name', 'like', "%{$search}%")
-                          ->orWhere('code', 'like', "%{$search}%");
-                  });
+                $q
+                    ->where('borrower_name', 'like', "%{$search}%")
+                    ->orWhere('purpose', 'like', "%{$search}%")
+                    ->orWhere('settlement_notes', 'like', "%{$search}%")
+                    ->orWhereHas('account', function ($sub) use ($search) {
+                        $sub
+                            ->where('name', 'like', "%{$search}%")
+                            ->orWhere('code', 'like', "%{$search}%");
+                    });
             });
         }
 
@@ -1580,7 +1586,8 @@ class FinanceController extends Controller
             $baseQuery->whereDate('transaction_date', '<=', $request->query('end_date'));
         }
 
-        $cashbondList = $baseQuery->orderByDesc('transaction_date')
+        $cashbondList = $baseQuery
+            ->orderByDesc('transaction_date')
             ->orderByDesc('id')
             ->get()
             ->map(function ($item) {
@@ -1620,7 +1627,8 @@ class FinanceController extends Controller
         $countAll = (int) (clone $summaryQuery)->count();
 
         // Akun Kas & Bank yang bisa dipilih sebagai sumber dana
-        $kasBankAccounts = $this->branchKasBankAccountsQuery()
+        $kasBankAccounts = $this
+            ->branchKasBankAccountsQuery()
             ->where('is_active', true)
             ->orderBy('code')
             ->get(['id', 'code', 'name', 'balance', 'account_number']);
@@ -2040,7 +2048,8 @@ class FinanceController extends Controller
             ->whereRaw('UPPER(TRIM(COALESCE(invoice_payment, ""))) = ?', ['KREDIT'])
             ->whereHas('receiving', fn($query) => $query->whereIn('pharmacy_id', $pharmacyIds)->whereIn('status', [1, 2, 3]))
             ->where(function ($dateQ) use ($startDate, $endDate) {
-                $dateQ->whereBetween('receiving_details.created_at', [FinanceShift::start($startDate), FinanceShift::endExclusive($endDate)])
+                $dateQ
+                    ->whereBetween('receiving_details.created_at', [FinanceShift::start($startDate), FinanceShift::endExclusive($endDate)])
                     ->orWhereHas('receiving_items', fn($query) => $query
                         ->whereRaw('created_at >= ? AND created_at < ?', [FinanceShift::start($startDate), FinanceShift::endExclusive($endDate)]));
             })
@@ -2451,7 +2460,7 @@ class FinanceController extends Controller
                     'referensi' => $detail->receiving_details_code ?: $rec->code,
                     'tanggal' => $invoiceDate ? \Carbon\Carbon::parse($invoiceDate)->format('d/m/Y') : ($rec->date ?: '-'),
                     'raw_tanggal' => $invoiceDate,
-                    'raw_tanggal_terima' => $this->normalizeFinanceDate($rec->date),
+                    'raw_tanggal_terima' => $this->normalizeFinanceDate($detail->created_at ?: $rec->date),
                     'jatuhTempo' => $dueCarbon ? $dueCarbon->format('d/m/Y') : '-',
                     'raw_jatuh_tempo' => $dueCarbon ? $dueCarbon->format('Y-m-d') : null,
                     'is_overdue' => $isOverdue,
@@ -2842,43 +2851,54 @@ class FinanceController extends Controller
                 $q->where('pharmacy_id', getActivePharmacyId());
             })
             ->where(function ($query) use ($targetPharmacyIds) {
-                $query->whereHas('receiving', function ($q) use ($targetPharmacyIds) {
-                    $q->whereIn('pharmacy_id', $targetPharmacyIds);
-                })->orWhereHas('transaction', function ($q) use ($targetPharmacyIds) {
-                    $q->whereIn('pharmacy_id', $targetPharmacyIds);
-                })->orWhere(function ($q) use ($targetPharmacyIds) {
-                    $q
-                        ->where('payment_type', 'BIAYA')
-                        ->where(function ($sub) use ($targetPharmacyIds) {
-                            $sub
-                                ->whereIn('pharmacy_id', $targetPharmacyIds)
-                                ->orWhereNull('pharmacy_id');
-                        });
-                })->orWhere(function ($q) use ($targetPharmacyIds) {
-                    $q->where('payment_type', 'PENDAPATAN')->whereIn('pharmacy_id', $targetPharmacyIds);
-                })->orWhere(function ($q) use ($targetPharmacyIds) {
-                    $q->where('payment_type', 'SETOR')->whereIn('pharmacy_id', $targetPharmacyIds);
-                })->orWhere(function ($q) use ($targetPharmacyIds) {
-                    $q->where('payment_type', 'TARIK TUNAI')->whereIn('pharmacy_id', $targetPharmacyIds);
-                })->orWhere(function ($q) use ($targetPharmacyIds) {
-                    $q->whereIn('payment_type', ['PENJUALAN TUNAI', 'PENJUALAN NON TUNAI', 'RETUR PENJUALAN'])
-                        ->whereIn('pharmacy_id', $targetPharmacyIds);
-                })->orWhere('payment_type', 'SALDO AWAL')
-                  ->orWhere('payment_type', 'PENYESUAIAN SALDO');
+                $query
+                    ->whereHas('receiving', function ($q) use ($targetPharmacyIds) {
+                        $q->whereIn('pharmacy_id', $targetPharmacyIds);
+                    })
+                    ->orWhereHas('transaction', function ($q) use ($targetPharmacyIds) {
+                        $q->whereIn('pharmacy_id', $targetPharmacyIds);
+                    })
+                    ->orWhere(function ($q) use ($targetPharmacyIds) {
+                        $q
+                            ->where('payment_type', 'BIAYA')
+                            ->where(function ($sub) use ($targetPharmacyIds) {
+                                $sub
+                                    ->whereIn('pharmacy_id', $targetPharmacyIds)
+                                    ->orWhereNull('pharmacy_id');
+                            });
+                    })
+                    ->orWhere(function ($q) use ($targetPharmacyIds) {
+                        $q->where('payment_type', 'PENDAPATAN')->whereIn('pharmacy_id', $targetPharmacyIds);
+                    })
+                    ->orWhere(function ($q) use ($targetPharmacyIds) {
+                        $q->where('payment_type', 'SETOR')->whereIn('pharmacy_id', $targetPharmacyIds);
+                    })
+                    ->orWhere(function ($q) use ($targetPharmacyIds) {
+                        $q->where('payment_type', 'TARIK TUNAI')->whereIn('pharmacy_id', $targetPharmacyIds);
+                    })
+                    ->orWhere(function ($q) use ($targetPharmacyIds) {
+                        $q
+                            ->whereIn('payment_type', ['PENJUALAN TUNAI', 'PENJUALAN NON TUNAI', 'RETUR PENJUALAN'])
+                            ->whereIn('pharmacy_id', $targetPharmacyIds);
+                    })
+                    ->orWhere('payment_type', 'SALDO AWAL')
+                    ->orWhere('payment_type', 'PENYESUAIAN SALDO');
             });
 
         if ($startDate && $endDate) {
             $query->whereBetween('payment_date', [$startDate, $endDate]);
         }
 
-        $query->orderByDesc('payment_date')
+        $query
+            ->orderByDesc('payment_date')
             ->orderByDesc('id');
 
         if ($limit) {
             $query->take($limit);
         }
 
-        return $query->get()
+        return $query
+            ->get()
             ->flatMap(function ($p) {
                 $isSetor = $p->payment_type === 'SETOR';
                 $isTarikTunai = $p->payment_type === 'TARIK TUNAI';
@@ -2940,12 +2960,15 @@ class FinanceController extends Controller
         if ($p->payment_type === 'PENJUALAN TUNAI') {
             $pihakTerkait = $p->transaction->debtors->name ?? ($p->transaction->patients->name ?? 'Pelanggan Umum');
             $doc = $p->transaction->transaction_code ?? $p->reference_number;
-            if ($doc) $noDokumen = $doc;
-            if (!$deskripsi) $deskripsi = 'Penerimaan penjualan tunai kasir';
+            if ($doc)
+                $noDokumen = $doc;
+            if (!$deskripsi)
+                $deskripsi = 'Penerimaan penjualan tunai kasir';
         } elseif ($p->payment_type === 'PENJUALAN NON TUNAI') {
             $pihakTerkait = $p->transaction->debtors->name ?? ($p->transaction->patients->name ?? 'Pelanggan Umum');
             $doc = $p->transaction->transaction_code ?? $p->reference_number;
-            if ($doc) $noDokumen = $doc;
+            if ($doc)
+                $noDokumen = $doc;
             if (!$deskripsi) {
                 $method = $p->transaction->payment_method ?? 'NON-TUNAI';
                 $bank = $p->transaction->transfer_bank_name ?? ($p->account->name ?? 'Bank');
@@ -2954,37 +2977,51 @@ class FinanceController extends Controller
         } elseif ($p->payment_type === 'PIUTANG') {
             $pihakTerkait = $p->transaction->debtors->name ?? ($p->transaction->patients->name ?? 'Pelanggan Umum');
             $doc = $p->transaction->invoice_number ?? $p->reference_number;
-            if ($doc) $noDokumen = $doc;
-            if (!$deskripsi) $deskripsi = "Penerimaan piutang penjualan dari {$pihakTerkait}";
+            if ($doc)
+                $noDokumen = $doc;
+            if (!$deskripsi)
+                $deskripsi = "Penerimaan piutang penjualan dari {$pihakTerkait}";
         } elseif ($p->payment_type === 'KREDIT') {
             $pihakTerkait = $p->receivingDetail->creditor->name ?? ($p->receivingDetail->creditor_code ?? 'PBF / Vendor');
             $doc = $p->receivingDetail->invoice_number ?? $p->reference_number;
-            if ($doc) $noDokumen = $doc;
-            if (!$deskripsi) $deskripsi = "Pelunasan hutang pembelian ke {$pihakTerkait}";
+            if ($doc)
+                $noDokumen = $doc;
+            if (!$deskripsi)
+                $deskripsi = "Pelunasan hutang pembelian ke {$pihakTerkait}";
         } elseif ($p->payment_type === 'CASH') {
             $pihakTerkait = $p->receivingDetail->creditor->name ?? ($p->receivingDetail->creditor_code ?? 'PBF / Vendor');
             $doc = $p->receivingDetail->invoice_number ?? $p->reference_number;
-            if ($doc) $noDokumen = $doc;
-            if (!$deskripsi) $deskripsi = "Pembelian tunai (cash) ke {$pihakTerkait}";
+            if ($doc)
+                $noDokumen = $doc;
+            if (!$deskripsi)
+                $deskripsi = "Pembelian tunai (cash) ke {$pihakTerkait}";
         } elseif ($p->payment_type === 'KONSINYASI') {
             $pihakTerkait = $p->receivingDetail->creditor->name ?? ($p->receivingDetail->creditor_code ?? 'PBF / Vendor');
             $doc = $p->receivingDetail->invoice_number ?? $p->reference_number;
-            if ($doc) $noDokumen = $doc;
-            if (!$deskripsi) $deskripsi = "Pembayaran barang konsinyasi terjual ke {$pihakTerkait}";
+            if ($doc)
+                $noDokumen = $doc;
+            if (!$deskripsi)
+                $deskripsi = "Pembayaran barang konsinyasi terjual ke {$pihakTerkait}";
         } elseif ($p->payment_type === 'BIAYA') {
             $pihakTerkait = $p->recipient ?: ($p->expenseAccount->name ?? 'Biaya Operasional');
             $doc = $p->reference_number ?: ('BY-' . str_pad($p->id, 5, '0', STR_PAD_LEFT));
-            if ($doc) $noDokumen = $doc;
-            if (!$deskripsi) $deskripsi = 'Pengeluaran biaya: ' . ($p->expenseAccount->name ?? 'Operasional');
+            if ($doc)
+                $noDokumen = $doc;
+            if (!$deskripsi)
+                $deskripsi = 'Pengeluaran biaya: ' . ($p->expenseAccount->name ?? 'Operasional');
         } elseif ($p->payment_type === 'PENDAPATAN') {
             $pihakTerkait = $p->recipient ?: ($p->incomeAccount->name ?? 'Pendapatan Lain-lain');
-            if (!$p->reference_number) $noDokumen = 'PL-' . str_pad($p->id, 5, '0', STR_PAD_LEFT);
-            if (!$deskripsi) $deskripsi = 'Pendapatan lain-lain: ' . ($p->incomeAccount->name ?? 'Pendapatan');
+            if (!$p->reference_number)
+                $noDokumen = 'PL-' . str_pad($p->id, 5, '0', STR_PAD_LEFT);
+            if (!$deskripsi)
+                $deskripsi = 'Pendapatan lain-lain: ' . ($p->incomeAccount->name ?? 'Pendapatan');
         } elseif ($p->payment_type === 'RETUR PENJUALAN') {
             $pihakTerkait = $p->transaction->patients->name ?? ($p->transaction->debtors->name ?? 'Pelanggan Umum');
             $doc = $p->reference_number ?: ('RT-' . $p->id);
-            if ($doc) $noDokumen = $doc;
-            if (!$deskripsi) $deskripsi = 'Pengembalian dana retur penjualan tunai kasir';
+            if ($doc)
+                $noDokumen = $doc;
+            if (!$deskripsi)
+                $deskripsi = 'Pengembalian dana retur penjualan tunai kasir';
         } elseif ($isSaldoAwal) {
             $pihakTerkait = $p->account->name ?? 'Kas / Bank';
             $noDokumen = 'SA-' . str_pad($p->id, 5, '0', STR_PAD_LEFT);
@@ -3234,29 +3271,38 @@ class FinanceController extends Controller
                 $q->where('pharmacy_id', getActivePharmacyId());
             })
             ->where(function ($q) use ($targetPharmacyIds) {
-                $q->whereHas('receiving', function ($sub) use ($targetPharmacyIds) {
-                    $sub->whereIn('pharmacy_id', $targetPharmacyIds);
-                })->orWhereHas('transaction', function ($sub) use ($targetPharmacyIds) {
-                    $sub->whereIn('pharmacy_id', $targetPharmacyIds);
-                })->orWhere(function ($sub) use ($targetPharmacyIds) {
-                    $sub
-                        ->where('payment_type', 'BIAYA')
-                        ->where(function ($sub2) use ($targetPharmacyIds) {
-                            $sub2
-                                ->whereIn('pharmacy_id', $targetPharmacyIds)
-                                ->orWhereNull('pharmacy_id');
-                        });
-                })->orWhere(function ($sub) use ($targetPharmacyIds) {
-                    $sub->where('payment_type', 'PENDAPATAN')->whereIn('pharmacy_id', $targetPharmacyIds);
-                })->orWhere(function ($sub) use ($targetPharmacyIds) {
-                    $sub->where('payment_type', 'SETOR')->whereIn('pharmacy_id', $targetPharmacyIds);
-                })->orWhere(function ($sub) use ($targetPharmacyIds) {
-                    $sub->where('payment_type', 'TARIK TUNAI')->whereIn('pharmacy_id', $targetPharmacyIds);
-                })->orWhere(function ($sub) use ($targetPharmacyIds) {
-                    $sub->whereIn('payment_type', ['PENJUALAN TUNAI', 'PENJUALAN NON TUNAI', 'RETUR PENJUALAN'])
-                        ->whereIn('pharmacy_id', $targetPharmacyIds);
-                })->orWhere('payment_type', 'SALDO AWAL')
-                  ->orWhere('payment_type', 'PENYESUAIAN SALDO');
+                $q
+                    ->whereHas('receiving', function ($sub) use ($targetPharmacyIds) {
+                        $sub->whereIn('pharmacy_id', $targetPharmacyIds);
+                    })
+                    ->orWhereHas('transaction', function ($sub) use ($targetPharmacyIds) {
+                        $sub->whereIn('pharmacy_id', $targetPharmacyIds);
+                    })
+                    ->orWhere(function ($sub) use ($targetPharmacyIds) {
+                        $sub
+                            ->where('payment_type', 'BIAYA')
+                            ->where(function ($sub2) use ($targetPharmacyIds) {
+                                $sub2
+                                    ->whereIn('pharmacy_id', $targetPharmacyIds)
+                                    ->orWhereNull('pharmacy_id');
+                            });
+                    })
+                    ->orWhere(function ($sub) use ($targetPharmacyIds) {
+                        $sub->where('payment_type', 'PENDAPATAN')->whereIn('pharmacy_id', $targetPharmacyIds);
+                    })
+                    ->orWhere(function ($sub) use ($targetPharmacyIds) {
+                        $sub->where('payment_type', 'SETOR')->whereIn('pharmacy_id', $targetPharmacyIds);
+                    })
+                    ->orWhere(function ($sub) use ($targetPharmacyIds) {
+                        $sub->where('payment_type', 'TARIK TUNAI')->whereIn('pharmacy_id', $targetPharmacyIds);
+                    })
+                    ->orWhere(function ($sub) use ($targetPharmacyIds) {
+                        $sub
+                            ->whereIn('payment_type', ['PENJUALAN TUNAI', 'PENJUALAN NON TUNAI', 'RETUR PENJUALAN'])
+                            ->whereIn('pharmacy_id', $targetPharmacyIds);
+                    })
+                    ->orWhere('payment_type', 'SALDO AWAL')
+                    ->orWhere('payment_type', 'PENYESUAIAN SALDO');
             });
 
         // Date range
@@ -3272,39 +3318,47 @@ class FinanceController extends Controller
         // Account filter
         if ($filterAccountId) {
             $query->where(function ($q) use ($filterAccountId) {
-                $q->where('account_id', $filterAccountId)
-                  ->orWhere(function ($sub) use ($filterAccountId) {
-                      $sub->where('transfer_account_id', $filterAccountId)
-                          ->whereIn('payment_type', ['SETOR', 'TARIK TUNAI']);
-                  });
+                $q
+                    ->where('account_id', $filterAccountId)
+                    ->orWhere(function ($sub) use ($filterAccountId) {
+                        $sub
+                            ->where('transfer_account_id', $filterAccountId)
+                            ->whereIn('payment_type', ['SETOR', 'TARIK TUNAI']);
+                    });
             });
         }
 
         // Direction filter
         if ($filterDirection === 'IN') {
             $query->where(function ($q) use ($filterAccountId) {
-                $q->whereIn('payment_type', ['PIUTANG', 'PENDAPATAN', 'PENJUALAN TUNAI', 'PENJUALAN NON TUNAI'])
-                  ->orWhere(function ($sub) {
-                      $sub->where('payment_type', 'PENYESUAIAN SALDO')
-                          ->where('reference_number', '!=', 'OPNAME-OUT');
-                  });
+                $q
+                    ->whereIn('payment_type', ['PIUTANG', 'PENDAPATAN', 'PENJUALAN TUNAI', 'PENJUALAN NON TUNAI'])
+                    ->orWhere(function ($sub) {
+                        $sub
+                            ->where('payment_type', 'PENYESUAIAN SALDO')
+                            ->where('reference_number', '!=', 'OPNAME-OUT');
+                    });
                 if ($filterAccountId) {
                     $q->orWhere(function ($sub) use ($filterAccountId) {
-                        $sub->where('transfer_account_id', $filterAccountId)
+                        $sub
+                            ->where('transfer_account_id', $filterAccountId)
                             ->whereIn('payment_type', ['SETOR', 'TARIK TUNAI']);
                     });
                 }
             });
         } elseif ($filterDirection === 'OUT') {
             $query->where(function ($q) use ($filterAccountId) {
-                $q->whereIn('payment_type', ['KREDIT', 'CASH', 'KONSINYASI', 'BIAYA', 'RETUR PENJUALAN'])
-                  ->orWhere(function ($sub) {
-                      $sub->where('payment_type', 'PENYESUAIAN SALDO')
-                          ->where('reference_number', '=', 'OPNAME-OUT');
-                  });
+                $q
+                    ->whereIn('payment_type', ['KREDIT', 'CASH', 'KONSINYASI', 'BIAYA', 'RETUR PENJUALAN'])
+                    ->orWhere(function ($sub) {
+                        $sub
+                            ->where('payment_type', 'PENYESUAIAN SALDO')
+                            ->where('reference_number', '=', 'OPNAME-OUT');
+                    });
                 if ($filterAccountId) {
                     $q->orWhere(function ($sub) use ($filterAccountId) {
-                        $sub->where('account_id', $filterAccountId)
+                        $sub
+                            ->where('account_id', $filterAccountId)
                             ->whereIn('payment_type', ['SETOR', 'TARIK TUNAI']);
                     });
                 }
@@ -3314,23 +3368,27 @@ class FinanceController extends Controller
         // Search query
         if (!empty($search)) {
             $query->where(function ($q) use ($search) {
-                $q->where('reference_number', 'like', "%{$search}%")
-                  ->orWhere('notes', 'like', "%{$search}%")
-                  ->orWhere('recipient', 'like', "%{$search}%")
-                  ->orWhereHas('transaction', function ($sub) use ($search) {
-                      $sub->where('transaction_code', 'like', "%{$search}%")
-                          ->orWhere('invoice_number', 'like', "%{$search}%")
-                          ->orWhereHas('debtors', fn($d) => $d->where('name', 'like', "%{$search}%"))
-                          ->orWhereHas('patients', fn($p) => $p->where('name', 'like', "%{$search}%"));
-                  })
-                  ->orWhereHas('receivingDetail', function ($sub) use ($search) {
-                      $sub->where('invoice_number', 'like', "%{$search}%")
-                          ->orWhereHas('creditor', fn($c) => $c->where('name', 'like', "%{$search}%"));
-                  })
-                  ->orWhereHas('account', function ($sub) use ($search) {
-                      $sub->where('name', 'like', "%{$search}%")
-                          ->orWhere('code', 'like', "%{$search}%");
-                  });
+                $q
+                    ->where('reference_number', 'like', "%{$search}%")
+                    ->orWhere('notes', 'like', "%{$search}%")
+                    ->orWhere('recipient', 'like', "%{$search}%")
+                    ->orWhereHas('transaction', function ($sub) use ($search) {
+                        $sub
+                            ->where('transaction_code', 'like', "%{$search}%")
+                            ->orWhere('invoice_number', 'like', "%{$search}%")
+                            ->orWhereHas('debtors', fn($d) => $d->where('name', 'like', "%{$search}%"))
+                            ->orWhereHas('patients', fn($p) => $p->where('name', 'like', "%{$search}%"));
+                    })
+                    ->orWhereHas('receivingDetail', function ($sub) use ($search) {
+                        $sub
+                            ->where('invoice_number', 'like', "%{$search}%")
+                            ->orWhereHas('creditor', fn($c) => $c->where('name', 'like', "%{$search}%"));
+                    })
+                    ->orWhereHas('account', function ($sub) use ($search) {
+                        $sub
+                            ->where('name', 'like', "%{$search}%")
+                            ->orWhere('code', 'like', "%{$search}%");
+                    });
             });
         }
 
@@ -3954,6 +4012,9 @@ class FinanceController extends Controller
         if (!$isFullData) {
             $cached = Cache::get($cacheKey);
             if ($cached && isset($cached['nilaiStok']) && isset($cached['countCashbondActive'])) {
+                if ($hutang !== null) {
+                    $cached = array_merge($cached, $this->summarizeHutangStats($hutang));
+                }
                 return $cached;
             }
         }
@@ -4010,28 +4071,7 @@ class FinanceController extends Controller
         $netCashflow = $kasMasuk - $kasKeluar;
 
         // Hutang Stats
-        $countHutangBelumLunas = 0;
-        $countBelumBayar = 0;
-        $countSebagian = 0;
-        $countLunas = 0;
-        $countDiajukan = 0;
-        $totalHutangSisa = 0;
-
-        foreach ($hutang as $h) {
-            $totalHutangSisa += $h['sisa'];
-            if (!empty($h['is_submitted']) && $h['status'] !== 'Lunas') {
-                $countDiajukan++;
-            }
-            if ($h['status'] === 'Lunas') {
-                $countLunas++;
-            } elseif ($h['status'] === 'Dibayar Sebagian') {
-                $countSebagian++;
-                $countHutangBelumLunas++;
-            } else {
-                $countBelumBayar++;
-                $countHutangBelumLunas++;
-            }
-        }
+        $hutangStats = $this->summarizeHutangStats($hutang);
 
         // Cash Stats
         $totalCashPurchases = array_sum(array_column($cash, 'total'));
@@ -4128,7 +4168,7 @@ class FinanceController extends Controller
         $countCashbondActive = (int) (clone $cashbondQuery)->count();
         $totalCashbondActive = (float) (clone $cashbondQuery)->sum('amount');
 
-        $stats = [
+        $stats = array_merge([
             'totalSaldoKasBank' => $totalSaldoKasBank,
             'accountsCount' => $accountsCount,
             'totalNilaiStok' => $nilaiStok['total'],
@@ -4136,13 +4176,6 @@ class FinanceController extends Controller
             'kasMasuk' => $kasMasuk,
             'kasKeluar' => $kasKeluar,
             'netCashflow' => $netCashflow,
-            'totalHutangSisa' => $totalHutangSisa,
-            'totalSisaHutang' => $totalHutangSisa,
-            'countHutangBelumLunas' => $countHutangBelumLunas,
-            'countBelumBayar' => $countBelumBayar,
-            'countSebagian' => $countSebagian,
-            'countDiajukan' => $countDiajukan,
-            'countLunas' => $countLunas,
             'totalCashPurchases' => $totalCashPurchases,
             'totalCashSpent' => $totalCashPurchases,
             'totalCashCount' => $totalCashCount,
@@ -4165,11 +4198,54 @@ class FinanceController extends Controller
             'countDiskonMonth' => $countDiskonMonth,
             'countCashbondActive' => $countCashbondActive,
             'totalCashbondActive' => $totalCashbondActive,
-        ];
+        ], $hutangStats);
 
         Cache::put($cacheKey, $stats, 60);
 
         return $stats;
+    }
+
+    /**
+     * Helper: Hitung ringkasan saldo & status faktur hutang dagang.
+     */
+    protected function summarizeHutangStats(array $hutang): array
+    {
+        $countHutangBelumLunas = 0;
+        $countBelumBayar = 0;
+        $countSebagian = 0;
+        $countLunas = 0;
+        $countDiajukan = 0;
+        $totalHutangSisa = 0.0;
+
+        foreach ($hutang as $h) {
+            $sisa = (float) ($h['sisa'] ?? 0);
+            $status = $h['status'] ?? 'Belum Dibayar';
+            $isSettled = in_array($status, ['Lunas', 'Lunas (Ada Retur)', 'Diretur Penuh'], true);
+
+            $totalHutangSisa += $sisa;
+            if (!empty($h['is_submitted']) && !$isSettled) {
+                $countDiajukan++;
+            }
+            if ($isSettled) {
+                $countLunas++;
+            } elseif ($status === 'Dibayar Sebagian') {
+                $countSebagian++;
+                $countHutangBelumLunas++;
+            } else {
+                $countBelumBayar++;
+                $countHutangBelumLunas++;
+            }
+        }
+
+        return [
+            'totalHutangSisa' => round($totalHutangSisa, 2),
+            'totalSisaHutang' => round($totalHutangSisa, 2),
+            'countHutangBelumLunas' => $countHutangBelumLunas,
+            'countBelumBayar' => $countBelumBayar,
+            'countSebagian' => $countSebagian,
+            'countDiajukan' => $countDiajukan,
+            'countLunas' => $countLunas,
+        ];
     }
 
     /**
@@ -5625,8 +5701,10 @@ class FinanceController extends Controller
         if (empty($startDate) || empty($endDate)) {
             $year = (int) $request->query('year', \Carbon\Carbon::now()->year);
             $month = (int) $request->query('month', \Carbon\Carbon::now()->month);
-            if ($month < 1 || $month > 12) $month = \Carbon\Carbon::now()->month;
-            if ($year < 2020 || $year > 2100) $year = \Carbon\Carbon::now()->year;
+            if ($month < 1 || $month > 12)
+                $month = \Carbon\Carbon::now()->month;
+            if ($year < 2020 || $year > 2100)
+                $year = \Carbon\Carbon::now()->year;
 
             $periodDate = \Carbon\Carbon::createFromDate($year, $month, 1)->startOfMonth();
             $startDate = $periodDate->copy()->startOfMonth()->toDateString();

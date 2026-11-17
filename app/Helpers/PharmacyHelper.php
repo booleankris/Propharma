@@ -14,8 +14,8 @@ if (!function_exists('getActivePharmacyId')) {
             return 0;
         }
 
-        // Jika user HO, Administrator, atau General Manager dan memilih cabang spesifik di session
-        if (($user->hasRole('HO') || $user->hasRole('administrator') || $user->hasRole('General Manager')) && session()->has('ho_pharmacy_id')) {
+        // Jika user memiliki akses pindah cabang dan memilih cabang spesifik di session
+        if (hasFeatureAccess('branch.switch_and_filter', ['HO', 'administrator', 'General Manager', 'Koordinator', 'koordinator'], $user) && session()->has('ho_pharmacy_id')) {
             return (int) session('ho_pharmacy_id');
         }
 
@@ -61,8 +61,8 @@ if (!function_exists('getPurchasingPharmacyId')) {
             return 0;
         }
 
-        // Jika user HO, Administrator, atau General Manager dan memilih cabang spesifik di session
-        if (($user->hasRole('HO') || $user->hasRole('administrator') || $user->hasRole('General Manager')) && session()->has('ho_pharmacy_id')) {
+        // Jika user memiliki akses pindah cabang dan memilih cabang spesifik di session
+        if (hasFeatureAccess('branch.switch_and_filter', ['HO', 'administrator', 'General Manager', 'Koordinator', 'koordinator'], $user) && session()->has('ho_pharmacy_id')) {
             $hoSelected = (int) session('ho_pharmacy_id');
             if ($hoSelected === 1 || $hoSelected === 9) {
                 return 9; // Gudang PMI
@@ -124,7 +124,7 @@ if (!function_exists('canAccessWarehouseStock')) {
         }
 
         $user = auth()->user();
-        if ($user && ($user->hasRole('HO') || $user->hasRole('administrator') || $user->hasRole('Manager') || $user->hasRole('manager') || $user->hasRole('Koordinator') || $user->hasRole('Gudang PMI'))) {
+        if ($user && hasFeatureAccess('supplies.warehouse_stock', ['HO', 'administrator', 'General Manager', 'Manager', 'manager', 'Koordinator', 'koordinator', 'Gudang PMI'], $user)) {
             return true;
         }
 
@@ -156,7 +156,11 @@ if (!function_exists('canAccessPurchasing')) {
             return false;
         }
 
-        if ($user && ($user->hasRole('HO') || $user->hasRole('administrator') || $user->hasRole('Manager') || $user->hasRole('manager') || $user->hasRole('Koordinator') || $user->hasRole('Gudang PMI'))) {
+        if ($user && !hasFeatureAccess(['orders.manage', 'receiving.manage'], ['General Manager', 'Kasir', 'Gudang PMI', 'HO', 'administrator', 'manager', 'Manager', 'Koordinator', 'koordinator', 'UMKM', 'operator', 'Operator', 'Finance'], $user)) {
+            return false;
+        }
+
+        if ($user && ($user->hasRole('HO') || $user->hasRole('administrator') || $user->hasRole('General Manager') || $user->hasRole('Manager') || $user->hasRole('manager') || $user->hasRole('Koordinator') || $user->hasRole('koordinator') || $user->hasRole('Gudang PMI'))) {
             return true;
         }
 
@@ -253,4 +257,58 @@ if (!function_exists('getRestrictedOnlineChannelKey')) {
         };
     }
 }
+
+if (!function_exists('hasFeatureAccess')) {
+    /**
+     * Periksa apakah user memiliki hak akses ke suatu fitur berdasarkan PermissionCatalog
+     * dengan fallback aman ke daftar role bawaan.
+     *
+     * Begitu permission terdaftar di DB (otomatis disinkronisasi 1:1 oleh PermissionCatalog::ensureSynced()),
+     * perubahan centang / hapus centang di Manager Access -> Manajemen Role langsung mengubah tampilan
+     * menu di sidebar, tombol di halaman, maupun akses di controller/route secara real-time.
+     */
+    function hasFeatureAccess($permissions, $fallbackRoles = [], $user = null): bool
+    {
+        $user = $user ?? auth()->user();
+        if (!$user) {
+            return false;
+        }
+
+        if ($user->hasRole('administrator')) {
+            return true;
+        }
+
+        $permList = is_array($permissions) ? $permissions : [$permissions];
+        $roleList = is_array($fallbackRoles)
+            ? $fallbackRoles
+            : ($fallbackRoles ? explode('|', (string) $fallbackRoles) : []);
+
+        try {
+            static $catalogSynced = false;
+            static $knownPermNames = null;
+
+            if (!$catalogSynced) {
+                \App\Support\PermissionCatalog::ensureSynced();
+                $catalogSynced = true;
+            }
+
+            if ($knownPermNames === null) {
+                $knownPermNames = \Spatie\Permission\Models\Permission::where('guard_name', 'web')
+                    ->pluck('name')
+                    ->flip()
+                    ->all();
+            }
+
+            $existingTargetPerms = array_values(array_filter($permList, fn ($p) => isset($knownPermNames[$p])));
+            if (!empty($existingTargetPerms)) {
+                return $user->hasAnyPermission($existingTargetPerms);
+            }
+        } catch (\Throwable $e) {
+            // Fallback ke pengecekan role jika tabel permission belum siap
+        }
+
+        return !empty($roleList) ? $user->hasAnyRole($roleList) : false;
+    }
+}
+
 

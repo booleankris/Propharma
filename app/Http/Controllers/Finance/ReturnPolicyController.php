@@ -22,9 +22,9 @@ class ReturnPolicyController extends Controller
         $this->middleware(function ($request, $next) {
             $user = auth()->user();
             $allowedRoles = ['administrator', 'General Manager', 'Gudang PMI', 'Koordinator', 'koordinator'];
-            $hasAccess = $user && $user->hasAnyRole($allowedRoles);
+            $hasAccess = $user && hasFeatureAccess('finance.return_policy', $allowedRoles, $user);
             if (!$hasAccess) {
-                abort(403, 'Akses ditolak: Ketentuan Retur hanya dapat diakses oleh Administrator, General Manager, Gudang PMI, dan Koordinator.');
+                abort(403, 'Akses ditolak: Ketentuan Retur hanya dapat diakses oleh role yang memiliki izin.');
             }
             return $next($request);
         });

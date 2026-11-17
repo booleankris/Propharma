@@ -194,4 +194,39 @@ class InvoiceExportDetailFormatTest extends TestCase
         $this->assertEquals('NM_KREDITUR', $rows[0][0]);
         $this->assertEquals('Tidak ada data untuk periode yang dipilih.', $rows[1][0]);
     }
+
+    public function test_tgl_terima_uses_receiving_details_created_at_even_when_receiving_date_is_earlier(): void
+    {
+        $export = new TestableInvoiceSingleSheetExport(1, '2026-11-13', '2026-11-13', 'Detail');
+
+        $fakeItems = collect([
+            (object) [
+                'receiving_details_id' => 209,
+                'invoice_number' => '441383',
+                'invoice_date' => '2026-11-13',
+                'invoice_due' => '2026-12-13',
+                'invoice_times' => 30,
+                'invoice_payment' => 'KREDIT',
+                'invoice_ppn' => 'EXCLUDE',
+                'receiving_id' => 10,
+                'receiving_details_code' => 'NT-26-11/0209',
+                'receiving_updated_at' => '2026-11-13 00:23:00',
+                'receiving_date' => '2026-11-12',
+                'receiving_details_created_at' => '2026-11-13 00:23:00',
+                'creditor_code' => 'KR0005',
+                'creditor_name' => 'PARIT PADANG GLOBAL, PT',
+                'qty_received' => 1,
+                'qty' => 1,
+                'discount' => 0,
+                'extra_discount' => 0,
+                'receiving_raw_price' => 999000,
+                'order_items_price' => 999000,
+            ],
+        ]);
+
+        $export->setFakeItems($fakeItems);
+        $rows = $export->testBuildDetail();
+
+        $this->assertEquals('13/11/2026', $rows[1][5]);
+    }
 }

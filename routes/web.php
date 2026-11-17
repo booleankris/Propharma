@@ -113,9 +113,10 @@ Route::get('/logout', function () {
     return redirect()->route('login')->with('warning', 'Anda telah berhasil logout.');
 })->name('logout.get');
 
-Route::middleware(['auth', 'role:administrator'])->group(function () {
+Route::middleware(['auth', 'role:administrator|General Manager|manager|Manager'])->group(function () {
     Route::resource('users', UserController::class);
     Route::resource('roles', RolesController::class);
+    Route::resource('pharmacies', PharmacyController::class);
 });
 
 Route::middleware(['auth', 'role:administrator'])->group(function () {
@@ -138,7 +139,6 @@ Route::middleware(['auth', 'role:administrator'])->group(function () {
     Route::get('teams/download/{id}', [TeamsController::class, 'download'])->name('teams.download');
     Route::get('downloadteam/', [TeamsController::class, 'downloadteam'])->name('allteam.download');
     Route::resource('adminitems', AdminItemController::class);
-    Route::resource('pharmacies', PharmacyController::class);
     Route::resource('teams', TeamsController::class);
     Route::resource('matchday', MatchDayController::class);
     Route::resource('matchday.matches', MatchController::class);
@@ -149,7 +149,7 @@ Route::middleware(['auth', 'role:administrator'])->group(function () {
     Route::post('searchreport/', [TransactionReportController::class, 'searchreport'])->name('searchreport');
 });
 
-Route::middleware(['auth', 'role:HO|administrator'])->group(function () {
+Route::middleware(['auth', 'role:HO|administrator|General Manager'])->group(function () {
     Route::post('/pharmacy/switch', [\App\Http\Controllers\PharmacySelectorController::class, 'switch'])->name('pharmacy.switch');
     Route::get('/ho/analytics', [\App\Http\Controllers\HO\HODashboardController::class, 'index'])->name('ho.analytics');
     Route::get('/ho/analytics/data', [\App\Http\Controllers\HO\HODashboardController::class, 'getData'])->name('ho.analytics.data');
@@ -158,7 +158,7 @@ Route::middleware(['auth', 'role:HO|administrator'])->group(function () {
 });
 
 // Master Pelaporan Obat (General Manager & Koordinator)
-Route::middleware(['auth', 'role:General Manager|Koordinator|manager|Manager'])->prefix('reported-medicines')->name('reported-medicines.')->group(function () {
+Route::middleware(['auth', 'role:General Manager|Koordinator|koordinator|manager|Manager|administrator'])->prefix('reported-medicines')->name('reported-medicines.')->group(function () {
     Route::get('/', [ReportedMedicineController::class, 'index'])->name('index');
     Route::get('/search', [ReportedMedicineController::class, 'searchMedicines'])->name('search');
     Route::post('/', [ReportedMedicineController::class, 'store'])->name('store');
@@ -167,16 +167,30 @@ Route::middleware(['auth', 'role:General Manager|Koordinator|manager|Manager'])-
     Route::get('/export', [ReportedMedicineController::class, 'export'])->name('export');
 });
 Route::get('/home', [HomeController::class, 'index'])
-    ->middleware(['auth', 'role:General Manager|Kasir|Gudang PMI|HO|administrator|manager|Koordinator|Online|Online Grab|Online Shopee|Digital|UMKM|operator|Finance'])
+    ->middleware(['auth', 'role:General Manager|Kasir|Gudang PMI|HO|administrator|manager|Manager|Koordinator|koordinator|Online|Online Grab|Online Shopee|Digital|UMKM|operator|Operator|Finance'])
     ->name('home');
 
-Route::middleware(['auth', 'role:General Manager'])->prefix('general-manager')->name('general-manager.')->group(function () {
+Route::middleware(['auth', 'role:General Manager|manager|Manager|administrator'])->prefix('general-manager')->name('general-manager.')->group(function () {
     Route::get('/roles', [\App\Http\Controllers\GeneralManagerController::class, 'index'])->name('users.roles.index');
-    Route::patch('/users/{user}/roles', [\App\Http\Controllers\GeneralManagerController::class, 'updateRoles'])->name('users.roles');
+
+    // Manajemen User (termasuk Atur Role Users)
+    Route::post('/users', [\App\Http\Controllers\GeneralManagerController::class, 'storeUser'])->name('users.store');
     Route::put('/users/{user}', [\App\Http\Controllers\GeneralManagerController::class, 'update'])->name('users.update');
+    Route::patch('/users/{user}/roles', [\App\Http\Controllers\GeneralManagerController::class, 'updateRoles'])->name('users.roles');
+    Route::delete('/users/{user}', [\App\Http\Controllers\GeneralManagerController::class, 'destroyUser'])->name('users.destroy');
+
+    // Manajemen Role
+    Route::post('/roles', [\App\Http\Controllers\GeneralManagerController::class, 'storeRole'])->name('roles.store');
+    Route::put('/roles/{role}', [\App\Http\Controllers\GeneralManagerController::class, 'updateRole'])->name('roles.update');
+    Route::delete('/roles/{role}', [\App\Http\Controllers\GeneralManagerController::class, 'destroyRole'])->name('roles.destroy');
+
+    // Manajemen Apotek
+    Route::post('/pharmacies', [\App\Http\Controllers\GeneralManagerController::class, 'storePharmacy'])->name('pharmacies.store');
+    Route::put('/pharmacies/{pharmacy}', [\App\Http\Controllers\GeneralManagerController::class, 'updatePharmacy'])->name('pharmacies.update');
+    Route::delete('/pharmacies/{pharmacy}', [\App\Http\Controllers\GeneralManagerController::class, 'destroyPharmacy'])->name('pharmacies.destroy');
 });
 
-Route::middleware(['auth', 'role:General Manager|Kasir|Gudang PMI|HO|administrator|manager|Koordinator|Online|Online Grab|Online Shopee|Digital|UMKM|operator|Finance'])->group(function () {
+Route::middleware(['auth', 'role:General Manager|Kasir|Gudang PMI|HO|administrator|manager|Manager|Koordinator|koordinator|Online|Online Grab|Online Shopee|Digital|UMKM|operator|Operator|Finance'])->group(function () {
     Route::get('/near-expiry', [HomeController::class, 'nearExpiry'])->name('kasir.nearExpiry');
     Route::get('/stock-notifications', [HomeController::class, 'stockNotifications'])->name('kasir.stockNotifications');
 
@@ -256,7 +270,6 @@ Route::middleware(['auth', 'role:General Manager|Kasir|Gudang PMI|HO|administrat
 
     // Master Data (Role HO, Operator, Koordinator & General Manager)
     Route::middleware(['role:HO|operator|Operator|administrator|Koordinator|koordinator|General Manager'])->group(function () {
-
         Route::resource('creditors', CreditorsController::class)->except(['show']);
         Route::post('creditors/{id}/restore', [CreditorsController::class, 'restore'])->name('creditors.restore');
         Route::resource('debtors', DebtorsController::class)->except(['show']);

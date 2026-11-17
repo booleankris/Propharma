@@ -389,7 +389,7 @@ class InvoiceSingleSheetExport implements FromArray, WithStyles, WithColumnWidth
 
             $tglFaktur  = $inv['invoice_date']
                 ? Carbon::parse($inv['invoice_date'])->format('d/m/Y') : '-';
-            $tglTerima  = ReceivingDateFilter::format($inv['receiving_date'] ?? null, $inv['receiving_details_created_at'] ?? null);
+            $tglTerima  = ReceivingDateFilter::format(null, $inv['receiving_details_created_at'] ?? null);
             $jatuhTempo = $inv['invoice_due']
                 ? Carbon::parse($inv['invoice_due'])->format('d/m/Y') : '-';
 

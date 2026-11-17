@@ -279,7 +279,7 @@ class SalesDataController extends Controller
         }
 
         $user = auth()->user();
-        $canEditPayment = $user && ($user->hasRole('General Manager') || $user->hasRole('administrator'));
+        $canEditPayment = $user && hasFeatureAccess('sales.update_payment', ['General Manager', 'administrator'], $user);
         $pharmacyId = (int) getActivePharmacyId();
 
         $availableBanks = FinanceAccount::getBranchBankOptions($pharmacyId);
@@ -571,10 +571,10 @@ class SalesDataController extends Controller
     public function updatePayment(Request $request, $id)
     {
         $currentUser = auth()->user();
-        if (!$currentUser || (!$currentUser->hasRole('General Manager') && !$currentUser->hasRole('administrator'))) {
+        if (!$currentUser || !hasFeatureAccess('sales.update_payment', ['General Manager', 'administrator'], $currentUser)) {
             return response()->json([
                 'success' => false,
-                'message' => 'Akses ditolak. Fitur ini hanya dapat diakses oleh akun General Manager.',
+                'message' => 'Akses ditolak. Fitur ini hanya dapat diakses oleh akun yang memiliki izin Ubah Metode Pembayaran.',
             ], 403);
         }
 

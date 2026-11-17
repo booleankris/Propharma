@@ -812,10 +812,11 @@
             </div>
         </div>
     </div>
-    {{-- Sahabat Finance Button (Khusus Finance, General Manager, & HO) --}}
-    @hasanyrole('Finance|General Manager|administrator|HO')
+    {{-- Sahabat Finance Button (Khusus Finance, General Manager, & HO / Permission finance.manage) --}}
+    @if (hasFeatureAccess('finance.manage', 'Finance|General Manager|administrator|HO'))
         <div class="finance-wrap">
-            <a href="{{ route('finance.index') }}" class="finance-btn {{ request()->is('finance*') || request()->is('pareto*') ? 'active' : '' }}"
+            <a href="{{ route('finance.index') }}"
+                class="finance-btn {{ request()->is('finance*') || request()->is('pareto*') ? 'active' : '' }}"
                 title="Sahabat Finance - Analisis Pareto & Profit">
                 <div class="finance-icon-box">
                     <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none"
@@ -835,7 +836,7 @@
 
             </a>
         </div>
-    @endhasanyrole
+    @endif
     <div class="sidebar-nav">
         <div class="nav-section-title">Menu Utama</div>
 
@@ -850,7 +851,7 @@
             Dashboard
         </a>
 
-        @if (!isWarehousePharmacy())
+        @if (!isWarehousePharmacy() && hasFeatureAccess('sales.pos', 'General Manager|Kasir|HO|administrator|manager|Manager|Koordinator|koordinator|Online|Online Grab|Online Shopee|Digital|UMKM|operator|Operator|Finance'))
             <a href="{{ url('transaction/upds') }}"
                 class="nav-item {{ request()->is('transaction/*') ? 'active' : '' }}">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
@@ -889,33 +890,37 @@
         @endif
 
         @if (!isOnlineRole())
-            <a onclick="openModal('logModal')" class="nav-item {{ request()->is('inventory*') ? 'active' : '' }}">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                    stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <path
-                        d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
-                    <polyline points="3.27 6.96 12 12.01 20.73 6.96" />
-                    <line x1="12" y1="22.08" x2="12" y2="12" />
-                </svg>
-                Persediaan
-            </a>
-            <a width="16" height="16" onclick="openModal('transfersModal')"
-                class="nav-item {{ request()->is('inventory*') ? 'active' : '' }}">
-                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"
-                    fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
-                    stroke-linejoin="round" class="icon icon-tabler icons-tabler-outline icon-tabler-transfer">
-                    <path stroke="none" d="M0 0h24v24H0z" fill="none" />
-                    <path d="M20 10h-16l5.5 -6" />
-                    <path d="M4 14h16l-5.5 6" />
-                </svg>
-                Mutasi
-            </a>
+            @if (hasFeatureAccess(['supplies.view', 'supplies.opname', 'supplies.warehouse_stock'], 'General Manager|Kasir|Gudang PMI|HO|administrator|manager|Manager|Koordinator|koordinator|UMKM|operator|Operator|Finance'))
+                <a onclick="openModal('logModal')" class="nav-item {{ request()->is('inventory*') ? 'active' : '' }}">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                        stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path
+                            d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
+                        <polyline points="3.27 6.96 12 12.01 20.73 6.96" />
+                        <line x1="12" y1="22.08" x2="12" y2="12" />
+                    </svg>
+                    Persediaan
+                </a>
+            @endif
+            @if (hasFeatureAccess('transfers.manage', 'General Manager|Kasir|Gudang PMI|HO|administrator|manager|Manager|Koordinator|koordinator|UMKM|operator|Operator|Finance'))
+                <a width="16" height="16" onclick="openModal('transfersModal')"
+                    class="nav-item {{ request()->is('inventory*') ? 'active' : '' }}">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"
+                        fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                        stroke-linejoin="round" class="icon icon-tabler icons-tabler-outline icon-tabler-transfer">
+                        <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+                        <path d="M20 10h-16l5.5 -6" />
+                        <path d="M4 14h16l-5.5 6" />
+                    </svg>
+                    Mutasi
+                </a>
+            @endif
         @endif
 
 
         <div class="nav-section-title">Statistik</div>
 
-        @if (!isWarehousePharmacy())
+        @if (!isWarehousePharmacy() && hasFeatureAccess(['sales.data', 'sales.retur', 'sales.reject'], 'General Manager|Kasir|HO|administrator|manager|Manager|Koordinator|koordinator|Online|Online Grab|Online Shopee|Digital|UMKM|operator|Operator|Finance'))
             <a onclick="openModal('salesModal')" class="nav-item {{ request()->is('sales*') ? 'active' : '' }}"
                 style="cursor:pointer;">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
@@ -943,9 +948,8 @@
             </a>
         @endif
 
-        @hasanyrole('HO|operator|Operator|administrator|Koordinator')
-            <a href="{{ route('patients.index') }}"
-                class="nav-item {{ request()->is('patients*') ? 'active' : '' }}">
+        @if (hasFeatureAccess('patients.manage', 'HO|operator|Operator|administrator|Koordinator|koordinator|General Manager'))
+            <a href="{{ route('patients.index') }}" class="nav-item {{ request()->is('patients*') ? 'active' : '' }}">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                     stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                     <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
@@ -958,15 +962,17 @@
                 class="nav-item {{ request()->is('master/patient-transactions*') ? 'active' : '' }}">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                     stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                    <path
+                        d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z">
+                    </path>
                 </svg>
                 Kunjungan Pasien
             </a>
-        @endhasanyrole
+        @endif
 
         <div class="nav-section-title">Pusat Laporan & Export</div>
 
-        @if (!isOnlineRole())
+        @if (!isOnlineRole() && hasFeatureAccess('reports.export_center', 'General Manager|Kasir|Gudang PMI|HO|administrator|manager|Manager|Koordinator|koordinator|UMKM|operator|Operator|Finance'))
             <a onclick="openModal('exportCenterModal')" class="nav-item"
                 style="cursor:pointer; background: rgba(56, 189, 248, 0.1); border-left: 3px solid #38bdf8;">
                 <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"
@@ -987,7 +993,7 @@
             </a>
         @endif
 
-        @if (!isWarehousePharmacy())
+        @if (!isWarehousePharmacy() && (isOnlineRole() || hasFeatureAccess('reports.export_center', 'General Manager|Kasir|HO|administrator|manager|Manager|Koordinator|koordinator|Online|Online Grab|Online Shopee|Digital|UMKM|operator|Operator|Finance')))
             <a onclick="openModal('reportModal')" class="nav-item" style="cursor:pointer;">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                     stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -1000,7 +1006,7 @@
             </a>
         @endif
 
-        @if (canAccessPurchasing())
+        @if (canAccessPurchasing() && hasFeatureAccess('reports.export_center', 'General Manager|Kasir|Gudang PMI|HO|administrator|manager|Manager|Koordinator|koordinator|UMKM|operator|Operator|Finance'))
             <a onclick="openModal('orderReportModal')" class="nav-item" style="cursor:pointer;">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                     stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -1012,9 +1018,10 @@
             </a>
         @endif
 
-        @hasanyrole('Finance|General Manager|administrator|HO|Koordinator')
+        @if (hasFeatureAccess('reports.pareto', 'Finance|General Manager|administrator|HO|Koordinator|koordinator'))
             @if (!isWarehousePharmacy() && !isOnlineRole())
-                <a href="{{ route('pareto.index') }}" class="nav-item {{ request()->is('pareto*') ? 'active' : '' }}" style="cursor:pointer;">
+                <a href="{{ route('pareto.index') }}" class="nav-item {{ request()->is('pareto*') ? 'active' : '' }}"
+                    style="cursor:pointer;">
 
                     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"
                         fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
@@ -1027,9 +1034,9 @@
                     Pareto
                 </a>
             @endif
-        @endhasanyrole
+        @endif
 
-        @hasanyrole('General Manager|Koordinator|manager|Manager')
+        @if (hasFeatureAccess('reports.special_medicines', 'General Manager|Koordinator|koordinator|manager|Manager|administrator'))
             <a href="{{ route('reported-medicines.index') }}"
                 class="nav-item {{ request()->is('reported-medicines*') ? 'active' : '' }}">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
@@ -1039,9 +1046,9 @@
                 </svg>
                 Pelaporan Obat
             </a>
-        @endhasanyrole
+        @endif
 
-        @role('HO')
+        @if (hasFeatureAccess('ho.analytics', 'HO|administrator'))
             <div class="nav-section-title">Head Office (HO)</div>
 
             <a href="{{ route('ho.analytics') }}" class="nav-item {{ request()->is('ho/analytics*') ? 'active' : '' }}"
@@ -1063,9 +1070,9 @@
                 <span
                     style="margin-left:auto; font-size:9px; font-weight:800; background:rgba(99,102,241,0.3); color:#a5b4fc; padding:2px 6px; border-radius:4px; text-transform:uppercase;">HO</span>
             </a>
-        @endrole
+        @endif
 
-        @hasanyrole('HO|operator|Operator|administrator|Koordinator|koordinator|General Manager')
+        @if (hasFeatureAccess('master.data', 'HO|operator|Operator|administrator|Koordinator|koordinator|General Manager'))
             <div class="nav-section-title">Master Data</div>
 
             <a onclick="openModal('masterModal')" class="nav-item" style="cursor:pointer;">
@@ -1077,7 +1084,21 @@
                 </svg>
                 Master Data
             </a>
-        @endhasanyrole
+        @endif
+
+        @if (hasFeatureAccess(['manager.access', 'users.manage', 'roles.manage', 'pharmacies.manage'], 'General Manager|manager|Manager|administrator'))
+            <div class="nav-section-title">Manager Access</div>
+
+            <a onclick="openModal('managerAccessModal')"
+                class="nav-item {{ request()->routeIs('general-manager.*') ? 'active' : '' }}" style="cursor:pointer;">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                    stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+                    <path d="M9 12l2 2 4-4" />
+                </svg>
+                Manager Access
+            </a>
+        @endif
 
         <div class="nav-section-title">Akun</div>
 
@@ -1090,7 +1111,7 @@
             Profil
         </a>
 
-        @hasrole('General Manager')
+        @if (hasFeatureAccess('reports.staff_stats', 'General Manager|administrator'))
             <a href="{{ url('staff-stats') }}" class="nav-item {{ request()->is('staff-stats*') ? 'active' : '' }}">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                     stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -1099,21 +1120,7 @@
                 </svg>
                 Statistik Kasir
             </a>
-        @endhasrole
-
-        @hasrole('General Manager')
-            <a href="{{ route('general-manager.users.roles.index') }}"
-                class="nav-item {{ request()->is('general-manager*') ? 'active' : '' }}">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                    stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
-                    <circle cx="9" cy="7" r="4" />
-                    <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
-                    <path d="M16 3.13a4 4 0 0 1 0 7.75" />
-                </svg>
-                Atur Role Users
-            </a>
-        @endhasrole
+        @endif
 
         <a href="{{ route('logout') }}"
             onclick="event.preventDefault(); document.getElementById('logout-form').submit();" class="nav-item"
@@ -1157,8 +1164,8 @@
 
         <div class="topbar-right flex items-center gap-4">
 
-            @role('HO')
-                <!-- Pharmacy Selector for HO -->
+            @if (hasFeatureAccess('branch.switch_and_filter', 'HO|General Manager|Koordinator|koordinator|administrator'))
+                <!-- Pharmacy Selector -->
                 <div class="flex items-center gap-2">
                     <form action="{{ route('pharmacy.switch') }}" method="POST" class="m-0 flex items-center gap-2">
                         @csrf
@@ -1180,7 +1187,7 @@
                 </div>
 
                 <div class="hidden sm:block h-5 w-px bg-gray-200"></div>
-            @endrole
+            @endif
 
             <!-- Tanggal -->
             <div class="hidden sm:block topbar-date text-sm font-medium text-gray-600">
@@ -1633,8 +1640,10 @@
                     <button onclick="selectReport(this)"
                         class="report-btn flex items-center gap-3 p-3 rounded-2xl border border-slate-100 bg-slate-50 text-left transition-all hover:border-slate-200 hover:bg-white">
                         <div class="w-8 h-8 rounded-xl bg-cyan-50 flex items-center justify-center flex-shrink-0">
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#0891b2" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                <path d="M4 19V5M4 19h17M8 15l3-4 3 2 5-7"/><circle cx="19" cy="6" r="1"/>
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#0891b2"
+                                stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M4 19V5M4 19h17M8 15l3-4 3 2 5-7" />
+                                <circle cx="19" cy="6" r="1" />
                             </svg>
                         </div>
                         <span class="text-sm font-semibold text-slate-600">Monitoring Penjualan</span>
@@ -1678,14 +1687,18 @@
                 <p class="text-xs font-semibold tracking-widest uppercase text-slate-400 mb-3">Periode Laporan</p>
                 <div class="grid grid-cols-2 gap-3">
                     <label class="text-xs font-medium text-slate-500">Bulan
-                        <select id="sales_month" class="mt-1 w-full text-sm border border-slate-200 rounded-xl px-3 py-2.5 text-slate-700 bg-slate-50 focus:outline-none focus:ring-2 focus:ring-violet-200">
+                        <select id="sales_month"
+                            class="mt-1 w-full text-sm border border-slate-200 rounded-xl px-3 py-2.5 text-slate-700 bg-slate-50 focus:outline-none focus:ring-2 focus:ring-violet-200">
                             @foreach ([1 => 'Januari', 2 => 'Februari', 3 => 'Maret', 4 => 'April', 5 => 'Mei', 6 => 'Juni', 7 => 'Juli', 8 => 'Agustus', 9 => 'September', 10 => 'Oktober', 11 => 'November', 12 => 'Desember'] as $monthNumber => $monthName)
-                                <option value="{{ $monthNumber }}" @selected(now()->month === $monthNumber)>{{ $monthName }}</option>
+                                <option value="{{ $monthNumber }}" @selected(now()->month === $monthNumber)>{{ $monthName }}
+                                </option>
                             @endforeach
                         </select>
                     </label>
                     <label class="text-xs font-medium text-slate-500">Tahun
-                        <input id="sales_year" type="number" min="2000" max="2100" value="{{ now()->year }}" class="mt-1 w-full text-sm border border-slate-200 rounded-xl px-3 py-2.5 text-slate-700 bg-slate-50 focus:outline-none focus:ring-2 focus:ring-violet-200" />
+                        <input id="sales_year" type="number" min="2000" max="2100"
+                            value="{{ now()->year }}"
+                            class="mt-1 w-full text-sm border border-slate-200 rounded-xl px-3 py-2.5 text-slate-700 bg-slate-50 focus:outline-none focus:ring-2 focus:ring-violet-200" />
                     </label>
                 </div>
             </div>
@@ -1785,8 +1798,8 @@
                                 <div
                                     class="icon-box w-7 h-7 rounded-xl flex items-center justify-center shrink-0 bg-gray-100 transition-all duration-200">
                                     <svg class="icon-svg text-gray-400" width="14" height="14"
-                                        viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-                                        stroke-linecap="round" stroke-linejoin="round">
+                                        viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                        stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                         <circle cx="11" cy="11" r="8" />
                                         <line x1="21" y1="21" x2="16.65" y2="16.65" />
                                         <line x1="11" y1="8" x2="11" y2="14" />
@@ -1845,8 +1858,8 @@
         <button onclick="getReport('preview')"
             class="group w-full flex items-center justify-center gap-2 bg-slate-100 hover:bg-slate-200 active:scale-[0.98] text-slate-700 text-sm font-semibold py-3 rounded-2xl transition-all duration-200 border border-slate-200/60">
             <svg class="w-4 h-4 text-slate-500 transition-transform duration-200 group-hover:scale-110"
-                viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
-                stroke-linejoin="round">
+                viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                stroke-linecap="round" stroke-linejoin="round">
                 <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
                 <circle cx="12" cy="12" r="3"></circle>
             </svg>
@@ -1866,7 +1879,7 @@
     </div>
 </div>
 
-@hasanyrole('HO|operator|Operator|administrator|Koordinator|koordinator|General Manager')
+@if (hasFeatureAccess('master.data', 'HO|operator|Operator|administrator|Koordinator|koordinator|General Manager'))
     {{-- Master Modal --}}
     <div id="masterModal"
         class="modal-hide modal-transition fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2
@@ -2034,7 +2047,7 @@
                     <span class="text-sm font-semibold text-lime-700 group-hover:text-white transition-colors">Master
                         Etalase</span>
                 </a>
-                @hasanyrole('General Manager|Koordinator|manager|Manager')
+                @if (hasFeatureAccess('reports.special_medicines', 'General Manager|Koordinator|koordinator|manager|Manager|administrator'))
                     <a href="{{ route('reported-medicines.index') }}"
                         class="group flex items-center gap-3 p-3.5 rounded-2xl bg-rose-50 hover:bg-rose-500 border border-rose-100 hover:border-rose-500 transition-all duration-200 hover:-translate-y-0.5">
                         <div
@@ -2051,7 +2064,7 @@
                                 Obat</span>
                         </div>
                     </a>
-                @endhasanyrole
+                @endif
             </div>
             <button
                 class="closeModal mt-5 w-full py-2.5 flex items-center justify-center gap-2 bg-gray-100 hover:bg-gray-200 text-gray-600 font-semibold rounded-2xl transition-all">
@@ -2062,7 +2075,96 @@
             </button>
         </div>
     </div>
-@endhasanyrole
+@endif
+
+@if (hasFeatureAccess(['manager.access', 'users.manage', 'roles.manage', 'pharmacies.manage'], 'General Manager|manager|Manager|administrator'))
+    {{-- Manager Access Modal --}}
+    <div id="managerAccessModal"
+        class="modal-hide modal-transition fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2
+        w-[92%] max-w-[480px] bg-white rounded-3xl shadow-2xl z-[9999] overflow-hidden">
+        <div class="relative bg-gradient-to-br from-indigo-600 via-blue-600 to-sky-600 px-6 pt-6 pb-8">
+            <div class="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -translate-y-1/2 translate-x-1/2"></div>
+            <div class="absolute bottom-0 left-4 w-16 h-16 bg-white/10 rounded-full translate-y-1/2"></div>
+            <div class="relative flex items-center justify-between">
+                <div>
+                    <p class="text-blue-100 text-xs font-medium tracking-widest uppercase mb-1">Kontrol &amp; Otoritas</p>
+                    <h2 class="text-2xl font-bold text-white">Manager Access</h2>
+                </div>
+                <div class="w-12 h-12 bg-white/20 rounded-2xl flex items-center justify-center backdrop-blur-sm">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6 text-white" fill="none"
+                        viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round"
+                            d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                    </svg>
+                </div>
+            </div>
+        </div>
+        <div class="px-5 py-5 max-h-[65vh] overflow-y-auto">
+            <div class="grid grid-cols-1 gap-3">
+                <a href="{{ route('general-manager.users.roles.index', ['tab' => 'users']) }}"
+                    class="group flex items-center gap-3.5 p-3.5 rounded-2xl bg-blue-50 hover:bg-blue-600 border border-blue-100 hover:border-blue-600 transition-all duration-200 hover:-translate-y-0.5">
+                    <div
+                        class="w-10 h-10 rounded-xl bg-blue-100 group-hover:bg-blue-500 flex items-center justify-center flex-shrink-0 transition-colors">
+                        <svg class="w-5 h-5 text-blue-600 group-hover:text-white transition-colors" fill="none"
+                            viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round"
+                                d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
+                        </svg>
+                    </div>
+                    <div class="min-w-0 flex-1">
+                        <div class="text-sm font-bold text-blue-800 group-hover:text-white transition-colors">Manajemen
+                            User</div>
+                        <div class="text-[11px] text-blue-600/80 group-hover:text-blue-100 transition-colors">Kelola akun,
+                            PIN, cabang &amp; atur role users</div>
+                    </div>
+                </a>
+
+                <a href="{{ route('general-manager.users.roles.index', ['tab' => 'roles']) }}"
+                    class="group flex items-center gap-3.5 p-3.5 rounded-2xl bg-indigo-50 hover:bg-indigo-600 border border-indigo-100 hover:border-indigo-600 transition-all duration-200 hover:-translate-y-0.5">
+                    <div
+                        class="w-10 h-10 rounded-xl bg-indigo-100 group-hover:bg-indigo-500 flex items-center justify-center flex-shrink-0 transition-colors">
+                        <svg class="w-5 h-5 text-indigo-600 group-hover:text-white transition-colors" fill="none"
+                            viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round"
+                                d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                        </svg>
+                    </div>
+                    <div class="min-w-0 flex-1">
+                        <div class="text-sm font-bold text-indigo-800 group-hover:text-white transition-colors">Manajemen
+                            Role</div>
+                        <div class="text-[11px] text-indigo-600/80 group-hover:text-indigo-100 transition-colors">Kelola
+                            level jabatan &amp; hak akses permission</div>
+                    </div>
+                </a>
+
+                <a href="{{ route('general-manager.users.roles.index', ['tab' => 'pharmacies']) }}"
+                    class="group flex items-center gap-3.5 p-3.5 rounded-2xl bg-emerald-50 hover:bg-emerald-600 border border-emerald-100 hover:border-emerald-600 transition-all duration-200 hover:-translate-y-0.5">
+                    <div
+                        class="w-10 h-10 rounded-xl bg-emerald-100 group-hover:bg-emerald-500 flex items-center justify-center flex-shrink-0 transition-colors">
+                        <svg class="w-5 h-5 text-emerald-600 group-hover:text-white transition-colors" fill="none"
+                            viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round"
+                                d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                        </svg>
+                    </div>
+                    <div class="min-w-0 flex-1">
+                        <div class="text-sm font-bold text-emerald-800 group-hover:text-white transition-colors">Manajemen
+                            Apotek</div>
+                        <div class="text-[11px] text-emerald-600/80 group-hover:text-emerald-100 transition-colors">Kelola
+                            data cabang apotek, izin SIA/SIPA &amp; status</div>
+                    </div>
+                </a>
+            </div>
+            <button
+                class="closeModal mt-5 w-full py-2.5 flex items-center justify-center gap-2 bg-gray-100 hover:bg-gray-200 text-gray-600 font-semibold rounded-2xl transition-all">
+                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+                Tutup
+            </button>
+        </div>
+    </div>
+@endif
 
 {{-- Persediaan Modal --}}
 <div id="logModal"
@@ -2269,37 +2371,37 @@
                     Penerimaan</span>
             </a>
 
-            @hasanyrole('administrator|General Manager|Gudang PMI|Koordinator|koordinator')
-            <a href="{{ route('finance.purchaseReturns.index') }}"
-                class="group flex items-center gap-3 p-3.5 rounded-2xl bg-amber-50 hover:bg-amber-500 border border-amber-100 hover:border-amber-500 transition-all duration-200 hover:-translate-y-0.5">
-                <div
-                    class="w-9 h-9 rounded-xl bg-amber-100 group-hover:bg-amber-400 flex items-center justify-center flex-shrink-0 transition-colors">
-                    <svg class="w-5 h-5 text-amber-600 group-hover:text-white transition-colors" fill="none"
-                        viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                        <path stroke-linecap="round" stroke-linejoin="round"
-                            d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
-                    </svg>
-                </div>
-                <span
-                    class="text-sm font-semibold text-amber-700 group-hover:text-white transition-colors leading-tight">Input
-                    Data Retur</span>
-            </a>
+            @if (hasFeatureAccess('finance.return_policy', 'administrator|General Manager|Gudang PMI|Koordinator|koordinator'))
+                <a href="{{ route('finance.purchaseReturns.index') }}"
+                    class="group flex items-center gap-3 p-3.5 rounded-2xl bg-amber-50 hover:bg-amber-500 border border-amber-100 hover:border-amber-500 transition-all duration-200 hover:-translate-y-0.5">
+                    <div
+                        class="w-9 h-9 rounded-xl bg-amber-100 group-hover:bg-amber-400 flex items-center justify-center flex-shrink-0 transition-colors">
+                        <svg class="w-5 h-5 text-amber-600 group-hover:text-white transition-colors" fill="none"
+                            viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round"
+                                d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
+                        </svg>
+                    </div>
+                    <span
+                        class="text-sm font-semibold text-amber-700 group-hover:text-white transition-colors leading-tight">Input
+                        Data Retur</span>
+                </a>
 
-            <a href="{{ route('finance.returnPolicies.index') }}"
-                class="group flex items-center gap-3 p-3.5 rounded-2xl bg-rose-50 hover:bg-rose-500 border border-rose-100 hover:border-rose-500 transition-all duration-200 hover:-translate-y-0.5">
-                <div
-                    class="w-9 h-9 rounded-xl bg-rose-100 group-hover:bg-rose-400 flex items-center justify-center flex-shrink-0 transition-colors">
-                    <svg class="w-5 h-5 text-rose-600 group-hover:text-white transition-colors" fill="none"
-                        viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                        <path stroke-linecap="round" stroke-linejoin="round"
-                            d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
-                    </svg>
-                </div>
-                <span
-                    class="text-sm font-semibold text-rose-700 group-hover:text-white transition-colors leading-tight">Ketentuan
-                    Retur</span>
-            </a>
-            @endhasanyrole
+                <a href="{{ route('finance.returnPolicies.index') }}"
+                    class="group flex items-center gap-3 p-3.5 rounded-2xl bg-rose-50 hover:bg-rose-500 border border-rose-100 hover:border-rose-500 transition-all duration-200 hover:-translate-y-0.5">
+                    <div
+                        class="w-9 h-9 rounded-xl bg-rose-100 group-hover:bg-rose-400 flex items-center justify-center flex-shrink-0 transition-colors">
+                        <svg class="w-5 h-5 text-rose-600 group-hover:text-white transition-colors" fill="none"
+                            viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round"
+                                d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+                        </svg>
+                    </div>
+                    <span
+                        class="text-sm font-semibold text-rose-700 group-hover:text-white transition-colors leading-tight">Ketentuan
+                        Retur</span>
+                </a>
+            @endif
 
         </div>
         <button
@@ -2467,10 +2569,16 @@
             </a>
             <a href="{{ route('sales.reject.follow-up') }}"
                 class="group flex items-center gap-3 p-3.5 rounded-2xl bg-violet-50 hover:bg-violet-500 border border-violet-100 hover:border-violet-500 transition-all duration-200 hover:-translate-y-0.5">
-                <div class="w-9 h-9 rounded-xl bg-violet-100 group-hover:bg-violet-400 flex items-center justify-center flex-shrink-0 transition-colors">
-                    <svg class="w-5 h-5 text-violet-600 group-hover:text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2m-4 0a2 2 0 002 2h2a2 2 0 002-2m-6 8h6m-6 4h6m-9-4h.01M9 17h.01"/></svg>
+                <div
+                    class="w-9 h-9 rounded-xl bg-violet-100 group-hover:bg-violet-400 flex items-center justify-center flex-shrink-0 transition-colors">
+                    <svg class="w-5 h-5 text-violet-600 group-hover:text-white" fill="none" viewBox="0 0 24 24"
+                        stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round"
+                            d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2m-4 0a2 2 0 002 2h2a2 2 0 002-2m-6 8h6m-6 4h6m-9-4h.01M9 17h.01" />
+                    </svg>
                 </div>
-                <span class="text-sm font-semibold text-violet-700 group-hover:text-white transition-colors">Tindak Lanjut Penolakan</span>
+                <span class="text-sm font-semibold text-violet-700 group-hover:text-white transition-colors">Tindak
+                    Lanjut Penolakan</span>
             </a>
 
         </div>
@@ -2868,7 +2976,7 @@
                 Filter Export
             </div>
             <div class="flex flex-wrap items-center gap-2 w-full md:w-auto">
-                @if (auth()->user()->hasAnyRole(['General Manager', 'Koordinator', 'koordinator', 'HO', 'administrator']))
+                @if (hasFeatureAccess('branch.switch_and_filter', 'General Manager|Koordinator|koordinator|HO|administrator'))
                     @php
                         $exportPharmacies = \App\Models\Pharmacies::whereNotIn('id', [6, 8])
                             ->orderBy('id', 'asc')
@@ -2902,84 +3010,111 @@
         <!-- Section 0: Katalog & Master Data Obat -->
         <div>
             <div class="flex items-center gap-2 mb-3">
-                <span class="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Katalog & Master Data</span>
+                <span class="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Katalog & Master
+                    Data</span>
             </div>
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <!-- Card Master Obat -->
-                <div class="bg-gradient-to-br from-emerald-50/70 to-teal-50/70 border border-emerald-200/90 rounded-2xl p-4 flex flex-col justify-between hover:shadow-md transition-all">
+                <div
+                    class="bg-gradient-to-br from-emerald-50/70 to-teal-50/70 border border-emerald-200/90 rounded-2xl p-4 flex flex-col justify-between hover:shadow-md transition-all">
                     <div>
                         <div class="flex items-start justify-between gap-2 mb-2">
-                            <div class="w-8 h-8 rounded-xl bg-emerald-100 border border-emerald-200 flex items-center justify-center text-emerald-700">
-                                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-tabler icon-tabler-pill">
-                                    <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+                            <div
+                                class="w-8 h-8 rounded-xl bg-emerald-100 border border-emerald-200 flex items-center justify-center text-emerald-700">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18"
+                                    viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                                    stroke-linecap="round" stroke-linejoin="round"
+                                    class="icon icon-tabler icon-tabler-pill">
+                                    <path stroke="none" d="M0 0h24v24H0z" fill="none" />
                                     <path d="M4.5 12.5l8 -8a4.95 4.95 0 1 1 7 7l-8 8a4.95 4.95 0 0 1 -7 -7z" />
                                     <path d="M8.5 8.5l7 7" />
                                 </svg>
                             </div>
-                            <span class="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200">Format Resmi (.xlsx)</span>
+                            <span
+                                class="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200">Format
+                                Resmi (.xlsx)</span>
                         </div>
                         <h4 class="text-sm font-bold text-slate-800 leading-snug mb-1">Master Data Obat</h4>
-                        <p class="text-[11px] text-slate-500 leading-relaxed mb-4">Export seluruh database obat (kode, barcode, nama, kategori, harga dasar, HNA, harga jual, stok) lengkap dan rapi.</p>
+                        <p class="text-[11px] text-slate-500 leading-relaxed mb-4">Export seluruh database obat (kode,
+                            barcode, nama, kategori, harga dasar, HNA, harga jual, stok) lengkap dan rapi.</p>
                     </div>
                     <div class="flex items-center gap-2">
                         <button type="button" onclick="exportMasterMedicinesCenter(this)"
                             class="flex-1 inline-flex items-center justify-center gap-2 py-2 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white text-xs font-bold shadow-xs transition-all cursor-pointer">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-tabler icons-tabler-outline icon-tabler-download">
-                                <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
-                                <path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2 -2v-2"/>
-                                <path d="M7 11l5 5l5 -5"/>
-                                <path d="M12 4l0 12"/>
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16"
+                                viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                                stroke-linecap="round" stroke-linejoin="round"
+                                class="icon icon-tabler icons-tabler-outline icon-tabler-download">
+                                <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+                                <path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2 -2v-2" />
+                                <path d="M7 11l5 5l5 -5" />
+                                <path d="M12 4l0 12" />
                             </svg>
                             Export Excel (.xlsx)
                         </button>
                         <a href="{{ route('medicines.index') }}" title="Buka Halaman Master Obat"
                             class="inline-flex items-center justify-center p-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-bold transition-colors">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
-                                <path d="M12 6h-6a2 2 0 0 0 -2 2v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-6"/>
-                                <path d="M11 13l9 -9"/>
-                                <path d="M15 4h5v5"/>
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16"
+                                viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                                stroke-linecap="round" stroke-linejoin="round">
+                                <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+                                <path d="M12 6h-6a2 2 0 0 0 -2 2v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-6" />
+                                <path d="M11 13l9 -9" />
+                                <path d="M15 4h5v5" />
                             </svg>
                         </a>
                     </div>
                 </div>
 
                 <!-- Card Rekap Stok Gudang -->
-                <div class="bg-gradient-to-br from-blue-50/70 to-indigo-50/70 border border-blue-200/90 rounded-2xl p-4 flex flex-col justify-between hover:shadow-md transition-all">
+                <div
+                    class="bg-gradient-to-br from-blue-50/70 to-indigo-50/70 border border-blue-200/90 rounded-2xl p-4 flex flex-col justify-between hover:shadow-md transition-all">
                     <div>
                         <div class="flex items-start justify-between gap-2 mb-2">
-                            <div class="w-8 h-8 rounded-xl bg-blue-100 border border-blue-200 flex items-center justify-center text-blue-700">
-                                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-tabler icon-tabler-package">
-                                    <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
-                                    <path d="M12 3l8 4.5l0 9l-8 4.5l-8 -4.5l0 -9l8 -4.5"/>
-                                    <path d="M12 12l8 -4.5"/>
-                                    <path d="M12 12l0 9"/>
-                                    <path d="M12 12l-8 -4.5"/>
+                            <div
+                                class="w-8 h-8 rounded-xl bg-blue-100 border border-blue-200 flex items-center justify-center text-blue-700">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18"
+                                    viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                                    stroke-linecap="round" stroke-linejoin="round"
+                                    class="icon icon-tabler icon-tabler-package">
+                                    <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+                                    <path d="M12 3l8 4.5l0 9l-8 4.5l-8 -4.5l0 -9l8 -4.5" />
+                                    <path d="M12 12l8 -4.5" />
+                                    <path d="M12 12l0 9" />
+                                    <path d="M12 12l-8 -4.5" />
                                 </svg>
                             </div>
-                            <span class="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-blue-100 text-blue-800 border border-blue-200">Gudang & Apotek</span>
+                            <span
+                                class="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-blue-100 text-blue-800 border border-blue-200">Gudang
+                                & Apotek</span>
                         </div>
                         <h4 class="text-sm font-bold text-slate-800 leading-snug mb-1">Rekap Saldo Stok Obat</h4>
-                        <p class="text-[11px] text-slate-500 leading-relaxed mb-4">Export posisi stok fisik seluruh obat di gudang logistik dan unit pelayanan apotek.</p>
+                        <p class="text-[11px] text-slate-500 leading-relaxed mb-4">Export posisi stok fisik seluruh
+                            obat di gudang logistik dan unit pelayanan apotek.</p>
                     </div>
                     <div class="flex items-center gap-2">
                         <button type="button" onclick="exportStockGudangCenter(this)"
                             class="flex-1 inline-flex items-center justify-center gap-2 py-2 px-3 rounded-xl bg-blue-600 hover:bg-blue-700 active:scale-95 text-white text-xs font-bold shadow-xs transition-all cursor-pointer">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-tabler icons-tabler-outline icon-tabler-download">
-                                <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
-                                <path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2 -2v-2"/>
-                                <path d="M7 11l5 5l5 -5"/>
-                                <path d="M12 4l0 12"/>
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16"
+                                viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                                stroke-linecap="round" stroke-linejoin="round"
+                                class="icon icon-tabler icons-tabler-outline icon-tabler-download">
+                                <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+                                <path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2 -2v-2" />
+                                <path d="M7 11l5 5l5 -5" />
+                                <path d="M12 4l0 12" />
                             </svg>
                             Export Stok Gudang
                         </button>
                         <a href="{{ route('supplies.stockData') }}" title="Buka Data Stok"
                             class="inline-flex items-center justify-center p-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-bold transition-colors">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
-                                <path d="M12 6h-6a2 2 0 0 0 -2 2v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-6"/>
-                                <path d="M11 13l9 -9"/>
-                                <path d="M15 4h5v5"/>
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16"
+                                viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                                stroke-linecap="round" stroke-linejoin="round">
+                                <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+                                <path d="M12 6h-6a2 2 0 0 0 -2 2v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-6" />
+                                <path d="M11 13l9 -9" />
+                                <path d="M15 4h5v5" />
                             </svg>
                         </a>
                     </div>
@@ -2988,10 +3123,7 @@
         </div>
 
         <!-- Section 1: Pengawasan & Regulasi -->
-        @if (auth()->user()->hasRole('General Manager') ||
-                auth()->user()->hasRole('HO') ||
-                isWarehousePharmacy() ||
-                auth()->user()->hasAnyRole(['Koordinator', 'manager', 'Manager']))
+        @if (isWarehousePharmacy() || hasFeatureAccess(['reports.special_medicines', 'reports.export_expiry'], 'General Manager|HO|Koordinator|koordinator|manager|Manager|Gudang PMI|administrator'))
             <div>
                 <div class="flex items-center gap-2 mb-3">
                     <span class="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Laporan Regulasi &
@@ -2999,8 +3131,7 @@
                 </div>
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <!-- Card SIPNAP (General Manager & Koordinator) -->
-                    @if (auth()->user()->hasRole('General Manager') ||
-                            auth()->user()->hasAnyRole(['Koordinator', 'manager', 'Manager']))
+                    @if (hasFeatureAccess('reports.special_medicines', 'General Manager|Koordinator|koordinator|manager|Manager|administrator'))
                         <div
                             class="bg-gradient-to-br from-amber-50/60 to-orange-50/60 border border-amber-200/80 rounded-2xl p-4 flex flex-col justify-between hover:shadow-md transition-all">
                             <div>
@@ -3043,7 +3174,7 @@
                     @endif
 
                     <!-- Card Monitoring ED -->
-                    @if (auth()->user()->hasRole('General Manager') || auth()->user()->hasRole('HO') || isWarehousePharmacy() || auth()->user()->hasAnyRole(['Koordinator', 'koordinator', 'manager', 'Manager']))
+                    @if (isWarehousePharmacy() || hasFeatureAccess('reports.export_expiry', 'General Manager|HO|Koordinator|koordinator|manager|Manager|Gudang PMI|administrator'))
                         <div
                             class="bg-gradient-to-br from-teal-50/60 to-emerald-50/60 border border-teal-200/80 rounded-2xl p-4 flex flex-col justify-between hover:shadow-md transition-all">
                             <div>
@@ -3444,7 +3575,8 @@
         if (btn) {
             btn.disabled = true;
             btn.classList.add('opacity-75', 'cursor-not-allowed');
-            btn.innerHTML = `<svg class="animate-spin -ml-1 mr-2 h-4 w-4 text-white inline-block" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> Menyiapkan...`;
+            btn.innerHTML =
+                `<svg class="animate-spin -ml-1 mr-2 h-4 w-4 text-white inline-block" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> Menyiapkan...`;
         }
 
         // Direct top-level navigation triggers native browser download safely
@@ -3509,7 +3641,8 @@
         if (btn) {
             btn.disabled = true;
             btn.classList.add('opacity-75', 'cursor-not-allowed');
-            btn.innerHTML = `<svg class="animate-spin -ml-1 mr-2 h-4 w-4 text-white inline-block" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> Menyiapkan...`;
+            btn.innerHTML =
+                `<svg class="animate-spin -ml-1 mr-2 h-4 w-4 text-white inline-block" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> Menyiapkan...`;
         }
 
         // Direct top-level navigation triggers native browser download safely

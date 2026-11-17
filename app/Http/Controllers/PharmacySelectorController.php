@@ -8,7 +8,7 @@ class PharmacySelectorController extends Controller
 {
     public function switch(Request $request)
     {
-        if (!auth()->user()->hasRole('HO') && !auth()->user()->hasRole('administrator') && !auth()->user()->hasRole('General Manager')) {
+        if (!hasFeatureAccess(['branch.switch_and_filter', 'ho.analytics'], ['HO', 'administrator', 'General Manager', 'Koordinator', 'koordinator'])) {
             abort(403, 'Unauthorized role.');
         }
 

@@ -3,9 +3,9 @@
 namespace App\Exports\Orders;
 
 use App\Models\Pharmacies;
+use App\Support\ReceivingDateFilter;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
-use App\Support\ReceivingDateFilter;
 use Maatwebsite\Excel\Concerns\FromArray;
 use Maatwebsite\Excel\Concerns\WithColumnWidths;
 use Maatwebsite\Excel\Concerns\WithStyles;
@@ -19,7 +19,7 @@ class PurchasePaymentExport implements FromArray, WithStyles, WithColumnWidths, 
     protected $pharmacyId;
     protected $startDate;
     protected $endDate;
-    protected $reportType; // 'Konsinyasi', 'Tunai', 'Kredit', 'Jatuh Tempo'
+    protected $reportType;  // 'Konsinyasi', 'Tunai', 'Kredit', 'Jatuh Tempo'
     protected $supplier;
 
     const PPN = 0.11;
@@ -92,7 +92,8 @@ class PurchasePaymentExport implements FromArray, WithStyles, WithColumnWidths, 
         if ($this->supplier) {
             $supplier = $this->supplier;
             $query->where(function ($sq) use ($supplier) {
-                $sq->where('order_items.creditor_code', $supplier)
+                $sq
+                    ->where('order_items.creditor_code', $supplier)
                     ->orWhere('creditors.code', $supplier)
                     ->orWhere('creditors.id', $supplier);
             });
@@ -103,7 +104,8 @@ class PurchasePaymentExport implements FromArray, WithStyles, WithColumnWidths, 
 
     private function buildBody(): array
     {
-        $items = $this->baseQuery()
+        $items = $this
+            ->baseQuery()
             ->select([
                 'receiving_details.id as receiving_details_id',
                 'receiving_details.invoice_number',
@@ -192,19 +194,19 @@ class PurchasePaymentExport implements FromArray, WithStyles, WithColumnWidths, 
                 $hna = floor($dpp / (1 + self::PPN));
                 $ppn = $jumlah - $hna;
                 $dpp = $hna;
-            } else { // TANPA
+            } else {  // TANPA
                 $ppn = 0;
                 $jumlah = $dpp;
             }
 
-            $inv['dpp']    = (float) $dpp;
-            $inv['ppn']    = (float) $ppn;
+            $inv['dpp'] = (float) $dpp;
+            $inv['ppn'] = (float) $ppn;
             $inv['jumlah'] = (float) $jumlah;
         }
         unset($inv);
 
         if ($this->reportType === 'Kredit') {
-            uasort($invoices, fn ($a, $b) => [
+            uasort($invoices, fn($a, $b) => [
                 mb_strtolower((string) ($a['creditor_name'] ?? '')),
                 mb_strtolower((string) ($a['creditor_code'] ?? '')),
                 mb_strtolower((string) ($a['invoice_number'] ?? '')),
@@ -244,10 +246,12 @@ class PurchasePaymentExport implements FromArray, WithStyles, WithColumnWidths, 
             }
 
             $tglFaktur = $inv['invoice_date']
-                ? Carbon::parse($inv['invoice_date'])->format('d/m/Y') : '-';
-            $tglTerima = ReceivingDateFilter::format($inv['receiving_date'], $inv['receiving_details_created_at']);
+                ? Carbon::parse($inv['invoice_date'])->format('d/m/Y')
+                : '-';
+            $tglTerima = ReceivingDateFilter::format(null, $inv['receiving_details_created_at']);
             $jatuhTempo = $inv['invoice_due']
-                ? Carbon::parse($inv['invoice_due'])->format('d/m/Y') : '-';
+                ? Carbon::parse($inv['invoice_due'])->format('d/m/Y')
+                : '-';
 
             if ($isJatuhTempo) {
                 // Jatuh Tempo: NM_KREDITUR | NO_FAKTUR | TGL_FAKTUR | NO_TERIMA | DPP | PPN | JUMLAH | JTH_TEMPO | WKT_KREDIT | TGL_TERIMA
@@ -293,19 +297,31 @@ class PurchasePaymentExport implements FromArray, WithStyles, WithColumnWidths, 
         // Total Row
         if ($isJatuhTempo) {
             $rows[] = [
-                'TOTAL', '', '', '',
+                'TOTAL',
+                '',
+                '',
+                '',
                 (float) $grandDpp,
                 (float) $grandPpn,
                 (float) $grandTotal,
-                '', '', '',
+                '',
+                '',
+                '',
             ];
         } else {
             $rows[] = [
-                'TOTAL', '', '', '', '', '',
+                'TOTAL',
+                '',
+                '',
+                '',
+                '',
+                '',
                 (float) $grandDpp,
                 (float) $grandPpn,
                 (float) $grandTotal,
-                '', '', '',
+                '',
+                '',
+                '',
             ];
         }
 
@@ -331,18 +347,23 @@ class PurchasePaymentExport implements FromArray, WithStyles, WithColumnWidths, 
         $sheet->getStyle('A1')->getFont()->setBold(true)->setSize(13);
         $sheet->getStyle('A4')->getFont()->setBold(true);
 
-        $sheet->getStyle("A{$dataStartRow}:{$lastCol}{$dataStartRow}")
-            ->getFont()->setBold(true);
+        $sheet
+            ->getStyle("A{$dataStartRow}:{$lastCol}{$dataStartRow}")
+            ->getFont()
+            ->setBold(true);
 
-        $sheet->getStyle("A{$dataStartRow}:{$lastCol}{$lastRow}")
-            ->getBorders()->getAllBorders()
+        $sheet
+            ->getStyle("A{$dataStartRow}:{$lastCol}{$lastRow}")
+            ->getBorders()
+            ->getAllBorders()
             ->setBorderStyle(Border::BORDER_THIN);
 
         for ($i = $dataStartRow; $i <= $lastRow; $i++) {
             $sheet->getRowDimension($i)->setRowHeight(22);
         }
 
-        $sheet->getStyle("A{$dataStartRow}:{$lastCol}{$lastRow}")
+        $sheet
+            ->getStyle("A{$dataStartRow}:{$lastCol}{$lastRow}")
             ->getAlignment()
             ->setHorizontal(Alignment::HORIZONTAL_LEFT);
 
@@ -375,7 +396,8 @@ class PurchasePaymentExport implements FromArray, WithStyles, WithColumnWidths, 
                 if ($endRow > $startRow) {
                     $sheet->mergeCells("A{$startRow}:A{$endRow}");
                     $sheet->mergeCells("B{$startRow}:B{$endRow}");
-                    $sheet->getStyle("A{$startRow}:B{$endRow}")
+                    $sheet
+                        ->getStyle("A{$startRow}:B{$endRow}")
                         ->getAlignment()
                         ->setVertical(Alignment::VERTICAL_CENTER);
                 }
@@ -384,16 +406,22 @@ class PurchasePaymentExport implements FromArray, WithStyles, WithColumnWidths, 
         }
 
         foreach ($numericCols as $col) {
-            $sheet->getStyle("{$col}{$dataStartRow}:{$col}{$lastRow}")
-                ->getAlignment()->setHorizontal(Alignment::HORIZONTAL_RIGHT);
-            $sheet->getStyle("{$col}{$dataStartRow}:{$col}{$lastRow}")
-                ->getNumberFormat()->setFormatCode('#,##0');
+            $sheet
+                ->getStyle("{$col}{$dataStartRow}:{$col}{$lastRow}")
+                ->getAlignment()
+                ->setHorizontal(Alignment::HORIZONTAL_RIGHT);
+            $sheet
+                ->getStyle("{$col}{$dataStartRow}:{$col}{$lastRow}")
+                ->getNumberFormat()
+                ->setFormatCode('#,##0');
         }
 
         // Bold the TOTAL row
         if ($lastRow > $dataStartRow) {
-            $sheet->getStyle("A{$lastRow}:{$lastCol}{$lastRow}")
-                ->getFont()->setBold(true);
+            $sheet
+                ->getStyle("A{$lastRow}:{$lastCol}{$lastRow}")
+                ->getFont()
+                ->setBold(true);
         }
     }
 
@@ -401,32 +429,32 @@ class PurchasePaymentExport implements FromArray, WithStyles, WithColumnWidths, 
     {
         if ($this->reportType === 'Jatuh Tempo') {
             return [
-                'A' => 28, // NM_KREDITUR
-                'B' => 20, // NO_FAKTUR
-                'C' => 13, // TGL_FAKTUR
-                'D' => 16, // NO_TERIMA
-                'E' => 18, // DPP
-                'F' => 18, // PPN
-                'G' => 18, // JUMLAH
-                'H' => 13, // JTH_TEMPO
-                'I' => 13, // WKT_KREDIT
-                'J' => 13, // TGL_TERIMA
+                'A' => 28,  // NM_KREDITUR
+                'B' => 20,  // NO_FAKTUR
+                'C' => 13,  // TGL_FAKTUR
+                'D' => 16,  // NO_TERIMA
+                'E' => 18,  // DPP
+                'F' => 18,  // PPN
+                'G' => 18,  // JUMLAH
+                'H' => 13,  // JTH_TEMPO
+                'I' => 13,  // WKT_KREDIT
+                'J' => 13,  // TGL_TERIMA
             ];
         }
 
         return [
-            'A' => 28, // NM_KREDITUR
-            'B' => 15, // KD_KREDITUR
-            'C' => 20, // NO_FAKTUR
-            'D' => 13, // TGL_FAKTUR
-            'E' => 16, // NO_TERIMA
-            'F' => 13, // TGL_TERIMA
-            'G' => 18, // DPP
-            'H' => 18, // PPN
-            'I' => 18, // JUMLAH
-            'J' => 13, // JTH_TEMPO
-            'K' => 13, // WKT_KREDIT
-            'L' => 15, // JNS_BAYAR
+            'A' => 28,  // NM_KREDITUR
+            'B' => 15,  // KD_KREDITUR
+            'C' => 20,  // NO_FAKTUR
+            'D' => 13,  // TGL_FAKTUR
+            'E' => 16,  // NO_TERIMA
+            'F' => 13,  // TGL_TERIMA
+            'G' => 18,  // DPP
+            'H' => 18,  // PPN
+            'I' => 18,  // JUMLAH
+            'J' => 13,  // JTH_TEMPO
+            'K' => 13,  // WKT_KREDIT
+            'L' => 15,  // JNS_BAYAR
         ];
     }
 

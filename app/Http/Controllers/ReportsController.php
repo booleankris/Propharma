@@ -537,8 +537,8 @@ class ReportsController extends Controller
 
     public function exportSpecialMedicines(Request $request)
     {
-        if (!auth()->user()->hasAnyRole(['General Manager', 'Koordinator', 'manager', 'Manager'])) {
-            return response()->json(['message' => 'Hanya General Manager dan Koordinator yang memiliki akses export SIPNAP.'], 403);
+        if (!hasFeatureAccess('reports.special_medicines', ['General Manager', 'Koordinator', 'koordinator', 'manager', 'Manager', 'administrator'])) {
+            return response()->json(['message' => 'Anda tidak memiliki akses export SIPNAP.'], 403);
         }
 
         $pharmacyId = $request->filled('pharmacy_id') ? (int) $request->pharmacy_id : getActivePharmacyId();

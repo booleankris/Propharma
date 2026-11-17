@@ -3,9 +3,9 @@
 namespace App\Exports\Orders;
 
 use App\Models\Pharmacies;
-use Illuminate\Support\Carbon;
-use Illuminate\Support\Facades\DB;
 use App\Support\ReceivingDateFilter;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Carbon;
 use Maatwebsite\Excel\Concerns\FromArray;
 use Maatwebsite\Excel\Concerns\WithColumnWidths;
 use Maatwebsite\Excel\Concerns\WithStyles;
@@ -26,11 +26,11 @@ class OrdersSingleSheetExport implements FromArray, WithStyles, WithColumnWidths
 
     public function __construct($pharmacyId, $startDate, $endDate, $paymentType = null, $sheetTitle = 'Semua')
     {
-        $this->pharmacyId  = $pharmacyId;
-        $this->startDate   = $startDate instanceof Carbon ? $startDate : Carbon::parse($startDate)->startOfDay();
-        $this->endDate     = $endDate instanceof Carbon ? $endDate : Carbon::parse($endDate)->endOfDay();
+        $this->pharmacyId = $pharmacyId;
+        $this->startDate = $startDate instanceof Carbon ? $startDate : Carbon::parse($startDate)->startOfDay();
+        $this->endDate = $endDate instanceof Carbon ? $endDate : Carbon::parse($endDate)->endOfDay();
         $this->paymentType = $paymentType;
-        $this->sheetTitle  = $sheetTitle;
+        $this->sheetTitle = $sheetTitle;
     }
 
     public function title(): string
@@ -70,10 +70,35 @@ class OrdersSingleSheetExport implements FromArray, WithStyles, WithColumnWidths
         $items = $this->purchaseItems($targetPharmacyIds);
 
         $tableHeaders = [
-            'ID', 'No Terima', 'Tgl Terima', 'Nama Kreditur', 'Kode Kreditur', 'No Faktur', 'Tgl Faktur',
-            'DPP', 'PPN', 'Jatuh Tempo', 'Waktu Kredit', 'Jenis Bayar', 'Kode Obat', 'Nama Obat', 'Pabrik',
-            'Qty Beli', 'Kemasan', 'Utuh', 'HNA', 'Jumlah HNA', 'Harga PPN', 'Diskon', 'Value Disc', 'Extra Diskon',
-            'Value Extra Disc', '% Disc Pembelian', 'Jumlah', 'Batch', 'Expired',
+            'ID',
+            'No Terima',
+            'Tgl Terima',
+            'Nama Kreditur',
+            'Kode Kreditur',
+            'No Faktur',
+            'Tgl Faktur',
+            'DPP',
+            'PPN',
+            'Jatuh Tempo',
+            'Waktu Kredit',
+            'Jenis Bayar',
+            'Kode Obat',
+            'Nama Obat',
+            'Pabrik',
+            'Qty Beli',
+            'Kemasan',
+            'Utuh',
+            'HNA',
+            'Jumlah HNA',
+            'Harga PPN',
+            'Diskon',
+            'Value Disc',
+            'Extra Diskon',
+            'Value Extra Disc',
+            '% Disc Pembelian',
+            'Jumlah',
+            'Batch',
+            'Expired',
         ];
 
         if ($items->isEmpty()) {
@@ -100,7 +125,7 @@ class OrdersSingleSheetExport implements FromArray, WithStyles, WithColumnWidths
             $jumlah = $amounts['jumlah'];
             $hargaPpn = round($rawPrice * (1 + self::PPN));
 
-            $tglTerima = ReceivingDateFilter::format($item->receiving_date, $item->receiving_details_created_at);
+            $tglTerima = ReceivingDateFilter::format(null, $item->receiving_details_created_at);
             $tglFaktur = $item->invoice_date ? Carbon::parse($item->invoice_date)->format('d/m/Y') : '-';
             $jatuhTempo = $item->invoice_due ? Carbon::parse($item->invoice_due)->format('d/m/Y') : '-';
             $expired = $item->expired_date ? Carbon::parse($item->expired_date)->format('d/m/Y') : '-';
@@ -120,12 +145,35 @@ class OrdersSingleSheetExport implements FromArray, WithStyles, WithColumnWidths
             $utuh = $isReceivedPack !== null ? $isReceivedPack : '-';
 
             $rows[] = [
-                $item->id, $item->receiving_details_code ?? '-', $tglTerima, $item->creditor_name ?? '-',
-                $item->creditor_code ?? '-', $item->invoice_number ?? '-', $tglFaktur, $dpp, $ppn, $jatuhTempo,
-                $item->invoice_times ?? '-', $item->invoice_payment ?? '-', $item->medicine_code ?? '-',
-                $item->medicine_name ?? '-', $item->factory_name ?? '-', (int) $qty, $packaging,
-                $utuh, $rawPrice, $gross, $hargaPpn, $item->discount ?? 0, round($nomDisc, 2),
-                $item->extra_discount ?? 0, round($nomExtraDisc, 2), $persenDisc, $jumlah, $batch, $expired,
+                $item->id,
+                $item->receiving_details_code ?? '-',
+                $tglTerima,
+                $item->creditor_name ?? '-',
+                $item->creditor_code ?? '-',
+                $item->invoice_number ?? '-',
+                $tglFaktur,
+                $dpp,
+                $ppn,
+                $jatuhTempo,
+                $item->invoice_times ?? '-',
+                $item->invoice_payment ?? '-',
+                $item->medicine_code ?? '-',
+                $item->medicine_name ?? '-',
+                $item->factory_name ?? '-',
+                (int) $qty,
+                $packaging,
+                $utuh,
+                $rawPrice,
+                $gross,
+                $hargaPpn,
+                $item->discount ?? 0,
+                round($nomDisc, 2),
+                $item->extra_discount ?? 0,
+                round($nomExtraDisc, 2),
+                $persenDisc,
+                $jumlah,
+                $batch,
+                $expired,
             ];
             $grandDpp += $dpp;
             $grandPpn += $ppn;
@@ -156,7 +204,7 @@ class OrdersSingleSheetExport implements FromArray, WithStyles, WithColumnWidths
         return $this->purchaseItems($targetPharmacyIds)->map(function ($item) {
             $amounts = $this->calculateAmounts($item);
             return [
-                'date' => ReceivingDateFilter::format($item->receiving_date, $item->receiving_details_created_at),
+                'date' => ReceivingDateFilter::format(null, $item->receiving_details_created_at),
                 'payment' => strtoupper(trim((string) ($item->invoice_payment ?? ''))),
                 'total' => $amounts['jumlah'],
                 'ppn' => $amounts['ppn'],
@@ -166,7 +214,6 @@ class OrdersSingleSheetExport implements FromArray, WithStyles, WithColumnWidths
 
     private function purchaseItems(array $targetPharmacyIds)
     {
-
         $query = DB::table('receiving_items')
             ->join('receiving_details', 'receiving_details.id', '=', 'receiving_items.receiving_details_id')
             ->join('receiving', 'receiving.id', '=', 'receiving_details.receiving_id')
@@ -183,16 +230,18 @@ class OrdersSingleSheetExport implements FromArray, WithStyles, WithColumnWidths
         if ($this->paymentType !== null) {
             if ($this->paymentType === 'OTHER') {
                 $query->where(function ($q) {
-                    $q->whereNull('receiving_details.invoice_payment')
-                      ->orWhere('receiving_details.invoice_payment', '')
-                      ->orWhereNotIn(DB::raw('UPPER(TRIM(receiving_details.invoice_payment))'), ['KREDIT', 'TUNAI', 'KONSINYASI']);
+                    $q
+                        ->whereNull('receiving_details.invoice_payment')
+                        ->orWhere('receiving_details.invoice_payment', '')
+                        ->orWhereNotIn(DB::raw('UPPER(TRIM(receiving_details.invoice_payment))'), ['KREDIT', 'TUNAI', 'KONSINYASI']);
                 });
             } else {
                 $query->where(DB::raw('UPPER(TRIM(receiving_details.invoice_payment))'), strtoupper(trim($this->paymentType)));
             }
         }
 
-        return $query->select([
+        return $query
+            ->select([
                 'receiving_items.id',
                 'receiving_items.qty_received',
                 'receiving_items.qty',
@@ -293,7 +342,7 @@ class OrdersSingleSheetExport implements FromArray, WithStyles, WithColumnWidths
             ->getAlignment()
             ->setHorizontal(Alignment::HORIZONTAL_LEFT);
 
-        // Right-align & number format: 
+        // Right-align & number format:
         // H=DPP, I=PPN, S=HNA, T=Jumlah HNA, U=Harga PPN, V=Diskon, W=Value Disc, X=Extra Diskon, Y=Value Extra Disc, AA=Jumlah
         foreach (['H', 'I', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'AA'] as $col) {
             $sheet
@@ -312,13 +361,13 @@ class OrdersSingleSheetExport implements FromArray, WithStyles, WithColumnWidths
             ->getAlignment()
             ->setHorizontal(Alignment::HORIZONTAL_RIGHT);
         $sheet
-            ->getStyle("Z" . ($dataStartRow + 1) . ":Z{$lastRow}")
+            ->getStyle('Z' . ($dataStartRow + 1) . ":Z{$lastRow}")
             ->getNumberFormat()
             ->setFormatCode('0.00"%"');
 
         // Text format for Batch (Col AB) so leading zeros or scientific-like strings are preserved
         $sheet
-            ->getStyle("AB" . ($dataStartRow + 1) . ":AB{$lastRow}")
+            ->getStyle('AB' . ($dataStartRow + 1) . ":AB{$lastRow}")
             ->getNumberFormat()
             ->setFormatCode(\PhpOffice\PhpSpreadsheet\Style\NumberFormat::FORMAT_TEXT);
     }

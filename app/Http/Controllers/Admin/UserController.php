@@ -4,36 +4,35 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\Pharmacies;
+use App\Models\User;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB as FacadesDB;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Hash as FacadesHash;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Str;
 use Spatie\Permission\Models\Role;
-use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\DB as FacadesDB;
-use Illuminate\Support\Facades\Hash as FacadesHash;
-use Illuminate\Support\Facades\Hash;
-
-use App\Models\User;
-
+use DataTables;
 use Form;
 use Image;
-use DataTables;
 
 class UserController extends Controller
 {
     public function __construct()
     {
         $this->middleware('auth');
-        $this->middleware('role:administrator');
+        $this->middleware('role:administrator|General Manager|manager|Manager');
     }
 
     public function index(Request $request)
     {
         if ($request->ajax()) {
-            $users = User::select(['id', 'pharmacy_id', 'username', 'name', 'secret_pin' ,'is_fixed']);
-            
+            $users = User::select(['id', 'pharmacy_id', 'username', 'name', 'secret_pin', 'is_fixed']);
+
             if ($request->has('order') == false) {
-                $users = $users->orderBy('is_fixed', 'DESC')
+                $users = $users
+                    ->orderBy('is_fixed', 'DESC')
                     ->orderBy('name', 'ASC');
             }
 
@@ -42,8 +41,8 @@ class UserController extends Controller
                 ->addColumn('pharmacy', function ($user) {
                     return $user->pharmacy
                         ? '<span class="badge badge-outline-info px-2 py-1">'
-                        . ucfirst($user->pharmacy->name) .
-                        '</span>'
+                            . ucfirst($user->pharmacy->name)
+                            . '</span>'
                         : '-';
                 })
                 ->addColumn('roles', function ($user) {
@@ -51,8 +50,8 @@ class UserController extends Controller
 
                     foreach ($user->getRoleNames() as $role) {
                         $roles .= '<span class="badge badge-primary mr-1">'
-                            . ucfirst($role) .
-                            '</span>';
+                            . ucfirst($role)
+                            . '</span>';
                     }
 
                     return $roles ?: '-';
@@ -61,8 +60,9 @@ class UserController extends Controller
                     $button = '<div class="btn-toolbar" role="toolbar">
                                             <div class="btn-group m-1 mr-2" role="group">
                                             <a class="btn btn-outline-primary" href="' . route('users.show', $user->id) . '">Detail</a>';
-                    if (Auth::user()->hasRole('administrator')) {
-                        if (Auth::user()->id == $user->id || $user->is_fixed == 0) {
+                    if (Auth::user()->hasAnyRole(['administrator', 'General Manager', 'manager', 'Manager'])) {
+                        $canEdit = Auth::user()->id == $user->id || ($user->is_fixed == 0 && (Auth::user()->hasRole('administrator') || !$user->hasRole('administrator')));
+                        if ($canEdit) {
                             $button .= '<a class="btn btn-primary" href="' . route('users.edit', $user->id) . '">Edit</a>';
                         }
                     }
@@ -76,7 +76,8 @@ class UserController extends Controller
                     $button .= '</div>';
                     return $button;
                 })
-                ->rawColumns(['roles', 'action', 'pharmacy'])->toJson();
+                ->rawColumns(['roles', 'action', 'pharmacy'])
+                ->toJson();
         }
 
         return view('admin.users.index');
@@ -93,23 +94,23 @@ class UserController extends Controller
     public function store(Request $request)
     {
         $this->validate($request, [
-            'name'        => 'required|string|min:3|max:255',
-            'username'    => 'required|string|min:3|max:255|unique:users,username',
+            'name' => 'required|string|min:3|max:255',
+            'username' => 'required|string|min:3|max:255|unique:users,username',
             'pharmacy_id' => 'required|exists:pharmacies,id',
-            'password'    => 'required|min:4|same:confirm-password',
-            'roles'       => 'required'
+            'password' => 'required|min:4|same:confirm-password',
+            'roles' => 'required'
         ], [
-            'name.required'        => 'Nama lengkap wajib diisi.',
-            'name.min'             => 'Nama lengkap minimal 3 karakter.',
-            'username.required'    => 'Username wajib diisi.',
-            'username.min'         => 'Username minimal 3 karakter.',
-            'username.unique'      => 'Username sudah digunakan, silakan gunakan username lain.',
+            'name.required' => 'Nama lengkap wajib diisi.',
+            'name.min' => 'Nama lengkap minimal 3 karakter.',
+            'username.required' => 'Username wajib diisi.',
+            'username.min' => 'Username minimal 3 karakter.',
+            'username.unique' => 'Username sudah digunakan, silakan gunakan username lain.',
             'pharmacy_id.required' => 'Apotek wajib dipilih.',
-            'pharmacy_id.exists'   => 'Apotek yang dipilih tidak valid.',
-            'password.required'    => 'Password / PIN wajib diisi.',
-            'password.min'         => 'Password / PIN minimal 4 karakter.',
-            'password.same'        => 'Konfirmasi password / PIN tidak cocok.',
-            'roles.required'       => 'Level / Role wajib dipilih.',
+            'pharmacy_id.exists' => 'Apotek yang dipilih tidak valid.',
+            'password.required' => 'Password / PIN wajib diisi.',
+            'password.min' => 'Password / PIN minimal 4 karakter.',
+            'password.same' => 'Konfirmasi password / PIN tidak cocok.',
+            'roles.required' => 'Level / Role wajib dipilih.',
         ]);
 
         try {
@@ -124,7 +125,8 @@ class UserController extends Controller
 
             FacadesDB::commit();
 
-            return redirect()->route('users.index')
+            return redirect()
+                ->route('users.index')
                 ->with('success', 'User ' . $user->name . ' berhasil ditambahkan');
         } catch (\Throwable $e) {
             FacadesDB::rollBack();
@@ -132,7 +134,8 @@ class UserController extends Controller
                 'trace' => $e->getTraceAsString()
             ]);
 
-            return redirect()->back()
+            return redirect()
+                ->back()
                 ->withInput($request->except(['password', 'confirm-password']))
                 ->with('error', 'Gagal menambahkan user: ' . $e->getMessage());
         }
@@ -162,20 +165,20 @@ class UserController extends Controller
     public function update(Request $request, $id)
     {
         $this->validate($request, [
-            'name'        => 'required|string|min:3|max:255',
-            'username'    => 'required|string|min:3|max:255|unique:users,username,' . $id,
+            'name' => 'required|string|min:3|max:255',
+            'username' => 'required|string|min:3|max:255|unique:users,username,' . $id,
             'pharmacy_id' => 'required|exists:pharmacies,id',
-            'password'    => 'nullable|min:4|same:confirm-password',
-            'roles'       => 'required'
+            'password' => 'nullable|min:4|same:confirm-password',
+            'roles' => 'required'
         ], [
-            'name.required'        => 'Nama lengkap wajib diisi.',
-            'username.required'    => 'Username wajib diisi.',
-            'username.unique'      => 'Username sudah digunakan oleh user lain.',
+            'name.required' => 'Nama lengkap wajib diisi.',
+            'username.required' => 'Username wajib diisi.',
+            'username.unique' => 'Username sudah digunakan oleh user lain.',
             'pharmacy_id.required' => 'Apotek wajib dipilih.',
-            'pharmacy_id.exists'   => 'Apotek yang dipilih tidak valid.',
-            'password.min'         => 'Password / PIN minimal 4 karakter.',
-            'password.same'        => 'Konfirmasi password / PIN tidak cocok.',
-            'roles.required'       => 'Level / Role wajib dipilih.',
+            'pharmacy_id.exists' => 'Apotek yang dipilih tidak valid.',
+            'password.min' => 'Password / PIN minimal 4 karakter.',
+            'password.same' => 'Konfirmasi password / PIN tidak cocok.',
+            'roles.required' => 'Level / Role wajib dipilih.',
         ]);
 
         try {
@@ -199,13 +202,15 @@ class UserController extends Controller
 
             FacadesDB::commit();
 
-            return redirect()->route('users.index')
+            return redirect()
+                ->route('users.index')
                 ->with('success', 'User ' . $user->name . ' berhasil diperbarui');
         } catch (\Throwable $e) {
             FacadesDB::rollBack();
             \Illuminate\Support\Facades\Log::error('Error updating user ' . $id . ': ' . $e->getMessage());
 
-            return redirect()->back()
+            return redirect()
+                ->back()
                 ->withInput($request->except(['password', 'confirm-password']))
                 ->with('error', 'Gagal memperbarui user: ' . $e->getMessage());
         }

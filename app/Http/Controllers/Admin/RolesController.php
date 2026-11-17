@@ -3,29 +3,27 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
-use Illuminate\Http\Request;
-use Spatie\Permission\Models\Role;
-use Spatie\Permission\Models\Permission;
-
-use App\PermissionsLabel;
 use App\Models\PermissionsLabel as ModelsPermissionsLabel;
-
+use App\PermissionsLabel;
+use Illuminate\Http\Request;
+use Spatie\Permission\Models\Permission;
+use Spatie\Permission\Models\Role;
 use DB;
 
 class RolesController extends Controller
 {
-    public function __construct() 
+    public function __construct()
     {
         $this->middleware('auth');
-        $this->middleware('role:administrator');
+        $this->middleware('role:administrator|General Manager|manager|Manager');
     }
 
     public function index(Request $request)
     {
         $roles = Role::orderBy('name', 'ASC')
-                    ->paginate(5);
+            ->paginate(5);
 
-        return view('admin.roles.index',compact('roles'))
+        return view('admin.roles.index', compact('roles'))
             ->with('i', ($request->input('page', 1) - 1) * 5);
     }
 
@@ -38,7 +36,7 @@ class RolesController extends Controller
     public function store(Request $request)
     {
         $this->validate($request, [
-            'name'       => 'required|unique:roles,name',
+            'name' => 'required|unique:roles,name',
             'permission' => 'required',
         ]);
 
@@ -46,15 +44,16 @@ class RolesController extends Controller
         $role->save();
         $role->permissions()->sync($request->input('permission'));
 
-        return redirect()->route('roles.index')
-                        ->with('success','Level berhasil dibuat');
+        return redirect()
+            ->route('roles.index')
+            ->with('success', 'Level berhasil dibuat');
     }
 
     public function show($id)
     {
         $role = Role::find($id);
-        $rolePermissions = Permission::join("role_has_permissions","role_has_permissions.permission_id","=","permissions.id")
-            ->where("role_has_permissions.role_id",$id)
+        $rolePermissions = Permission::join('role_has_permissions', 'role_has_permissions.permission_id', '=', 'permissions.id')
+            ->where('role_has_permissions.role_id', $id)
             ->get();
 
         return view('admin.roles.show', compact('role', 'rolePermissions'));
@@ -63,27 +62,28 @@ class RolesController extends Controller
     public function destroy($id)
     {
         $role = Role::findOrFail($id);
-        if($role->fixed == 0) {
+        if ($role->fixed == 0) {
             $role->delete();
-            return redirect()->route('roles.index')
-                        ->with('success', 'Level berhasil dihapus');
+            return redirect()
+                ->route('roles.index')
+                ->with('success', 'Level berhasil dihapus');
+        } else {
+            return redirect()
+                ->route('roles.index')
+                ->with('error', 'Level tidak dapat dihapus');
         }
-        else {
-            return redirect()->route('roles.index')
-                        ->with('error', 'Level tidak dapat dihapus');
-        }
-        
     }
 
     public function edit($id)
     {
         $role = Role::find($id);
         $permission = Permission::get();
-        $rolePermissions = DB::table("role_has_permissions")->where("role_has_permissions.role_id",$id)
-            ->pluck('role_has_permissions.permission_id','role_has_permissions.permission_id')
+        $rolePermissions = DB::table('role_has_permissions')
+            ->where('role_has_permissions.role_id', $id)
+            ->pluck('role_has_permissions.permission_id', 'role_has_permissions.permission_id')
             ->all();
-    
-        return view('admin.roles.edit',compact('role','permission','rolePermissions'));
+
+        return view('admin.roles.edit', compact('role', 'permission', 'rolePermissions'));
     }
 
     public function update(Request $request, $id)
@@ -92,14 +92,15 @@ class RolesController extends Controller
             'name' => 'required',
             'permission' => 'required',
         ]);
-    
+
         $role = Role::find($id);
         $role->name = $request->input('name');
         $role->save();
-    
+
         $role->permissions()->sync($request->input('permission'));
-    
-        return redirect()->route('roles.index')
-                        ->with('success','Role updated successfully');
+
+        return redirect()
+            ->route('roles.index')
+            ->with('success', 'Role updated successfully');
     }
 }

@@ -82,6 +82,7 @@ class HutangExport implements FromArray, WithStyles, WithColumnWidths, WithTitle
             },
             'pharmacy',
         ])
+            ->whereIn('status', [1, 2, 3])
             ->whereIn('pharmacy_id', $this->targetPharmacyIds)
             ->whereHas('receiving_details', function ($q) {
                 $q->where('invoice_payment', 'KREDIT');
@@ -152,15 +153,11 @@ class HutangExport implements FromArray, WithStyles, WithColumnWidths, WithTitle
         foreach ($receivings as $rcv) {
             foreach ($rcv->receiving_details as $detail) {
                 $items = $detail->receiving_items ?? collect();
-                $invoiceAmounts = ReceivingInvoiceTotals::calculate(
-                    $items,
-                    $detail->invoice_ppn ?? $detail->creditor?->ppn_type
-                );
+                $ppnType = strtoupper(trim($detail->invoice_ppn ?? $detail->creditor?->ppn_type ?? 'TANPA'));
+                $invoiceAmounts = ReceivingInvoiceTotals::calculate($items, $ppnType);
                 $subtotal = $invoiceAmounts['subtotal'];
                 $ppn = $invoiceAmounts['ppn'];
-                $calculatedTotal = $invoiceAmounts['total'];
-                $nominal = (float) ($detail->nominal ?? $calculatedTotal);
-                $finalTotal = $nominal > 0 ? $nominal : $calculatedTotal;
+                $finalTotal = $invoiceAmounts['total'];
 
                 // Hitung retur pembelian
                 $matchedReturns = collect();
@@ -178,10 +175,8 @@ class HutangExport implements FromArray, WithStyles, WithColumnWidths, WithTitle
                 $totalRetur = round(max($sudahPotongRetur, $financeRetur), 2);
                 $netTotal = round(max(0, $finalTotal - $totalRetur), 2);
 
-                $totalPaid = (float) $detail->payments->where('payment_type', '!=', 'RETUR')->sum('amount');
-                if ($totalPaid > $netTotal) {
-                    $totalPaid = $netTotal;
-                }
+                $paidCashBank = (float) $detail->payments->where('payment_type', '!=', 'RETUR')->sum('amount');
+                $totalPaid = round(min($netTotal, $paidCashBank), 2);
                 $sisa = round(max(0, $netTotal - $totalPaid), 2);
                 $isLunas = ($sisa < 0.005 && $finalTotal > 0) || ((int) $rcv->status === 3 && $sisa <= 0.005);
                 $sisa = $isLunas ? 0 : $sisa;
@@ -215,12 +210,12 @@ class HutangExport implements FromArray, WithStyles, WithColumnWidths, WithTitle
                         continue;
                 }
 
-                $tglFaktur = $this->safeFormatDate($rcv->date);
+                $tglTerima = $this->safeFormatDate($detail->created_at ?? $rcv->date);
                 $tempoDate = $this->safeFormatDate($detail->invoice_due);
                 $dateField = $this->filters['date_field'] ?? 'due';
                 $filterDate = match ($dateField) {
                     'invoice' => $detail->invoice_date,
-                    'received' => $rcv->date,
+                    'received' => $detail->created_at ?? $rcv->date,
                     default => $detail->invoice_due,
                 };
                 $filterDate = $this->safeParseDate($filterDate)?->format('Y-m-d') ?? '';
@@ -257,7 +252,7 @@ class HutangExport implements FromArray, WithStyles, WithColumnWidths, WithTitle
                     $detail->creditor->name ?? '-',
                     $detail->receiving_details_code ?: ($rcv->code ?: '-'),
                     $rcv->pharmacy->name ?? '-',
-                    $tglFaktur,
+                    $tglTerima,
                     $tempoDate,
                     $statusLabel,
                     $subtotal,
