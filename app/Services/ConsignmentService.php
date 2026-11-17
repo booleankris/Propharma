@@ -33,17 +33,18 @@ class ConsignmentService
      */
     public function getData(array $pharmacyIds): array
     {
+        Receiving::syncPostedZeroStatus($pharmacyIds);
+
         $receivings = Receiving::with([
             'pharmacy',
-            'receiving_details' => fn ($query) => $query->where('invoice_payment', 'KONSINYASI'),
+            'receiving_details' => fn ($query) => $query->where('invoice_payment', 'KONSINYASI')->postedToStock(),
             'receiving_details.creditor',
             'receiving_details.payments.account',
             'receiving_details.payments.creator',
-            'receiving_details.receiving_items.order_items.medicines',
+            'receiving_details.receiving_items' => fn ($query) => $query->whereNotNull('batches_id')->with('order_items.medicines'),
         ])
-            ->whereIn('status', [1, 2, 3])
             ->whereIn('pharmacy_id', $pharmacyIds)
-            ->whereHas('receiving_details', fn ($query) => $query->where('invoice_payment', 'KONSINYASI'))
+            ->whereHas('receiving_details', fn ($query) => $query->where('invoice_payment', 'KONSINYASI')->postedToStock())
             ->latest('updated_at')
             ->get();
 

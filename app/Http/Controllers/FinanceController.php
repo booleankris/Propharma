@@ -1392,14 +1392,16 @@ class FinanceController extends Controller
             ->with([
                 'receiving:id,pharmacy_id,status,date,created_at',
                 'creditor:code,ppn_type',
-                'receiving_items:id,receiving_details_id,total,raw_price,qty_received',
+                'receiving_items' => fn($query) => $query
+                    ->whereNotNull('batches_id')
+                    ->select(['id', 'receiving_details_id', 'total', 'raw_price', 'qty_received', 'qty', 'discount', 'extra_discount']),
                 'payments' => fn($query) => $query->whereDate('payment_date', '<=', $asOfDate),
             ])
             ->whereRaw('UPPER(TRIM(COALESCE(invoice_payment, ""))) = ?', ['KREDIT'])
+            ->postedToStock()
             ->whereHas('receiving', function ($query) use ($pharmacyIds, $asOfDate) {
                 $query
                     ->whereIn('pharmacy_id', $pharmacyIds)
-                    ->whereIn('status', [1, 2, 3])
                     ->where(function ($date) use ($asOfDate) {
                         $date->whereRaw("COALESCE(STR_TO_DATE(NULLIF(date, ''), '%d/%m/%Y'), STR_TO_DATE(NULLIF(date, ''), '%Y-%m-%d'), DATE(created_at)) <= ?", [$asOfDate]);
                     });
@@ -1922,11 +1924,14 @@ class FinanceController extends Controller
         $creditDetails = ReceivingDetails::with([
             'receiving:id,pharmacy_id,status',
             'creditor:code,name,ppn_type',
-            'receiving_items:id,receiving_details_id,total,raw_price,qty_received',
+            'receiving_items' => fn($query) => $query
+                ->whereNotNull('batches_id')
+                ->select(['id', 'receiving_details_id', 'total', 'raw_price', 'qty_received', 'qty', 'discount', 'extra_discount']),
             'payments:id,receiving_detail_id,amount',
         ])
             ->whereRaw('UPPER(TRIM(COALESCE(invoice_payment, ""))) = ?', ['KREDIT'])
-            ->whereHas('receiving', fn($query) => $query->whereIn('pharmacy_id', $pharmacyIds)->whereIn('status', [1, 2, 3]))
+            ->postedToStock()
+            ->whereHas('receiving', fn($query) => $query->whereIn('pharmacy_id', $pharmacyIds))
             ->get();
         foreach ($creditDetails as $detail) {
             $subtotal = 0.0;
@@ -2046,7 +2051,8 @@ class FinanceController extends Controller
         $periodCreditDetails = ReceivingDetails::with(['creditor:code,ppn_type', 'receiving_items' => fn($query) => $query
                 ->whereRaw('created_at >= ? AND created_at < ?', [FinanceShift::start($startDate), FinanceShift::endExclusive($endDate)])])
             ->whereRaw('UPPER(TRIM(COALESCE(invoice_payment, ""))) = ?', ['KREDIT'])
-            ->whereHas('receiving', fn($query) => $query->whereIn('pharmacy_id', $pharmacyIds)->whereIn('status', [1, 2, 3]))
+            ->postedToStock()
+            ->whereHas('receiving', fn($query) => $query->whereIn('pharmacy_id', $pharmacyIds))
             ->where(function ($dateQ) use ($startDate, $endDate) {
                 $dateQ
                     ->whereBetween('receiving_details.created_at', [FinanceShift::start($startDate), FinanceShift::endExclusive($endDate)])
@@ -2231,21 +2237,21 @@ class FinanceController extends Controller
     protected function getHutangData()
     {
         $targetPharmacyIds = $this->getTargetPharmacyIds();
+        Receiving::syncPostedZeroStatus($targetPharmacyIds);
 
         $receivingsKredit = Receiving::with([
             'receiving_details' => function ($query) {
-                $query->where('invoice_payment', 'KREDIT');
+                $query->where('invoice_payment', 'KREDIT')->postedToStock();
             },
             'receiving_details.creditor',
             'receiving_details.payments.account',
             'receiving_details.payments.creator',
-            'receiving_details.receiving_items.order_items.medicines',
+            'receiving_details.receiving_items' => fn($query) => $query->whereNotNull('batches_id')->with('order_items.medicines'),
             'pharmacy'
         ])
-            ->whereIn('status', [1, 2, 3])
             ->whereIn('pharmacy_id', $targetPharmacyIds)
             ->whereHas('receiving_details', function ($query) {
-                $query->where('invoice_payment', 'KREDIT');
+                $query->where('invoice_payment', 'KREDIT')->postedToStock();
             })
             ->latest('updated_at')
             ->get();
@@ -2498,21 +2504,21 @@ class FinanceController extends Controller
     protected function getCashData()
     {
         $targetPharmacyIds = $this->getTargetPharmacyIds();
+        Receiving::syncPostedZeroStatus($targetPharmacyIds);
 
         $receivingsCash = Receiving::with([
             'receiving_details' => function ($query) {
-                $query->where('invoice_payment', 'TUNAI');
+                $query->where('invoice_payment', 'TUNAI')->postedToStock();
             },
             'receiving_details.creditor',
             'receiving_details.payments.account',
             'receiving_details.payments.creator',
-            'receiving_details.receiving_items.order_items.medicines',
+            'receiving_details.receiving_items' => fn($query) => $query->whereNotNull('batches_id')->with('order_items.medicines'),
             'pharmacy'
         ])
-            ->whereIn('status', [1, 2, 3])
             ->whereIn('pharmacy_id', $targetPharmacyIds)
             ->whereHas('receiving_details', function ($query) {
-                $query->where('invoice_payment', 'TUNAI');
+                $query->where('invoice_payment', 'TUNAI')->postedToStock();
             })
             ->latest('updated_at')
             ->take(100)
@@ -4731,7 +4737,8 @@ class FinanceController extends Controller
             $matches = ReceivingDetails::with(['receiving_items.order_items', 'receiving_items.order_items.medicines', 'receiving', 'creditor'])
                 ->where('invoice_payment', 'KREDIT')
                 ->where('invoice_number', $invoiceNumber)
-                ->whereHas('receiving', fn($query) => $query->whereIn('pharmacy_id', $pharmacyIds)->whereIn('status', [1, 2, 3]))
+                ->postedToStock()
+                ->whereHas('receiving', fn($query) => $query->whereIn('pharmacy_id', $pharmacyIds))
                 ->get();
             if ($invoiceNumber !== '' && $matches->count() === 0) {
                 $errors[] = "Baris {$line}: Faktur '{$invoiceNumber}' tidak ditemukan pada cabang yang dapat diakses.";

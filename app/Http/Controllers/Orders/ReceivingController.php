@@ -2107,6 +2107,10 @@ class ReceivingController extends Controller
                 ReceivingDetails::whereKey($oldDetailId)->delete();
             }
 
+            if ($isCommittedToStock && $targetDetail->receiving_id) {
+                Receiving::syncPostedZeroStatus(null, [(int) $targetDetail->receiving_id]);
+            }
+
             DB::commit();
 
             return response()->json([
@@ -2594,6 +2598,10 @@ class ReceivingController extends Controller
                 'batches_id' => $batch->id,
             ]);
 
+            if ($detail->receiving_id) {
+                Receiving::syncPostedZeroStatus(null, [(int) $detail->receiving_id]);
+            }
+
             if (!$isWarehouse && isset($transferHeader)) {
                 MedicineTransferItems::create([
                     'medicine_transfer_id' => $transferHeader->id,
@@ -2779,6 +2787,10 @@ class ReceivingController extends Controller
                 $source->delete();
             }
 
+            if ($target->receiving_id) {
+                Receiving::syncPostedZeroStatus(null, [(int) $target->receiving_id]);
+            }
+
             DB::commit();
 
             return response()->json([
@@ -2855,6 +2867,10 @@ class ReceivingController extends Controller
                 if ($oldId != $targetDetail->id && ReceivingItems::where('receiving_details_id', $oldId)->count() === 0) {
                     ReceivingDetails::where('id', $oldId)->delete();
                 }
+            }
+
+            if ($targetDetail->receiving_id) {
+                Receiving::syncPostedZeroStatus(null, [(int) $targetDetail->receiving_id]);
             }
 
             DB::commit();
@@ -3916,9 +3932,19 @@ class ReceivingController extends Controller
                 OrderItems::whereIn('id', $savedOrderItemIds)->update(['status' => 2]);
             }
 
-            // Update receiving status to partially received (2) if still 0
-            if ($receiving && $receiving->status == 0) {
-                $receiving->update(['status' => 2]);
+            // Naikkan status semua header receiving yang item-nya sudah masuk stok (batches_id tidak null) dari 0 -> 2.
+            $postedReceivingIds = $receivingItems
+                ->pluck('receiving_details.receiving_id')
+                ->push($receiving?->id)
+                ->push($order->receiving_id)
+                ->filter()
+                ->map(fn ($id) => (int) $id)
+                ->unique()
+                ->values()
+                ->all();
+
+            if (!empty($postedReceivingIds)) {
+                Receiving::syncPostedZeroStatus(null, $postedReceivingIds);
             }
             if ($order && $order->status == 1) {
                 $order->update(['status' => 2]);

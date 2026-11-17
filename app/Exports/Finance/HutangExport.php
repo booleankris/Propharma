@@ -74,18 +74,24 @@ class HutangExport implements FromArray, WithStyles, WithColumnWidths, WithTitle
         ];
 
         // 2. Query Data
+        Receiving::syncPostedZeroStatus($this->targetPharmacyIds);
+
         $query = Receiving::with([
             'receiving_details' => function ($q) {
                 $q
                     ->where('invoice_payment', 'KREDIT')
-                    ->with(['creditor', 'payments', 'receiving_items.order_items.medicines']);
+                    ->postedToStock()
+                    ->with([
+                        'creditor',
+                        'payments',
+                        'receiving_items' => fn ($ri) => $ri->whereNotNull('batches_id')->with('order_items.medicines'),
+                    ]);
             },
             'pharmacy',
         ])
-            ->whereIn('status', [1, 2, 3])
             ->whereIn('pharmacy_id', $this->targetPharmacyIds)
             ->whereHas('receiving_details', function ($q) {
-                $q->where('invoice_payment', 'KREDIT');
+                $q->where('invoice_payment', 'KREDIT')->postedToStock();
             });
 
         if (!empty($this->filters['search'])) {

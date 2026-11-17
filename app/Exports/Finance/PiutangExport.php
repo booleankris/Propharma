@@ -289,7 +289,8 @@ class PiutangExport implements FromArray, WithStyles, WithColumnWidths, WithTitl
         $this->detailHeaderRow = count($rows) + 1;
         $rows[] = ['No. Transaksi', 'Debitur / Instansi', 'Nama Obat', 'Qty', 'Harga Satuan (Rp)', 'Diskon (Rp)', 'Total Setelah Diskon (Rp)'];
         $this->detailDataStartRow = count($rows) + 1;
-        foreach ($detailRows as $detailRow) $rows[] = $detailRow;
+        foreach ($detailRows as $detailRow)
+            $rows[] = $detailRow;
         $this->detailDataEndRow = count($rows);
 
         return $rows;
@@ -478,7 +479,8 @@ class PiutangExport implements FromArray, WithStyles, WithColumnWidths, WithTitl
                 'numberFormat' => ['formatCode' => '#,##0.00'],
             ]);
             for ($row = $start; $row <= $end; $row++) {
-                if ($row % 2 === 0) $sheet->getStyle("A{$row}:G{$row}")->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB('F8FAFC');
+                if ($row % 2 === 0)
+                    $sheet->getStyle("A{$row}:G{$row}")->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB('F8FAFC');
             }
         }
     }

@@ -260,7 +260,8 @@ class CashflowTradeReportService
                 'payments' => fn($query) => $query->whereDate('payment_date', '<=', $paymentCutoff),
             ])
             ->whereRaw('UPPER(TRIM(COALESCE(invoice_payment, ""))) = ?', ['KREDIT'])
-            ->whereHas('receiving', fn($query) => $query->whereIn('pharmacy_id', $pharmacyIds)->whereIn('status', [1, 2, 3]))
+            ->postedToStock()
+            ->whereHas('receiving', fn($query) => $query->whereIn('pharmacy_id', $pharmacyIds))
             ->where(function ($dateQuery) use ($cutoff, $startDate) {
                 $dateQuery->where('receiving_details.created_at', '<', $cutoff)
                     ->orWhereHas('receiving', function ($rq) use ($startDate) {

@@ -76,17 +76,24 @@ class CashExport implements FromArray, WithStyles, WithColumnWidths, WithTitle
         ];
 
         // 2. Query Data
+        Receiving::syncPostedZeroStatus($this->targetPharmacyIds);
+
         $sortOrder = strtolower($this->filters['sort_order'] ?? 'desc') === 'asc' ? 'asc' : 'desc';
         $query = Receiving::with([
             'receiving_details' => function ($q) {
                 $q->where('invoice_payment', 'TUNAI')
-                  ->with(['creditor', 'payments.account', 'receiving_items.order_items.medicines']);
+                  ->postedToStock()
+                  ->with([
+                      'creditor',
+                      'payments.account',
+                      'receiving_items' => fn ($ri) => $ri->whereNotNull('batches_id')->with('order_items.medicines'),
+                  ]);
             },
             'pharmacy',
         ])
             ->whereIn('pharmacy_id', $this->targetPharmacyIds)
             ->whereHas('receiving_details', function ($q) {
-                $q->where('invoice_payment', 'TUNAI');
+                $q->where('invoice_payment', 'TUNAI')->postedToStock();
             })
             ->orderBy('date', $sortOrder);
 

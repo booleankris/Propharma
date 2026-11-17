@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
@@ -42,6 +43,15 @@ class ReceivingDetails extends Model
     public function payments()
     {
         return $this->hasMany(FinancePayment::class, 'receiving_detail_id');
+    }
+
+    /**
+     * Faktur dianggap 100% pasti sudah diterima/masuk stok jika memiliki minimal
+     * satu item dengan batches_id terisi.
+     */
+    public function scopePostedToStock(Builder $query): Builder
+    {
+        return $query->whereHas('receiving_items', fn ($ri) => $ri->whereNotNull('batches_id'));
     }
 }
 

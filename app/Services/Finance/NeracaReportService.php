@@ -361,9 +361,9 @@ class NeracaReportService
                 'payments' => fn ($query) => $query->whereDate('payment_date', '<=', $asOfDate),
             ])
             ->whereRaw('UPPER(TRIM(COALESCE(invoice_payment, ""))) = ?', ['KREDIT'])
+            ->postedToStock()
             ->whereHas('receiving', function ($query) use ($pharmacyIds, $asOfDate) {
                 $query->whereIn('pharmacy_id', $pharmacyIds)
-                    ->whereIn('status', [1, 2, 3])
                     ->where(function ($date) use ($asOfDate) {
                         $date->whereRaw("COALESCE(STR_TO_DATE(NULLIF(date, ''), '%d/%m/%Y'), STR_TO_DATE(NULLIF(date, ''), '%Y-%m-%d'), DATE(created_at)) <= ?", [$asOfDate]);
                     });

@@ -44,5 +44,19 @@ class Receiving extends Model
     {
         return $this->hasMany(FinancePayment::class, 'receiving_id');
     }
+
+    /**
+     * Naikkan otomatis receiving berstatus 0 menjadi 2 jika di dalamnya sudah ada
+     * item penerimaan yang 100% masuk stok (batches_id tidak null).
+     */
+    public static function syncPostedZeroStatus(?array $pharmacyIds = null, ?array $receivingIds = null): int
+    {
+        return static::query()
+            ->where('status', 0)
+            ->when(!empty($pharmacyIds), fn ($q) => $q->whereIn('pharmacy_id', $pharmacyIds))
+            ->when(!empty($receivingIds), fn ($q) => $q->whereIn('id', $receivingIds))
+            ->whereHas('receiving_details.receiving_items', fn ($q) => $q->whereNotNull('batches_id'))
+            ->update(['status' => 2]);
+    }
 }
 
