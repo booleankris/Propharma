@@ -405,7 +405,7 @@ class PiutangExport implements FromArray, WithStyles, WithColumnWidths, WithTitl
             // Currency formatting on Total, Retur, Paid, and Remaining columns.
             $sheet->getStyle("O{$start}:R{$end}")->applyFromArray([
                 'alignment' => ['horizontal' => Alignment::HORIZONTAL_RIGHT],
-                'numberFormat' => ['formatCode' => '#,##0'],
+                'numberFormat' => ['formatCode' => '#,##0.00'],
             ]);
 
             // 4. Total / Summary Row
@@ -431,7 +431,7 @@ class PiutangExport implements FromArray, WithStyles, WithColumnWidths, WithTitl
 
             $sheet->getStyle("O{$totalRow}:R{$totalRow}")->applyFromArray([
                 'alignment' => ['horizontal' => Alignment::HORIZONTAL_RIGHT, 'vertical' => Alignment::VERTICAL_CENTER],
-                'numberFormat' => ['formatCode' => '#,##0'],
+                'numberFormat' => ['formatCode' => '#,##0.00'],
                 'font' => ['bold' => true, 'color' => ['rgb' => '92400E']],
             ]);
             $sheet->getRowDimension($totalRow)->setRowHeight(24);

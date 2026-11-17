@@ -244,7 +244,7 @@ class PermissionCatalog
                     ],
                     'patients.manage' => [
                         'label' => 'Data Pasien & Kunjungan Pasien',
-                        'description' => 'Kelola daftar pasien (/patients) dan riwayat kunjungan pasien (/master/patient-transactions).',
+                        'description' => 'Kelola daftar pasien (/patients), riwayat kunjungan pasien (/master/patient-transactions), dan kartu obat pasien (/master/patient-medicine-cards).',
                         'roles' => $masterAndPatientRoles,
                     ],
                 ],

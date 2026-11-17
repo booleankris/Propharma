@@ -968,6 +968,17 @@
                 </svg>
                 Kunjungan Pasien
             </a>
+
+            <a href="{{ route('master.patient-medicine-cards.index') }}"
+                class="nav-item {{ request()->is('master/patient-medicine-cards*') ? 'active' : '' }}">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                    stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2" />
+                    <rect x="9" y="3" width="6" height="4" rx="1" />
+                    <path d="M9 14l2 2 4-4" />
+                </svg>
+                Kartu Obat Pasien
+            </a>
         @endif
 
         <div class="nav-section-title">Pusat Laporan & Export</div>

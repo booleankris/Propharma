@@ -3,11 +3,13 @@
 namespace Tests\Unit;
 
 use App\Exports\Finance\HutangExport;
+use App\Exports\Finance\PiutangExport;
 use App\Exports\Orders\OrdersSingleSheetExport;
 use App\Exports\Orders\PurchasePaymentExport;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use Tests\TestCase;
 
 class ReceivingDetailsDateConsistencyTest extends TestCase
@@ -228,5 +230,54 @@ class ReceivingDetailsDateConsistencyTest extends TestCase
 
         $paymentRows = (new PurchasePaymentExport(9, '2026-11-13', '2026-11-13', 'Kredit'))->array();
         $this->assertSame('13/11/2026', $paymentRows[7][5]);
+    }
+
+    public function test_hutang_export_formats_currency_columns_with_two_decimal_places(): void
+    {
+        $export = new HutangExport([9], [
+            'date_field' => 'received',
+            'start_date' => '2026-11-13',
+            'end_date' => '2026-11-13',
+        ]);
+
+        $spreadsheet = new Spreadsheet();
+        $sheet = $spreadsheet->getActiveSheet();
+        $sheet->fromArray($export->array());
+        $export->styles($sheet);
+
+        $this->assertSame('#,##0.00', $sheet->getStyle('I6')->getNumberFormat()->getFormatCode());
+        $this->assertSame('#,##0.00', $sheet->getStyle('O6')->getNumberFormat()->getFormatCode());
+        $this->assertSame('#,##0.00', $sheet->getStyle('I7')->getNumberFormat()->getFormatCode());
+        $this->assertSame('#,##0.00', $sheet->getStyle('O7')->getNumberFormat()->getFormatCode());
+    }
+
+    public function test_piutang_export_formats_currency_columns_with_two_decimal_places(): void
+    {
+        $export = new PiutangExport([9]);
+        $ref = new \ReflectionClass($export);
+        foreach ([
+            'dataRowCount' => 1,
+            'lastRow' => 7,
+            'detailTitleRow' => 9,
+            'detailHeaderRow' => 10,
+            'detailDataStartRow' => 11,
+            'detailDataEndRow' => 11,
+        ] as $prop => $val) {
+            $property = $ref->getProperty($prop);
+            $property->setAccessible(true);
+            $property->setValue($export, $val);
+        }
+
+        $spreadsheet = new Spreadsheet();
+        $sheet = $spreadsheet->getActiveSheet();
+        $sheet->setCellValue('N6', 'BELUM BAYAR');
+        $export->styles($sheet);
+
+        $this->assertSame('#,##0.00', $sheet->getStyle('O6')->getNumberFormat()->getFormatCode());
+        $this->assertSame('#,##0.00', $sheet->getStyle('R6')->getNumberFormat()->getFormatCode());
+        $this->assertSame('#,##0.00', $sheet->getStyle('O7')->getNumberFormat()->getFormatCode());
+        $this->assertSame('#,##0.00', $sheet->getStyle('R7')->getNumberFormat()->getFormatCode());
+        $this->assertSame('#,##0.00', $sheet->getStyle('E11')->getNumberFormat()->getFormatCode());
+        $this->assertSame('#,##0.00', $sheet->getStyle('G11')->getNumberFormat()->getFormatCode());
     }
 }

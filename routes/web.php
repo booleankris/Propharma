@@ -31,6 +31,7 @@ use App\Http\Controllers\Master\MasterDataExportController;
 use App\Http\Controllers\Master\MedicineController;
 use App\Http\Controllers\Master\ParametersController;
 use App\Http\Controllers\Master\PatientsController;
+use App\Http\Controllers\Master\PatientMedicineCardController;
 use App\Http\Controllers\Master\PatientTransactionsController;
 use App\Http\Controllers\Master\ReportedMedicineController;
 use App\Http\Controllers\Orders\OrdersController;
@@ -314,6 +315,15 @@ Route::middleware(['auth', 'role:General Manager|Kasir|Gudang PMI|HO|administrat
             Route::post('/export', [PatientTransactionsController::class, 'export'])->name('export');
             Route::get('/export-status/{id}', [PatientTransactionsController::class, 'exportStatus'])->name('export-status');
             Route::get('/export-download/{id}', [PatientTransactionsController::class, 'exportDownload'])->name('export-download');
+        });
+
+        // Kartu Obat Pasien (Riwayat Obat, Frekuensi & Retur)
+        Route::prefix('master/patient-medicine-cards')->name('master.patient-medicine-cards.')->group(function () {
+            Route::get('/', [PatientMedicineCardController::class, 'index'])->name('index');
+            Route::get('/data', [PatientMedicineCardController::class, 'data'])->name('data');
+            Route::get('/search-patients', [PatientMedicineCardController::class, 'searchPatients'])->name('search-patients');
+            Route::get('/search-medicines', [PatientMedicineCardController::class, 'searchMedicines'])->name('search-medicines');
+            Route::get('/export', [PatientMedicineCardController::class, 'export'])->name('export');
         });
     });
 

@@ -399,7 +399,7 @@ class HutangExport implements FromArray, WithStyles, WithColumnWidths, WithTitle
             // Currency formatting on Numeric Columns I to O
             $sheet->getStyle("I{$start}:O{$end}")->applyFromArray([
                 'alignment' => ['horizontal' => Alignment::HORIZONTAL_RIGHT],
-                'numberFormat' => ['formatCode' => '#,##0'],
+                'numberFormat' => ['formatCode' => '#,##0.00'],
             ]);
 
             // 4. Total / Summary Row
@@ -425,7 +425,7 @@ class HutangExport implements FromArray, WithStyles, WithColumnWidths, WithTitle
 
             $sheet->getStyle("I{$totalRow}:O{$totalRow}")->applyFromArray([
                 'alignment' => ['horizontal' => Alignment::HORIZONTAL_RIGHT],
-                'numberFormat' => ['formatCode' => '#,##0'],
+                'numberFormat' => ['formatCode' => '#,##0.00'],
                 'font' => ['bold' => true, 'color' => ['rgb' => '1E40AF']],
             ]);
             $sheet->getRowDimension($totalRow)->setRowHeight(24);
