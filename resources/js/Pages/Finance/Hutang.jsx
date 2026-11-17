@@ -1,5 +1,6 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { router } from '@inertiajs/react';
+import axios from 'axios';
 import FinanceLayout from './Layouts/FinanceLayout';
 import PbfCombobox from './Components/PbfCombobox';
 import DateRangeFilter from './Components/DateRangeFilter';
@@ -10,7 +11,7 @@ import {
     CreditCard, Search, Filter, Check, X, Building2,
     Calendar, CheckCircle2, AlertCircle, Eye, ChevronLeft, ChevronRight,
     ArrowLeft, Printer, Share2, MoreVertical, ChevronDown, History, Landmark, Maximize2, Download, FileSpreadsheet,
-    AlertTriangle, Clock, ArrowUp, ArrowDown, ArrowUpDown, Upload, RotateCcw
+    AlertTriangle, Clock, ArrowUp, ArrowDown, ArrowUpDown, Upload, RotateCcw, Loader2
 } from 'lucide-react';
 
 // Helper mengecek apakah faktur sudah dianggap lunas atau diretur penuh
@@ -74,24 +75,86 @@ const computeDueInfo = (item) => {
     return { isLunas: false, isOverdue: false, daysOverdue: 0, daysRemaining: 0, hasDate: false };
 };
 
-export default function Hutang({ hutangDagang = [], creditors = [], kasBankAccounts = [], stats = {} }) {
-    // State Filter & Pagination
-    const [searchTerm, setSearchTerm] = useState('');
-    const [statusFilter, setStatusFilter] = useState('ALL');
-    const [filterPbf, setFilterPbf] = useState('');
-    const [startDate, setStartDate] = useState('');
-    const [endDate, setEndDate] = useState('');
-    const [datePreset, setDatePreset] = useState('all');
-    const [dateField, setDateField] = useState('due');
-    const [currentPage, setCurrentPage] = useState(1);
-    const itemsPerPage = 10;
+export default function Hutang({
+    hutangDagang = [],
+    pagination = null,
+    dueStats: serverDueStats = null,
+    filters: serverFilters = {},
+    creditors = [],
+    kasBankAccounts = [],
+    stats = {},
+}) {
+    // State Filter & Pagination (disinkronkan dengan server)
+    const [searchTerm, setSearchTerm] = useState(serverFilters.search ?? '');
+    const [statusFilter, setStatusFilter] = useState(serverFilters.status ?? 'ALL');
+    const [filterPbf, setFilterPbf] = useState(serverFilters.pbf ?? '');
+    const [startDate, setStartDate] = useState(serverFilters.start_date ?? '');
+    const [endDate, setEndDate] = useState(serverFilters.end_date ?? '');
+    const [datePreset, setDatePreset] = useState(serverFilters.date_preset ?? 'all');
+    const [dateField, setDateField] = useState(serverFilters.date_field ?? 'due');
+    const [sortOrder, setSortOrder] = useState(serverFilters.sort_order ?? 'desc');
+    const [dueFilter, setDueFilter] = useState(serverFilters.due_mode ?? 'all');
+    const [isDueDropdownOpen, setIsDueDropdownOpen] = useState(false);
+    const [isLoadingList, setIsLoadingList] = useState(false);
+
+    const currentPage = pagination?.current_page ?? 1;
+    const totalPages = pagination?.last_page ?? 1;
+    const totalFilteredItems = pagination?.total ?? hutangDagang.length;
+    const pageFrom = pagination?.from ?? (hutangDagang.length > 0 ? 1 : 0);
+    const pageTo = pagination?.to ?? hutangDagang.length;
+
+    const navigateHutang = (overrides = {}) => {
+        const next = {
+            search: overrides.search !== undefined ? overrides.search : searchTerm,
+            pbf: overrides.pbf !== undefined ? overrides.pbf : filterPbf,
+            status: overrides.status !== undefined ? overrides.status : statusFilter,
+            due_mode: overrides.due_mode !== undefined ? overrides.due_mode : dueFilter,
+            date_field: overrides.date_field !== undefined ? overrides.date_field : dateField,
+            date_preset: overrides.date_preset !== undefined ? overrides.date_preset : datePreset,
+            start_date: overrides.start_date !== undefined ? overrides.start_date : startDate,
+            end_date: overrides.end_date !== undefined ? overrides.end_date : endDate,
+            sort_order: overrides.sort_order !== undefined ? overrides.sort_order : sortOrder,
+            page: overrides.page !== undefined ? overrides.page : currentPage,
+        };
+        const params = {};
+        if (next.search && next.search.trim() !== '') params.search = next.search.trim();
+        if (next.pbf) params.pbf = next.pbf;
+        if (next.status && next.status !== 'ALL') params.status = next.status;
+        if (next.due_mode && next.due_mode !== 'all') params.due_mode = next.due_mode;
+        if (next.date_field && next.date_field !== 'due') params.date_field = next.date_field;
+        if (next.date_preset && next.date_preset !== 'all') params.date_preset = next.date_preset;
+        if (next.start_date) params.start_date = next.start_date;
+        if (next.end_date) params.end_date = next.end_date;
+        if (next.sort_order && next.sort_order !== 'desc') params.sort_order = next.sort_order;
+        if (next.page && next.page > 1) params.page = next.page;
+
+        router.get('/finance/hutang', params, {
+            preserveState: true,
+            preserveScroll: true,
+            replace: true,
+            onStart: () => setIsLoadingList(true),
+            onFinish: () => setIsLoadingList(false),
+        });
+    };
+
+    const didMountSearchRef = useRef(false);
+    useEffect(() => {
+        if (!didMountSearchRef.current) {
+            didMountSearchRef.current = true;
+            return;
+        }
+        const timer = setTimeout(() => {
+            navigateHutang({ search: searchTerm, page: 1 });
+        }, 300);
+        return () => clearTimeout(timer);
+    }, [searchTerm]);
 
     const handleDatePreset = (preset) => {
         setDatePreset(preset);
-        setCurrentPage(1);
         if (preset === 'all') {
             setStartDate('');
             setEndDate('');
+            navigateHutang({ date_preset: 'all', start_date: '', end_date: '', page: 1 });
             return;
         }
         const today = new Date();
@@ -111,23 +174,75 @@ export default function Hutang({ hutangDagang = [], creditors = [], kasBankAccou
             : preset === 'this_month'
                 ? new Date(today.getFullYear(), today.getMonth() + 1, 0)
                 : new Date(today.getFullYear(), today.getMonth(), 0);
-        setStartDate(formatDate(start));
-        setEndDate(formatDate(end));
+        const nextStart = formatDate(start);
+        const nextEnd = formatDate(end);
+        setStartDate(nextStart);
+        setEndDate(nextEnd);
+        navigateHutang({ date_preset: preset, start_date: nextStart, end_date: nextEnd, page: 1 });
     };
 
-    // State Sorting & Filter Jatuh Tempo
-    const [sortOrder, setSortOrder] = useState('desc'); // 'desc' | 'asc'
-    const [dueFilter, setDueFilter] = useState('all'); // 'all' | 'overdue' | 'due_soon' | 'due_nearest' | 'due_furthest'
-    const [isDueDropdownOpen, setIsDueDropdownOpen] = useState(false);
-
-    // Selection untuk Pelunasan Massal (Maks 10)
+    // Selection lintas halaman untuk Pelunasan Massal (Maks 10)
     const [selectedHutangIds, setSelectedHutangIds] = useState([]);
+    const [selectedItemsMap, setSelectedItemsMap] = useState({});
     const [selectionWarning, setSelectionWarning] = useState('');
 
-    // State Halaman Detil Penuh (seperti screenshot) & Quick Preview Drawer
+    // State Halaman Detil Penuh & Quick Preview Drawer + Lazy Cache
     const [detailViewHutang, setDetailViewHutang] = useState(null);
     const [drawerHutang, setDrawerHutang] = useState(null);
     const [isShippingOpen, setIsShippingOpen] = useState(true);
+    const [isLoadingDetail, setIsLoadingDetail] = useState(false);
+    const detailCacheRef = useRef({});
+
+    useEffect(() => {
+        if (!hutangDagang.length) return;
+        setSelectedItemsMap((prev) => {
+            const next = { ...prev };
+            let changed = false;
+            hutangDagang.forEach((item) => {
+                if (next[item.id]) {
+                    next[item.id] = item;
+                    changed = true;
+                }
+            });
+            return changed ? next : prev;
+        });
+    }, [hutangDagang]);
+
+    const loadHutangDetail = async (item) => {
+        if (!item?.id) return;
+        if (detailCacheRef.current[item.id]) {
+            const cached = detailCacheRef.current[item.id];
+            setDrawerHutang((curr) => (curr?.id === item.id ? cached : curr));
+            setDetailViewHutang((curr) => (curr?.id === item.id ? cached : curr));
+            return;
+        }
+        setIsLoadingDetail(true);
+        try {
+            const res = await axios.get(`/finance/hutang/${item.id}/detail`);
+            const full = res?.data?.data;
+            if (full) {
+                detailCacheRef.current[item.id] = full;
+                setDrawerHutang((curr) => (curr?.id === item.id ? full : curr));
+                setDetailViewHutang((curr) => (curr?.id === item.id ? full : curr));
+            }
+        } catch (err) {
+            console.error('Gagal memuat detail hutang:', err);
+        } finally {
+            setIsLoadingDetail(false);
+        }
+    };
+
+    const openHutangDrawer = (item) => {
+        const initial = detailCacheRef.current[item.id] || item;
+        setDrawerHutang(initial);
+        loadHutangDetail(item);
+    };
+
+    const openHutangDetail = (item) => {
+        const initial = detailCacheRef.current[item.id] || item;
+        setDetailViewHutang(initial);
+        loadHutangDetail(item);
+    };
 
     // State Modal Bayar Satuan
     const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
@@ -156,8 +271,11 @@ export default function Hutang({ hutangDagang = [], creditors = [], kasBankAccou
     const [isImporting, setIsImporting] = useState(false);
     const [importSuccessMessage, setImportSuccessMessage] = useState('');
 
-    // Statistik Jatuh Tempo
+    // Statistik Jatuh Tempo (dari server jika tersedia)
     const dueStats = useMemo(() => {
+        if (serverDueStats && typeof serverDueStats.overdue === 'number') {
+            return serverDueStats;
+        }
         let overdue = 0;
         let dueSoon = 0;
         hutangDagang.forEach((item) => {
@@ -168,88 +286,17 @@ export default function Hutang({ hutangDagang = [], creditors = [], kasBankAccou
             }
         });
         return { overdue, dueSoon };
-    }, [hutangDagang]);
+    }, [serverDueStats, hutangDagang]);
 
-    // Filter & Sorting data
-    const filteredHutang = useMemo(() => {
-        let result = hutangDagang.filter((item) => {
-            const normalizedSearch = searchTerm.trim().toLowerCase();
-            const matchSearch = !normalizedSearch || [
-                item.nomor,
-                item.vendor,
-                item.vendor_code,
-                item.referensi,
-            ].some((value) => String(value || '').toLowerCase().includes(normalizedSearch));
+    const paginatedHutang = hutangDagang;
 
-            let matchStatus = true;
-            if (statusFilter === 'LUNAS') {
-                matchStatus = isItemSettled(item);
-            } else if (statusFilter === 'BELUM_LUNAS') {
-                matchStatus = !isItemSettled(item);
-            } else if (statusFilter === 'DIAJUKAN') {
-                matchStatus = Boolean(item.is_submitted) && !isItemSettled(item);
-            } else if (statusFilter === 'RETUR') {
-                matchStatus = (Number(item.total_retur) > 0) || item.status === 'Diretur Penuh' || item.status === 'Diretur Sebagian' || item.status === 'Lunas (Ada Retur)';
-            }
-
-            const matchPbf = filterPbf
-                ? [item.vendor, item.vendor_code].some((value) => String(value || '').toLowerCase().includes(filterPbf.trim().toLowerCase()))
-                : true;
-
-            const dueInfo = computeDueInfo(item);
-            let matchDue = true;
-            if (dueFilter === 'overdue') {
-                matchDue = dueInfo.isOverdue && !dueInfo.isLunas;
-            } else if (dueFilter === 'due_soon') {
-                matchDue = !dueInfo.isOverdue && dueInfo.daysRemaining <= 7 && !dueInfo.isLunas && dueInfo.hasDate;
-            }
-
-            const itemDate = dateField === 'invoice'
-                ? (item.raw_tanggal || '')
-                : dateField === 'received'
-                    ? (item.raw_tanggal_terima || '')
-                    : (item.raw_jatuh_tempo || '');
-            const matchStartDate = !startDate || (itemDate && itemDate >= startDate);
-            const matchEndDate = !endDate || (itemDate && itemDate <= endDate);
-
-            return matchSearch && matchStatus && matchPbf && matchDue && matchStartDate && matchEndDate;
-        });
-
-        // Sorting berdasarkan pilihan pengguna
-        return result.sort((a, b) => {
-            if (dueFilter === 'due_nearest') {
-                const dateA = a.raw_jatuh_tempo ? new Date(a.raw_jatuh_tempo).getTime() : 9999999999999;
-                const dateB = b.raw_jatuh_tempo ? new Date(b.raw_jatuh_tempo).getTime() : 9999999999999;
-                return dateA - dateB;
-            }
-            if (dueFilter === 'due_furthest') {
-                const dateA = a.raw_jatuh_tempo ? new Date(a.raw_jatuh_tempo).getTime() : 0;
-                const dateB = b.raw_jatuh_tempo ? new Date(b.raw_jatuh_tempo).getTime() : 0;
-                return dateB - dateA;
-            }
-
-            // Default: urutkan memakai tanggal yang sedang dipilih untuk filter rentang.
-            const sortDateKey = dateField === 'invoice'
-                ? 'raw_tanggal'
-                : dateField === 'received'
-                    ? 'raw_tanggal_terima'
-                    : 'raw_jatuh_tempo';
-            const timeA = a[sortDateKey] ? new Date(a[sortDateKey]).getTime() : (Number(a.id) || 0);
-            const timeB = b[sortDateKey] ? new Date(b[sortDateKey]).getTime() : (Number(b.id) || 0);
-            return sortOrder === 'asc' ? timeA - timeB : timeB - timeA;
-        });
-    }, [hutangDagang, searchTerm, statusFilter, filterPbf, sortOrder, dueFilter, startDate, endDate, dateField]);
-
-    const totalPages = Math.ceil(filteredHutang.length / itemsPerPage) || 1;
-    const paginatedHutang = useMemo(() => {
-        const start = (currentPage - 1) * itemsPerPage;
-        return filteredHutang.slice(start, start + itemsPerPage);
-    }, [filteredHutang, currentPage, itemsPerPage]);
-
-    // Items terpilih untuk bulk payment
+    // Items terpilih untuk bulk payment (lintas halaman via selectedItemsMap)
     const selectedHutangItems = useMemo(() => {
-        return hutangDagang.filter((item) => selectedHutangIds.includes(item.id));
-    }, [hutangDagang, selectedHutangIds]);
+        const byId = new Map(hutangDagang.map((item) => [item.id, item]));
+        return selectedHutangIds
+            .map((id) => byId.get(id) || selectedItemsMap[id])
+            .filter(Boolean);
+    }, [hutangDagang, selectedHutangIds, selectedItemsMap]);
 
     const totalSelectedHutangSisa = useMemo(() => {
         const sum = selectedHutangItems.reduce((acc, curr) => acc + (Number(curr.sisa) || 0), 0);
@@ -320,6 +367,11 @@ export default function Hutang({ hutangDagang = [], creditors = [], kasBankAccou
         if (isItemSettled(item)) return;
         if (selectedHutangIds.includes(item.id)) {
             setSelectedHutangIds((prev) => prev.filter((id) => id !== item.id));
+            setSelectedItemsMap((prev) => {
+                const next = { ...prev };
+                delete next[item.id];
+                return next;
+            });
         } else {
             if (selectedHutangIds.length >= 10) {
                 setSelectionWarning('Maksimal 10 faktur yang dapat dipilih sekaligus untuk pelunasan massal.');
@@ -327,6 +379,7 @@ export default function Hutang({ hutangDagang = [], creditors = [], kasBankAccou
                 return;
             }
             setSelectedHutangIds((prev) => [...prev, item.id]);
+            setSelectedItemsMap((prev) => ({ ...prev, [item.id]: item }));
         }
     };
 
@@ -339,19 +392,29 @@ export default function Hutang({ hutangDagang = [], creditors = [], kasBankAccou
                 setTimeout(() => setSelectionWarning(''), 4000);
                 return;
             }
-            const toAdd = eligible
-                .map((item) => item.id)
-                .filter((id) => !selectedHutangIds.includes(id))
+            const addedItems = eligible
+                .filter((item) => !selectedHutangIds.includes(item.id))
                 .slice(0, remainingSlots);
+            const toAdd = addedItems.map((item) => item.id);
 
-            if (toAdd.length < eligible.length) {
+            if (toAdd.length < eligible.filter((item) => !selectedHutangIds.includes(item.id)).length) {
                 setSelectionWarning('Hanya 10 faktur pertama yang dipilih (batas maksimal 10 faktur).');
                 setTimeout(() => setSelectionWarning(''), 4000);
             }
             setSelectedHutangIds((prev) => [...prev, ...toAdd]);
+            setSelectedItemsMap((prev) => {
+                const next = { ...prev };
+                addedItems.forEach((it) => { next[it.id] = it; });
+                return next;
+            });
         } else {
             const currentPageIds = paginatedHutang.map((item) => item.id);
             setSelectedHutangIds((prev) => prev.filter((id) => !currentPageIds.includes(id)));
+            setSelectedItemsMap((prev) => {
+                const next = { ...prev };
+                currentPageIds.forEach((id) => { delete next[id]; });
+                return next;
+            });
         }
     };
 
@@ -393,6 +456,7 @@ export default function Hutang({ hutangDagang = [], creditors = [], kasBankAccou
             onSuccess: () => {
                 setIsPaymentModalOpen(false);
                 setIsSubmittingPayment(false);
+                delete detailCacheRef.current[paymentForm.receiving_detail_id];
                 if (drawerHutang && drawerHutang.id === paymentForm.receiving_detail_id) {
                     setDrawerHutang(null);
                 }
@@ -439,7 +503,9 @@ export default function Hutang({ hutangDagang = [], creditors = [], kasBankAccou
             onSuccess: () => {
                 setIsBulkModalOpen(false);
                 setIsSubmittingBulk(false);
+                detailCacheRef.current = {};
                 setSelectedHutangIds([]);
+                setSelectedItemsMap({});
             },
             onError: (errs) => {
                 setIsSubmittingBulk(false);
@@ -461,7 +527,9 @@ export default function Hutang({ hutangDagang = [], creditors = [], kasBankAccou
                 setIsImportModalOpen(false);
                 setImportFile(null);
                 setIsImporting(false);
+                detailCacheRef.current = {};
                 setSelectedHutangIds([]);
+                setSelectedItemsMap({});
                 setImportSuccessMessage(page?.props?.flash?.success || 'Impor pembayaran Hutang Dagang berhasil.');
             },
             onError: (errs) => {
@@ -482,7 +550,9 @@ export default function Hutang({ hutangDagang = [], creditors = [], kasBankAccou
             preserveScroll: true,
             onSuccess: () => {
                 setIsSubmittingBulk(false);
+                detailCacheRef.current = {};
                 setSelectedHutangIds([]);
+                setSelectedItemsMap({});
             },
             onError: () => {
                 setIsSubmittingBulk(false);
@@ -490,10 +560,7 @@ export default function Hutang({ hutangDagang = [], creditors = [], kasBankAccou
         });
     };
 
-    const allSelectedHutangSubmitted = selectedHutangIds.length > 0 && selectedHutangIds.every(id => {
-        const item = filteredHutang.find(h => h.id === id);
-        return item ? item.is_submitted : false;
-    });
+    const allSelectedHutangSubmitted = selectedHutangIds.length > 0 && selectedHutangItems.length === selectedHutangIds.length && selectedHutangItems.every(item => Boolean(item?.is_submitted));
 
     return (
         <FinanceLayout
@@ -698,7 +765,16 @@ export default function Hutang({ hutangDagang = [], creditors = [], kasBankAccou
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-slate-100 text-slate-700">
-                                    {detailViewHutang.items && detailViewHutang.items.length > 0 ? (
+                                    {isLoadingDetail && !(detailViewHutang.items && detailViewHutang.items.length > 0) ? (
+                                        <tr>
+                                            <td colSpan={8} className="py-8 text-center text-slate-500">
+                                                <span className="inline-flex items-center gap-2">
+                                                    <Loader2 className="w-4 h-4 animate-spin text-blue-600" />
+                                                    <span>Memuat rincian item, retur, dan pembayaran...</span>
+                                                </span>
+                                            </td>
+                                        </tr>
+                                    ) : detailViewHutang.items && detailViewHutang.items.length > 0 ? (
                                         detailViewHutang.items.map((it, idx) => (
                                             <tr key={idx}>
                                                 <td className="py-3">
@@ -964,7 +1040,7 @@ export default function Hutang({ hutangDagang = [], creditors = [], kasBankAccou
                                 {formatRupiah(stats.totalHutangSisa || 0)}
                             </div>
                             <p className="text-xs text-slate-400 mt-0.5">
-                                Dari total {hutangDagang.length} faktur kredit yang tercatat
+                                Dari total {stats.totalHutangCount ?? totalFilteredItems} faktur kredit yang tercatat
                             </p>
                         </div>
 
@@ -1010,7 +1086,7 @@ export default function Hutang({ hutangDagang = [], creditors = [], kasBankAccou
                                         type="text"
                                         placeholder="Cari nomor faktur, PBF, kode PBF, atau penerimaan..."
                                         value={searchTerm}
-                                        onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}
+                                        onChange={(e) => setSearchTerm(e.target.value)}
                                         className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 focus:bg-white focus:outline-none"
                                     />
                                 </div>
@@ -1019,38 +1095,56 @@ export default function Hutang({ hutangDagang = [], creditors = [], kasBankAccou
                                 <PbfCombobox
                                     pbfs={creditors}
                                     selectedPbf={filterPbf}
-                                    onSelectPbf={(val) => { setFilterPbf(val); setCurrentPage(1); }}
+                                    onSelectPbf={(val) => {
+                                        setFilterPbf(val);
+                                        navigateHutang({ pbf: val, page: 1 });
+                                    }}
                                     placeholder="Filter PBF (Kreditur)..."
                                 />
 
                                 {/* Status Filter */}
                                 <div className="flex items-center bg-slate-100 p-1 rounded-xl text-xs">
                                     <button
-                                        onClick={() => { setStatusFilter('ALL'); setCurrentPage(1); }}
+                                        onClick={() => {
+                                            setStatusFilter('ALL');
+                                            navigateHutang({ status: 'ALL', page: 1 });
+                                        }}
                                         className={`px-3 py-1.5 rounded-lg font-semibold transition ${statusFilter === 'ALL' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-500 hover:text-slate-800'}`}
                                     >
                                         Semua
                                     </button>
                                     <button
-                                        onClick={() => { setStatusFilter('BELUM_LUNAS'); setCurrentPage(1); }}
+                                        onClick={() => {
+                                            setStatusFilter('BELUM_LUNAS');
+                                            navigateHutang({ status: 'BELUM_LUNAS', page: 1 });
+                                        }}
                                         className={`px-3 py-1.5 rounded-lg font-semibold transition ${statusFilter === 'BELUM_LUNAS' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-500 hover:text-slate-800'}`}
                                     >
                                         Belum Lunas
                                     </button>
                                     <button
-                                        onClick={() => { setStatusFilter('DIAJUKAN'); setCurrentPage(1); }}
+                                        onClick={() => {
+                                            setStatusFilter('DIAJUKAN');
+                                            navigateHutang({ status: 'DIAJUKAN', page: 1 });
+                                        }}
                                         className={`px-3 py-1.5 rounded-lg font-semibold transition ${statusFilter === 'DIAJUKAN' ? 'bg-white text-blue-700 shadow-xs font-bold' : 'text-slate-500 hover:text-slate-800'}`}
                                     >
                                         Diajukan
                                     </button>
                                     <button
-                                        onClick={() => { setStatusFilter('RETUR'); setCurrentPage(1); }}
+                                        onClick={() => {
+                                            setStatusFilter('RETUR');
+                                            navigateHutang({ status: 'RETUR', page: 1 });
+                                        }}
                                         className={`px-3 py-1.5 rounded-lg font-semibold transition ${statusFilter === 'RETUR' ? 'bg-white text-rose-700 shadow-xs font-bold' : 'text-slate-500 hover:text-slate-800'}`}
                                     >
                                         Retur
                                     </button>
                                     <button
-                                        onClick={() => { setStatusFilter('LUNAS'); setCurrentPage(1); }}
+                                        onClick={() => {
+                                            setStatusFilter('LUNAS');
+                                            navigateHutang({ status: 'LUNAS', page: 1 });
+                                        }}
                                         className={`px-3 py-1.5 rounded-lg font-semibold transition ${statusFilter === 'LUNAS' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-500 hover:text-slate-800'}`}
                                     >
                                         Lunas
@@ -1063,8 +1157,9 @@ export default function Hutang({ hutangDagang = [], creditors = [], kasBankAccou
                                 <button
                                     type="button"
                                     onClick={() => {
-                                        setSortOrder((prev) => (prev === 'asc' ? 'desc' : 'asc'));
-                                        setCurrentPage(1);
+                                        const nextOrder = sortOrder === 'asc' ? 'desc' : 'asc';
+                                        setSortOrder(nextOrder);
+                                        navigateHutang({ sort_order: nextOrder, page: 1 });
                                     }}
                                     className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold border transition cursor-pointer ${sortOrder === 'asc'
                                         ? 'bg-amber-50 border-amber-300 text-amber-800 font-bold shadow-2xs'
@@ -1104,7 +1199,7 @@ export default function Hutang({ hutangDagang = [], creditors = [], kasBankAccou
                                         <div className="absolute left-0 mt-1.5 w-60 bg-white border border-slate-200 rounded-xl shadow-xl z-50 py-1 divide-y divide-slate-100 text-xs animate-in fade-in zoom-in-95 duration-150">
                                             <button
                                                 type="button"
-                                                onClick={() => { setDueFilter('all'); setIsDueDropdownOpen(false); setCurrentPage(1); }}
+                                                onClick={() => { setDueFilter('all'); setIsDueDropdownOpen(false); navigateHutang({ due_mode: 'all', page: 1 }); }}
                                                 className={`w-full text-left px-3.5 py-2 hover:bg-slate-50 flex items-center justify-between cursor-pointer ${dueFilter === 'all' ? 'font-bold text-amber-700 bg-amber-50/50' : 'text-slate-700'}`}
                                             >
                                                 <span>Semua Jatuh Tempo</span>
@@ -1112,7 +1207,7 @@ export default function Hutang({ hutangDagang = [], creditors = [], kasBankAccou
                                             </button>
                                             <button
                                                 type="button"
-                                                onClick={() => { setDueFilter('overdue'); setIsDueDropdownOpen(false); setCurrentPage(1); }}
+                                                onClick={() => { setDueFilter('overdue'); setIsDueDropdownOpen(false); navigateHutang({ due_mode: 'overdue', page: 1 }); }}
                                                 className={`w-full text-left px-3.5 py-2 hover:bg-red-50 flex items-center justify-between text-red-700 cursor-pointer ${dueFilter === 'overdue' ? 'font-bold bg-red-50' : ''}`}
                                             >
                                                 <div className="flex items-center gap-1.5">
@@ -1123,7 +1218,7 @@ export default function Hutang({ hutangDagang = [], creditors = [], kasBankAccou
                                             </button>
                                             <button
                                                 type="button"
-                                                onClick={() => { setDueFilter('due_soon'); setIsDueDropdownOpen(false); setCurrentPage(1); }}
+                                                onClick={() => { setDueFilter('due_soon'); setIsDueDropdownOpen(false); navigateHutang({ due_mode: 'due_soon', page: 1 }); }}
                                                 className={`w-full text-left px-3.5 py-2 hover:bg-amber-50 flex items-center justify-between text-amber-800 cursor-pointer ${dueFilter === 'due_soon' ? 'font-bold bg-amber-50' : ''}`}
                                             >
                                                 <div className="flex items-center gap-1.5">
@@ -1134,7 +1229,7 @@ export default function Hutang({ hutangDagang = [], creditors = [], kasBankAccou
                                             </button>
                                             <button
                                                 type="button"
-                                                onClick={() => { setDueFilter('due_nearest'); setIsDueDropdownOpen(false); setCurrentPage(1); }}
+                                                onClick={() => { setDueFilter('due_nearest'); setIsDueDropdownOpen(false); navigateHutang({ due_mode: 'due_nearest', page: 1 }); }}
                                                 className={`w-full text-left px-3.5 py-2 hover:bg-slate-50 flex items-center justify-between cursor-pointer ${dueFilter === 'due_nearest' ? 'font-bold text-blue-700 bg-blue-50/50' : 'text-slate-700'}`}
                                             >
                                                 <span>Tempo Terdekat (Urutkan)</span>
@@ -1142,7 +1237,7 @@ export default function Hutang({ hutangDagang = [], creditors = [], kasBankAccou
                                             </button>
                                             <button
                                                 type="button"
-                                                onClick={() => { setDueFilter('due_furthest'); setIsDueDropdownOpen(false); setCurrentPage(1); }}
+                                                onClick={() => { setDueFilter('due_furthest'); setIsDueDropdownOpen(false); navigateHutang({ due_mode: 'due_furthest', page: 1 }); }}
                                                 className={`w-full text-left px-3.5 py-2 hover:bg-slate-50 flex items-center justify-between cursor-pointer ${dueFilter === 'due_furthest' ? 'font-bold text-blue-700 bg-blue-50/50' : 'text-slate-700'}`}
                                             >
                                                 <span>Tempo Terjauh (Urutkan)</span>
@@ -1188,7 +1283,11 @@ export default function Hutang({ hutangDagang = [], creditors = [], kasBankAccou
                                 <span>Filter tanggal berdasarkan</span>
                                 <select
                                     value={dateField}
-                                    onChange={(e) => { setDateField(e.target.value); setCurrentPage(1); }}
+                                    onChange={(e) => {
+                                        const val = e.target.value;
+                                        setDateField(val);
+                                        navigateHutang({ date_field: val, page: 1 });
+                                    }}
                                     className="px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-medium text-slate-700 focus:ring-2 focus:ring-blue-500 focus:outline-none"
                                 >
                                     <option value="due">Jatuh tempo</option>
@@ -1203,10 +1302,11 @@ export default function Hutang({ hutangDagang = [], creditors = [], kasBankAccou
                                 accent="blue"
                                 onPreset={handleDatePreset}
                                 onChange={([start, end]) => {
+                                    const nextPreset = start || end ? 'custom' : 'all';
                                     setStartDate(start);
                                     setEndDate(end);
-                                    setDatePreset(start || end ? 'custom' : 'all');
-                                    setCurrentPage(1);
+                                    setDatePreset(nextPreset);
+                                    navigateHutang({ date_preset: nextPreset, start_date: start, end_date: end, page: 1 });
                                 }}
                             />
                         </div>
@@ -1220,7 +1320,7 @@ export default function Hutang({ hutangDagang = [], creditors = [], kasBankAccou
                     </div>
 
                     {/* Tabel Hutang Dagang */}
-                    <div className="bg-white border border-slate-200 rounded-2xl shadow-xs overflow-hidden">
+                    <div className={`bg-white border border-slate-200 rounded-2xl shadow-xs overflow-hidden transition-opacity ${isLoadingList ? 'opacity-60 pointer-events-none' : ''}`}>
                         <div className="overflow-x-auto">
                             <table className="w-full text-left border-collapse text-xs">
                                 <thead>
@@ -1262,7 +1362,7 @@ export default function Hutang({ hutangDagang = [], creditors = [], kasBankAccou
                                         paginatedHutang.map((item) => (
                                             <tr
                                                 key={item.id}
-                                                onClick={() => setDrawerHutang(item)}
+                                                onClick={() => openHutangDrawer(item)}
                                                 className="hover:bg-blue-50/40 cursor-pointer transition group"
                                             >
                                                 <td className="px-4 py-3.5" onClick={(e) => e.stopPropagation()}>
@@ -1392,7 +1492,7 @@ export default function Hutang({ hutangDagang = [], creditors = [], kasBankAccou
                                                         ) : null}
                                                         <button
                                                             type="button"
-                                                            onClick={() => setDetailViewHutang(item)}
+                                                            onClick={() => openHutangDetail(item)}
                                                             className="px-2.5 py-1 border border-slate-200 text-slate-600 hover:bg-slate-100 rounded-lg text-xs font-semibold transition cursor-pointer"
                                                             title="Buka Halaman Detil Lengkap"
                                                         >
@@ -1408,30 +1508,32 @@ export default function Hutang({ hutangDagang = [], creditors = [], kasBankAccou
                         </div>
 
                         {/* Pagination */}
-                        {totalPages > 1 && (
+                        {(totalPages > 1 || totalFilteredItems > 0) && (
                             <div className="p-4 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
                                 <div>
-                                    Menampilkan {(currentPage - 1) * itemsPerPage + 1} - {Math.min(currentPage * itemsPerPage, filteredHutang.length)} dari {filteredHutang.length} faktur
+                                    Menampilkan {pageFrom} - {pageTo} dari {totalFilteredItems} faktur
                                 </div>
-                                <div className="flex items-center gap-1">
-                                    <button
-                                        onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-                                        disabled={currentPage === 1}
-                                        className="p-1.5 rounded-lg border border-slate-200 disabled:opacity-40 hover:bg-slate-50"
-                                    >
-                                        <ChevronLeft className="w-4 h-4" />
-                                    </button>
-                                    <span className="px-3 py-1 font-semibold text-slate-800">
-                                        {currentPage} / {totalPages}
-                                    </span>
-                                    <button
-                                        onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-                                        disabled={currentPage === totalPages}
-                                        className="p-1.5 rounded-lg border border-slate-200 disabled:opacity-40 hover:bg-slate-50"
-                                    >
-                                        <ChevronRight className="w-4 h-4" />
-                                    </button>
-                                </div>
+                                {totalPages > 1 && (
+                                    <div className="flex items-center gap-1">
+                                        <button
+                                            onClick={() => navigateHutang({ page: Math.max(1, currentPage - 1) })}
+                                            disabled={currentPage <= 1 || isLoadingList}
+                                            className="p-1.5 rounded-lg border border-slate-200 disabled:opacity-40 hover:bg-slate-50 cursor-pointer"
+                                        >
+                                            <ChevronLeft className="w-4 h-4" />
+                                        </button>
+                                        <span className="px-3 py-1 font-semibold text-slate-800">
+                                            {currentPage} / {totalPages}
+                                        </span>
+                                        <button
+                                            onClick={() => navigateHutang({ page: Math.min(totalPages, currentPage + 1) })}
+                                            disabled={currentPage >= totalPages || isLoadingList}
+                                            className="p-1.5 rounded-lg border border-slate-200 disabled:opacity-40 hover:bg-slate-50 cursor-pointer"
+                                        >
+                                            <ChevronRight className="w-4 h-4" />
+                                        </button>
+                                    </div>
+                                )}
                             </div>
                         )}
                     </div>
@@ -1712,7 +1814,7 @@ export default function Hutang({ hutangDagang = [], creditors = [], kasBankAccou
                 onClose={() => setDrawerHutang(null)}
                 onExpand={(item) => {
                     setDrawerHutang(null);
-                    setDetailViewHutang(item);
+                    openHutangDetail(item);
                 }}
                 title="Rincian Faktur Hutang"
                 subtitle={(item) => `${item.nomor} • ${item.referensi}`}
@@ -1723,7 +1825,7 @@ export default function Hutang({ hutangDagang = [], creditors = [], kasBankAccou
                             onClick={() => {
                                 const target = item;
                                 setDrawerHutang(null);
-                                setDetailViewHutang(target);
+                                openHutangDetail(target);
                             }}
                             className="flex-1 py-2.5 border border-slate-200 text-slate-700 hover:bg-slate-50 active:scale-[0.99] rounded-xl text-xs font-bold transition text-center cursor-pointer"
                         >
@@ -1824,7 +1926,16 @@ export default function Hutang({ hutangDagang = [], creditors = [], kasBankAccou
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-slate-100">
-                                        {(item.items || []).map((it, idx) => (
+                                        {isLoadingDetail && !(item.items && item.items.length > 0) ? (
+                                            <tr>
+                                                <td colSpan={4} className="p-4 text-center text-slate-500">
+                                                    <span className="inline-flex items-center gap-1.5">
+                                                        <Loader2 className="w-3.5 h-3.5 animate-spin text-blue-600" />
+                                                        <span>Memuat rincian obat...</span>
+                                                    </span>
+                                                </td>
+                                            </tr>
+                                        ) : (item.items || []).map((it, idx) => (
                                             <tr key={idx}>
                                                 <td className="p-3">
                                                     <div className="font-semibold text-slate-800">{it.nama}</div>
@@ -1965,7 +2076,10 @@ export default function Hutang({ hutangDagang = [], creditors = [], kasBankAccou
                 secondaryActionLabel={allSelectedHutangSubmitted ? "Batalkan Pengajuan" : "Ajukan Pelunasan"}
                 secondaryActionColor={allSelectedHutangSubmitted ? "slate" : "blue"}
                 onSecondaryAction={() => handleBulkSubmitHutang(!allSelectedHutangSubmitted)}
-                onClear={() => setSelectedHutangIds([])}
+                onClear={() => {
+                    setSelectedHutangIds([]);
+                    setSelectedItemsMap({});
+                }}
                 isSubmitting={isSubmittingBulk}
                 themeColor="blue"
             />

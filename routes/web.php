@@ -614,6 +614,7 @@ Route::middleware(['auth', 'role:General Manager|Kasir|Gudang PMI|HO|administrat
     Route::prefix('finance')->name('finance.')->middleware(['role:Finance|General Manager|administrator|HO'])->group(function () {
         Route::get('/', [\App\Http\Controllers\FinanceController::class, 'index'])->name('index');
         Route::get('/hutang', [\App\Http\Controllers\FinanceController::class, 'hutang'])->name('hutang');
+        Route::get('/hutang/{id}/detail', [\App\Http\Controllers\FinanceController::class, 'hutangDetail'])->whereNumber('id')->name('hutang.detail');
         Route::get('/cash', [\App\Http\Controllers\FinanceController::class, 'cash'])->name('cash');
         Route::get('/cashflow', [\App\Http\Controllers\FinanceController::class, 'cashflow'])->name('cashflow');
         Route::get('/cashflow/export', [\App\Http\Controllers\FinanceController::class, 'exportCashflow'])->name('cashflow.export');
@@ -625,6 +626,7 @@ Route::middleware(['auth', 'role:General Manager|Kasir|Gudang PMI|HO|administrat
         Route::post('/tarik-tunai', [\App\Http\Controllers\FinanceController::class, 'storeTarikTunai'])->name('tarikTunai.store');
         Route::get('/konsinyasi', [\App\Http\Controllers\FinanceController::class, 'konsinyasi'])->name('konsinyasi');
         Route::get('/piutang', [\App\Http\Controllers\FinanceController::class, 'piutang'])->name('piutang');
+        Route::get('/piutang/{id}/detail', [\App\Http\Controllers\FinanceController::class, 'piutangDetail'])->whereNumber('id')->name('piutang.detail');
         Route::get('/kas-bank', [\App\Http\Controllers\FinanceController::class, 'kasBank'])->name('kasBank');
         Route::get('/pendapatan-lain-lain', [\App\Http\Controllers\FinanceController::class, 'pendapatanLainLain'])->name('pendapatanLainLain');
         Route::get('/biaya', [\App\Http\Controllers\FinanceController::class, 'biaya'])->name('biaya');

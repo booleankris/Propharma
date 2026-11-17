@@ -1,5 +1,6 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { router } from '@inertiajs/react';
+import axios from 'axios';
 import FinanceLayout from './Layouts/FinanceLayout';
 import DateRangeFilter from './Components/DateRangeFilter';
 import Drawer from './Components/Drawer';
@@ -11,39 +12,122 @@ import {
     ShoppingCart, Search, Check, X, Calendar, AlertCircle, ChevronLeft, ChevronRight, User,
     ArrowLeft, Printer, MoreVertical, ChevronDown, History, Landmark, Maximize2, CreditCard,
     Download, ArrowUp, ArrowDown, Clock, AlertTriangle, FileText, CheckCircle2, FileSpreadsheet, Upload,
-    RotateCcw
+    RotateCcw, Loader2
 } from 'lucide-react';
 
-export default function Piutang({ piutangPenjualan = [], debtors = [], kasBankAccounts = [], stats = {}, creditReturns = [] }) {
-    const [mainTab, setMainTab] = useState('faktur'); // 'faktur' | 'retur'
-    const [searchTerm, setSearchTerm] = useState('');
-    const [statusFilter, setStatusFilter] = useState('ALL');
-    const [debtorFilter, setDebtorFilter] = useState('');
-    const [startDate, setStartDate] = useState('');
-    const [endDate, setEndDate] = useState('');
-    const [datePreset, setDatePreset] = useState('all');
-    const [sortCreatedAt, setSortCreatedAt] = useState('asc'); // Filter 1: Waktu Pembuatan ASC/DESC
-    const [dueFilter, setDueFilter] = useState('all'); // Filter 2: Berdasarkan Jatuh Tempo
+export default function Piutang({
+    piutangPenjualan = [],
+    pagination = null,
+    dueStats: serverDueStats = null,
+    creditReturns = [],
+    returPagination = null,
+    filters: serverFilters = {},
+    debtors = [],
+    kasBankAccounts = [],
+    stats = {},
+}) {
+    const [mainTab, setMainTab] = useState(serverFilters.tab ?? 'faktur'); // 'faktur' | 'retur'
+    const [searchTerm, setSearchTerm] = useState(serverFilters.search ?? '');
+    const [statusFilter, setStatusFilter] = useState(serverFilters.status ?? 'ALL');
+    const [debtorFilter, setDebtorFilter] = useState(serverFilters.debtor_id ?? '');
+    const [startDate, setStartDate] = useState(serverFilters.start_date ?? '');
+    const [endDate, setEndDate] = useState(serverFilters.end_date ?? '');
+    const [datePreset, setDatePreset] = useState(serverFilters.date_preset ?? 'all');
+    const [sortCreatedAt, setSortCreatedAt] = useState(serverFilters.sort_order ?? 'desc');
+    const [dueFilter, setDueFilter] = useState(serverFilters.due_mode ?? 'all');
     const [isDueDropdownOpen, setIsDueDropdownOpen] = useState(false);
-    const [currentPage, setCurrentPage] = useState(1);
-    const itemsPerPage = 10;
+    const [isLoadingList, setIsLoadingList] = useState(false);
 
     // State Khusus Tab Riwayat Retur Kredit
-    const [returSearchTerm, setReturSearchTerm] = useState('');
-    const [returDebtorFilter, setReturDebtorFilter] = useState('');
-    const [returCurrentPage, setReturCurrentPage] = useState(1);
-    const returItemsPerPage = 10;
+    const [returSearchTerm, setReturSearchTerm] = useState(serverFilters.retur_search ?? '');
+    const [returDebtorFilter, setReturDebtorFilter] = useState(serverFilters.retur_debtor_id ?? '');
+
+    const currentPage = pagination?.current_page ?? 1;
+    const totalPages = pagination?.last_page ?? 1;
+    const totalFilteredItems = pagination?.total ?? piutangPenjualan.length;
+    const pageFrom = pagination?.from ?? (piutangPenjualan.length > 0 ? 1 : 0);
+    const pageTo = pagination?.to ?? piutangPenjualan.length;
+
+    const returCurrentPage = returPagination?.current_page ?? 1;
+    const returTotalPages = returPagination?.last_page ?? 1;
+    const returTotalItems = returPagination?.total ?? creditReturns.length;
+    const returPageFrom = returPagination?.from ?? (creditReturns.length > 0 ? 1 : 0);
+    const returPageTo = returPagination?.to ?? creditReturns.length;
 
     const isItemSettled = (item) => {
         return !item || item.status === 'Lunas' || item.status === 'Diretur Penuh' || item.status === 'Lunas (Ada Retur)' || (Number(item.sisa) || 0) <= 0.005;
     };
 
+    const navigatePiutang = (overrides = {}) => {
+        const next = {
+            tab: overrides.tab !== undefined ? overrides.tab : mainTab,
+            search: overrides.search !== undefined ? overrides.search : searchTerm,
+            debtor_id: overrides.debtor_id !== undefined ? overrides.debtor_id : debtorFilter,
+            status: overrides.status !== undefined ? overrides.status : statusFilter,
+            due_mode: overrides.due_mode !== undefined ? overrides.due_mode : dueFilter,
+            date_preset: overrides.date_preset !== undefined ? overrides.date_preset : datePreset,
+            start_date: overrides.start_date !== undefined ? overrides.start_date : startDate,
+            end_date: overrides.end_date !== undefined ? overrides.end_date : endDate,
+            sort_order: overrides.sort_order !== undefined ? overrides.sort_order : sortCreatedAt,
+            page: overrides.page !== undefined ? overrides.page : currentPage,
+            retur_search: overrides.retur_search !== undefined ? overrides.retur_search : returSearchTerm,
+            retur_debtor_id: overrides.retur_debtor_id !== undefined ? overrides.retur_debtor_id : returDebtorFilter,
+            retur_page: overrides.retur_page !== undefined ? overrides.retur_page : returCurrentPage,
+        };
+        const params = {};
+        if (next.tab && next.tab !== 'faktur') params.tab = next.tab;
+        if (next.search && next.search.trim() !== '') params.search = next.search.trim();
+        if (next.debtor_id) params.debtor_id = next.debtor_id;
+        if (next.status && next.status !== 'ALL') params.status = next.status;
+        if (next.due_mode && next.due_mode !== 'all') params.due_mode = next.due_mode;
+        if (next.date_preset && next.date_preset !== 'all') params.date_preset = next.date_preset;
+        if (next.start_date) params.start_date = next.start_date;
+        if (next.end_date) params.end_date = next.end_date;
+        if (next.sort_order && next.sort_order !== 'desc') params.sort_order = next.sort_order;
+        if (next.page && next.page > 1) params.page = next.page;
+        if (next.retur_search && next.retur_search.trim() !== '') params.retur_search = next.retur_search.trim();
+        if (next.retur_debtor_id) params.retur_debtor_id = next.retur_debtor_id;
+        if (next.retur_page && next.retur_page > 1) params.retur_page = next.retur_page;
+
+        router.get('/finance/piutang', params, {
+            preserveState: true,
+            preserveScroll: true,
+            replace: true,
+            onStart: () => setIsLoadingList(true),
+            onFinish: () => setIsLoadingList(false),
+        });
+    };
+
+    const didMountSearchRef = useRef(false);
+    useEffect(() => {
+        if (!didMountSearchRef.current) {
+            didMountSearchRef.current = true;
+            return;
+        }
+        const timer = setTimeout(() => {
+            navigatePiutang({ search: searchTerm, page: 1 });
+        }, 300);
+        return () => clearTimeout(timer);
+    }, [searchTerm]);
+
+    const didMountReturSearchRef = useRef(false);
+    useEffect(() => {
+        if (!didMountReturSearchRef.current) {
+            didMountReturSearchRef.current = true;
+            return;
+        }
+        const timer = setTimeout(() => {
+            navigatePiutang({ retur_search: returSearchTerm, retur_page: 1 });
+        }, 300);
+        return () => clearTimeout(timer);
+    }, [returSearchTerm]);
+
     const handleDatePreset = (preset) => {
         setDatePreset(preset);
-        setCurrentPage(1);
         if (preset === 'all') {
             setStartDate('');
             setEndDate('');
+            navigatePiutang({ date_preset: 'all', start_date: '', end_date: '', page: 1, retur_page: 1 });
             return;
         }
         const today = new Date();
@@ -63,19 +147,104 @@ export default function Piutang({ piutangPenjualan = [], debtors = [], kasBankAc
             : preset === 'this_month'
                 ? new Date(today.getFullYear(), today.getMonth() + 1, 0)
                 : new Date(today.getFullYear(), today.getMonth(), 0);
-        setStartDate(formatDate(start));
-        setEndDate(formatDate(end));
+        const nextStart = formatDate(start);
+        const nextEnd = formatDate(end);
+        setStartDate(nextStart);
+        setEndDate(nextEnd);
+        navigatePiutang({ date_preset: preset, start_date: nextStart, end_date: nextEnd, page: 1, retur_page: 1 });
     };
 
-    // Selection untuk Pelunasan Massal (Maks 10)
+    // Selection lintas halaman untuk Pelunasan Massal (Maks 10)
     const [selectedPiutangIds, setSelectedPiutangIds] = useState([]);
+    const [selectedItemsMap, setSelectedItemsMap] = useState({});
     const [selectionWarning, setSelectionWarning] = useState('');
 
-    // State Halaman Detil Penuh & Quick Preview Drawer
+    // State Halaman Detil Penuh & Quick Preview Drawer + Lazy Cache
     const [detailViewPiutang, setDetailViewPiutang] = useState(null);
     const [drawerPiutang, setDrawerPiutang] = useState(null);
     const [isShippingOpen, setIsShippingOpen] = useState(true);
     const [isBuktiModalOpen, setIsBuktiModalOpen] = useState(false);
+    const [isLoadingDetail, setIsLoadingDetail] = useState(false);
+    const detailCacheRef = useRef({});
+
+    useEffect(() => {
+        if (!piutangPenjualan.length) return;
+        setSelectedItemsMap((prev) => {
+            const next = { ...prev };
+            let changed = false;
+            piutangPenjualan.forEach((item) => {
+                if (next[item.id]) {
+                    next[item.id] = item;
+                    changed = true;
+                }
+            });
+            return changed ? next : prev;
+        });
+    }, [piutangPenjualan]);
+
+    const loadPiutangDetail = async (txId) => {
+        if (!txId) return;
+        if (detailCacheRef.current[txId]) {
+            const cached = detailCacheRef.current[txId];
+            setDrawerPiutang((curr) => (curr?.id === txId ? cached : curr));
+            setDetailViewPiutang((curr) => (curr?.id === txId ? cached : curr));
+            return;
+        }
+        setIsLoadingDetail(true);
+        try {
+            const res = await axios.get(`/finance/piutang/${txId}/detail`);
+            const full = res?.data?.data;
+            if (full) {
+                detailCacheRef.current[txId] = full;
+                setDrawerPiutang((curr) => (curr?.id === txId ? full : curr));
+                setDetailViewPiutang((curr) => (curr?.id === txId ? full : curr));
+            }
+        } catch (err) {
+            console.error('Gagal memuat detail piutang:', err);
+        } finally {
+            setIsLoadingDetail(false);
+        }
+    };
+
+    const openPiutangDrawer = (item) => {
+        const initial = detailCacheRef.current[item.id] || item;
+        setDrawerPiutang(initial);
+        loadPiutangDetail(item.id);
+    };
+
+    const openPiutangDetail = (item) => {
+        const initial = detailCacheRef.current[item.id] || item;
+        setDetailViewPiutang(initial);
+        loadPiutangDetail(item.id);
+    };
+
+    const openPiutangDetailById = (txId, fallbackRet = null) => {
+        if (!txId) return;
+        const fromList = piutangPenjualan.find((p) => p.id === txId);
+        const initial = detailCacheRef.current[txId] || fromList || {
+            id: txId,
+            nomor: fallbackRet?.transaction_code || `TRX-${txId}`,
+            debtor: fallbackRet?.debtor || '-',
+            debtor_code: fallbackRet?.debtor_code || '-',
+            pasien: fallbackRet?.pasien || '-',
+            dokter: fallbackRet?.dokter || '-',
+            apotek: fallbackRet?.apotek || '-',
+            tanggal: fallbackRet?.tanggal || '-',
+            jatuhTempo: '-',
+            status: 'Belum Bayar',
+            subtotal: 0,
+            total: 0,
+            total_retur: 0,
+            net_total: 0,
+            terbayar: 0,
+            sisa: 0,
+            items: [],
+            payments: [],
+            returs: [],
+        };
+        setDetailViewPiutang(initial);
+        loadPiutangDetail(txId);
+    };
 
     // State Modal Terima Pembayaran Satuan
     const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
@@ -107,101 +276,15 @@ export default function Piutang({ piutangPenjualan = [], debtors = [], kasBankAc
     const [isImporting, setIsImporting] = useState(false);
     const [importSuccessMessage, setImportSuccessMessage] = useState('');
 
-    // Filter & Sorting Data Piutang
-    const filteredPiutang = useMemo(() => {
-        let result = piutangPenjualan.filter((item) => {
-            const matchSearch =
-                (item.nomor && item.nomor.toLowerCase().includes(searchTerm.toLowerCase())) ||
-                (item.debtor && item.debtor.toLowerCase().includes(searchTerm.toLowerCase())) ||
-                (item.pasien && item.pasien.toLowerCase().includes(searchTerm.toLowerCase())) ||
-                (item.dokter && item.dokter.toLowerCase().includes(searchTerm.toLowerCase()));
-
-            let matchStatus = true;
-            if (statusFilter === 'LUNAS') {
-                matchStatus = isItemSettled(item);
-            } else if (statusFilter === 'BELUM_LUNAS') {
-                matchStatus = !isItemSettled(item);
-            } else if (statusFilter === 'DIAJUKAN') {
-                matchStatus = Boolean(item.is_submitted) && !isItemSettled(item);
-            } else if (statusFilter === 'RETUR') {
-                matchStatus = (Number(item.total_retur) > 0) || item.status === 'Diretur Penuh' || item.status === 'Diretur Sebagian' || item.status === 'Lunas (Ada Retur)';
-            }
-
-            const matchDebtor = debtorFilter
-                ? String(item.debtor_id) === String(debtorFilter)
-                : true;
-
-            let matchDue = true;
-            if (dueFilter === 'overdue') {
-                matchDue = item.is_overdue && !isItemSettled(item);
-            } else if (dueFilter === 'due_soon') {
-                matchDue = !item.is_overdue && item.days_remaining <= 7 && !isItemSettled(item);
-            }
-
-            const itemDate = item.raw_created_at?.slice(0, 10) || (item.tanggal?.includes('/') ? item.tanggal.split('/').reverse().join('-') : '');
-            const matchStartDate = !startDate || (itemDate && itemDate >= startDate);
-            const matchEndDate = !endDate || (itemDate && itemDate <= endDate);
-
-            return matchSearch && matchStatus && matchDebtor && matchDue && matchStartDate && matchEndDate;
-        });
-
-        // Sorting berdasarkan pilihan pengguna
-        return result.sort((a, b) => {
-            if (dueFilter === 'due_nearest') {
-                const dateA = a.raw_jatuh_tempo ? new Date(a.raw_jatuh_tempo).getTime() : 0;
-                const dateB = b.raw_jatuh_tempo ? new Date(b.raw_jatuh_tempo).getTime() : 0;
-                return dateA - dateB;
-            }
-            if (dueFilter === 'due_furthest') {
-                const dateA = a.raw_jatuh_tempo ? new Date(a.raw_jatuh_tempo).getTime() : 0;
-                const dateB = b.raw_jatuh_tempo ? new Date(b.raw_jatuh_tempo).getTime() : 0;
-                return dateB - dateA;
-            }
-
-            // Default: Urutkan Waktu Pembuatan (ASC atau DESC)
-            const timeA = a.raw_created_at ? new Date(a.raw_created_at).getTime() : (Number(a.id) || 0);
-            const timeB = b.raw_created_at ? new Date(b.raw_created_at).getTime() : (Number(b.id) || 0);
-            return sortCreatedAt === 'asc' ? timeA - timeB : timeB - timeA;
-        });
-    }, [piutangPenjualan, searchTerm, statusFilter, debtorFilter, sortCreatedAt, dueFilter, startDate, endDate]);
-
-    const totalPages = Math.ceil(filteredPiutang.length / itemsPerPage) || 1;
-    const paginatedPiutang = useMemo(() => {
-        const start = (currentPage - 1) * itemsPerPage;
-        return filteredPiutang.slice(start, start + itemsPerPage);
-    }, [filteredPiutang, currentPage, itemsPerPage]);
-
-    // Filter & Paginasi Tab Riwayat Retur Kredit
-    const filteredCreditReturns = useMemo(() => {
-        return creditReturns.filter((ret) => {
-            const matchSearch =
-                (ret.code && ret.code.toLowerCase().includes(returSearchTerm.toLowerCase())) ||
-                (ret.transaction_code && ret.transaction_code.toLowerCase().includes(returSearchTerm.toLowerCase())) ||
-                (ret.debtor && ret.debtor.toLowerCase().includes(returSearchTerm.toLowerCase())) ||
-                (ret.medicine_name && ret.medicine_name.toLowerCase().includes(returSearchTerm.toLowerCase())) ||
-                (ret.pasien && ret.pasien.toLowerCase().includes(returSearchTerm.toLowerCase()));
-
-            const matchDebtor = returDebtorFilter
-                ? String(ret.debtor_id) === String(returDebtorFilter)
-                : true;
-
-            const retDate = ret.raw_created_at?.slice(0, 10) || (ret.tanggal?.includes('/') ? ret.tanggal.split('/').reverse().join('-') : '');
-            const matchStartDate = !startDate || (retDate && retDate >= startDate);
-            const matchEndDate = !endDate || (retDate && retDate <= endDate);
-
-            return matchSearch && matchDebtor && matchStartDate && matchEndDate;
-        });
-    }, [creditReturns, returSearchTerm, returDebtorFilter, startDate, endDate]);
-
-    const returTotalPages = Math.ceil(filteredCreditReturns.length / returItemsPerPage) || 1;
-    const paginatedCreditReturns = useMemo(() => {
-        const start = (returCurrentPage - 1) * returItemsPerPage;
-        return filteredCreditReturns.slice(start, start + returItemsPerPage);
-    }, [filteredCreditReturns, returCurrentPage, returItemsPerPage]);
+    const paginatedPiutang = piutangPenjualan;
+    const paginatedCreditReturns = creditReturns;
 
     const selectedPiutangItems = useMemo(() => {
-        return piutangPenjualan.filter((item) => selectedPiutangIds.includes(item.id));
-    }, [piutangPenjualan, selectedPiutangIds]);
+        const byId = new Map(piutangPenjualan.map((item) => [item.id, item]));
+        return selectedPiutangIds
+            .map((id) => byId.get(id) || selectedItemsMap[id])
+            .filter(Boolean);
+    }, [piutangPenjualan, selectedPiutangIds, selectedItemsMap]);
 
     const totalSelectedPiutangSisa = useMemo(() => {
         const sum = selectedPiutangItems.reduce((acc, curr) => acc + (Number(curr.sisa) || 0), 0);
@@ -224,6 +307,11 @@ export default function Piutang({ piutangPenjualan = [], debtors = [], kasBankAc
         if (isItemSettled(item)) return;
         if (selectedPiutangIds.includes(item.id)) {
             setSelectedPiutangIds((prev) => prev.filter((id) => id !== item.id));
+            setSelectedItemsMap((prev) => {
+                const next = { ...prev };
+                delete next[item.id];
+                return next;
+            });
         } else {
             if (selectedPiutangIds.length >= 10) {
                 setSelectionWarning('Maksimal 10 transaksi yang dapat dipilih sekaligus.');
@@ -231,6 +319,7 @@ export default function Piutang({ piutangPenjualan = [], debtors = [], kasBankAc
                 return;
             }
             setSelectedPiutangIds((prev) => [...prev, item.id]);
+            setSelectedItemsMap((prev) => ({ ...prev, [item.id]: item }));
         }
     };
 
@@ -243,19 +332,29 @@ export default function Piutang({ piutangPenjualan = [], debtors = [], kasBankAc
                 setTimeout(() => setSelectionWarning(''), 4000);
                 return;
             }
-            const toAdd = eligible
-                .map((item) => item.id)
-                .filter((id) => !selectedPiutangIds.includes(id))
+            const addedItems = eligible
+                .filter((item) => !selectedPiutangIds.includes(item.id))
                 .slice(0, remainingSlots);
+            const toAdd = addedItems.map((item) => item.id);
 
-            if (toAdd.length < eligible.length) {
+            if (toAdd.length < eligible.filter((item) => !selectedPiutangIds.includes(item.id)).length) {
                 setSelectionWarning('Hanya 10 transaksi pertama yang dipilih (maks. 10).');
                 setTimeout(() => setSelectionWarning(''), 4000);
             }
             setSelectedPiutangIds((prev) => [...prev, ...toAdd]);
+            setSelectedItemsMap((prev) => {
+                const next = { ...prev };
+                addedItems.forEach((it) => { next[it.id] = it; });
+                return next;
+            });
         } else {
             const currentPageIds = paginatedPiutang.map((item) => item.id);
             setSelectedPiutangIds((prev) => prev.filter((id) => !currentPageIds.includes(id)));
+            setSelectedItemsMap((prev) => {
+                const next = { ...prev };
+                currentPageIds.forEach((id) => { delete next[id]; });
+                return next;
+            });
         }
     };
 
@@ -353,6 +452,7 @@ export default function Piutang({ piutangPenjualan = [], debtors = [], kasBankAc
             onSuccess: () => {
                 setIsPaymentModalOpen(false);
                 setIsSubmittingPayment(false);
+                delete detailCacheRef.current[paymentForm.medicine_transaction_id];
                 if (drawerPiutang && drawerPiutang.id === paymentForm.medicine_transaction_id) {
                     setDrawerPiutang(null);
                 }
@@ -399,7 +499,9 @@ export default function Piutang({ piutangPenjualan = [], debtors = [], kasBankAc
             onSuccess: () => {
                 setIsBulkModalOpen(false);
                 setIsSubmittingBulk(false);
+                detailCacheRef.current = {};
                 setSelectedPiutangIds([]);
+                setSelectedItemsMap({});
             },
             onError: (errs) => {
                 setIsSubmittingBulk(false);
@@ -421,7 +523,9 @@ export default function Piutang({ piutangPenjualan = [], debtors = [], kasBankAc
                 setIsImportModalOpen(false);
                 setImportFile(null);
                 setIsImporting(false);
+                detailCacheRef.current = {};
                 setSelectedPiutangIds([]);
+                setSelectedItemsMap({});
                 setImportSuccessMessage(page?.props?.flash?.success || 'Impor pembayaran Piutang berhasil.');
             },
             onError: (errs) => {
@@ -442,7 +546,9 @@ export default function Piutang({ piutangPenjualan = [], debtors = [], kasBankAc
             preserveScroll: true,
             onSuccess: () => {
                 setIsSubmittingBulk(false);
+                detailCacheRef.current = {};
                 setSelectedPiutangIds([]);
+                setSelectedItemsMap({});
             },
             onError: () => {
                 setIsSubmittingBulk(false);
@@ -450,10 +556,7 @@ export default function Piutang({ piutangPenjualan = [], debtors = [], kasBankAc
         });
     };
 
-    const allSelectedPiutangSubmitted = selectedPiutangIds.length > 0 && selectedPiutangIds.every(id => {
-        const item = filteredPiutang.find(p => p.id === id);
-        return item ? item.is_submitted : false;
-    });
+    const allSelectedPiutangSubmitted = selectedPiutangIds.length > 0 && selectedPiutangItems.length === selectedPiutangIds.length && selectedPiutangItems.every(item => Boolean(item?.is_submitted));
 
     return (
         <FinanceLayout
@@ -645,7 +748,16 @@ export default function Piutang({ piutangPenjualan = [], debtors = [], kasBankAc
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-slate-100 text-slate-700">
-                                    {detailViewPiutang.items && detailViewPiutang.items.length > 0 ? (
+                                    {isLoadingDetail && !(detailViewPiutang.items && detailViewPiutang.items.length > 0) ? (
+                                        <tr>
+                                            <td colSpan={8} className="py-8 text-center text-slate-500">
+                                                <span className="inline-flex items-center gap-2">
+                                                    <Loader2 className="w-4 h-4 animate-spin text-amber-600" />
+                                                    <span>Memuat rincian item obat, retur, dan pembayaran...</span>
+                                                </span>
+                                            </td>
+                                        </tr>
+                                    ) : detailViewPiutang.items && detailViewPiutang.items.length > 0 ? (
                                         detailViewPiutang.items.map((it, idx) => (
                                             <tr key={idx}>
                                                 <td className="py-3">
@@ -911,7 +1023,7 @@ export default function Piutang({ piutangPenjualan = [], debtors = [], kasBankAc
                                     {formatRupiah(stats.totalPiutangBruto || stats.totalPiutang || 0)}
                                 </div>
                                 <p className="text-[11px] text-slate-400 mt-0.5">
-                                    Dari {piutangPenjualan.length} transaksi penjualan
+                                    Dari {stats.totalPiutangCount ?? totalFilteredItems} transaksi penjualan
                                 </p>
                             </div>
 
@@ -925,7 +1037,7 @@ export default function Piutang({ piutangPenjualan = [], debtors = [], kasBankAc
                                     - {formatRupiah(stats.totalPiutangRetur || 0)}
                                 </div>
                                 <p className="text-[11px] text-rose-600/70 mt-0.5">
-                                    {creditReturns.length} item retur memotong piutang
+                                    {returTotalItems} item retur memotong piutang
                                 </p>
                             </div>
 
@@ -961,7 +1073,10 @@ export default function Piutang({ piutangPenjualan = [], debtors = [], kasBankAc
                     <div className="flex items-center gap-2 border-b border-slate-200">
                         <button
                             type="button"
-                            onClick={() => setMainTab('faktur')}
+                            onClick={() => {
+                                setMainTab('faktur');
+                                navigatePiutang({ tab: 'faktur' });
+                            }}
                             className={`inline-flex items-center gap-2 px-4 py-3 text-xs font-bold border-b-2 transition cursor-pointer ${
                                 mainTab === 'faktur'
                                     ? 'border-amber-600 text-amber-700'
@@ -973,13 +1088,16 @@ export default function Piutang({ piutangPenjualan = [], debtors = [], kasBankAc
                             <span className={`px-2 py-0.5 rounded-full text-[10px] font-extrabold ${
                                 mainTab === 'faktur' ? 'bg-amber-100 text-amber-800' : 'bg-slate-100 text-slate-600'
                             }`}>
-                                {piutangPenjualan.length}
+                                {stats.totalPiutangCount ?? totalFilteredItems}
                             </span>
                         </button>
 
                         <button
                             type="button"
-                            onClick={() => setMainTab('retur')}
+                            onClick={() => {
+                                setMainTab('retur');
+                                navigatePiutang({ tab: 'retur' });
+                            }}
                             className={`inline-flex items-center gap-2 px-4 py-3 text-xs font-bold border-b-2 transition cursor-pointer ${
                                 mainTab === 'retur'
                                     ? 'border-rose-600 text-rose-700'
@@ -991,7 +1109,7 @@ export default function Piutang({ piutangPenjualan = [], debtors = [], kasBankAc
                             <span className={`px-2 py-0.5 rounded-full text-[10px] font-extrabold ${
                                 mainTab === 'retur' ? 'bg-rose-100 text-rose-800' : 'bg-slate-100 text-slate-600'
                             }`}>
-                                {creditReturns.length}
+                                {returTotalItems}
                             </span>
                         </button>
                     </div>
@@ -1011,7 +1129,7 @@ export default function Piutang({ piutangPenjualan = [], debtors = [], kasBankAc
                                                 type="text"
                                                 placeholder="Cari transaksi, debitur, pasien..."
                                                 value={searchTerm}
-                                                onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}
+                                                onChange={(e) => setSearchTerm(e.target.value)}
                                                 className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-amber-500 focus:bg-white focus:outline-none"
                                             />
                                         </div>
@@ -1020,7 +1138,10 @@ export default function Piutang({ piutangPenjualan = [], debtors = [], kasBankAc
                                         <DebtorCombobox
                                             debtors={debtors}
                                             selectedDebtorId={debtorFilter}
-                                            onSelectDebtor={(val) => { setDebtorFilter(val); setCurrentPage(1); }}
+                                            onSelectDebtor={(val) => {
+                                                setDebtorFilter(val);
+                                                navigatePiutang({ debtor_id: val, page: 1 });
+                                            }}
                                             placeholder="Filter Debitur (Instansi)..."
                                         />
 
@@ -1028,35 +1149,35 @@ export default function Piutang({ piutangPenjualan = [], debtors = [], kasBankAc
                                         <div className="flex items-center bg-slate-100 p-1 rounded-xl text-xs flex-wrap gap-0.5">
                                             <button
                                                 type="button"
-                                                onClick={() => { setStatusFilter('ALL'); setCurrentPage(1); }}
+                                                onClick={() => { setStatusFilter('ALL'); navigatePiutang({ status: 'ALL', page: 1 }); }}
                                                 className={`px-3 py-1.5 rounded-lg font-semibold transition cursor-pointer ${statusFilter === 'ALL' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-500 hover:text-slate-800'}`}
                                             >
                                                 Semua
                                             </button>
                                             <button
                                                 type="button"
-                                                onClick={() => { setStatusFilter('BELUM_LUNAS'); setCurrentPage(1); }}
+                                                onClick={() => { setStatusFilter('BELUM_LUNAS'); navigatePiutang({ status: 'BELUM_LUNAS', page: 1 }); }}
                                                 className={`px-3 py-1.5 rounded-lg font-semibold transition cursor-pointer ${statusFilter === 'BELUM_LUNAS' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-500 hover:text-slate-800'}`}
                                             >
                                                 Belum Lunas
                                             </button>
                                             <button
                                                 type="button"
-                                                onClick={() => { setStatusFilter('DIAJUKAN'); setCurrentPage(1); }}
+                                                onClick={() => { setStatusFilter('DIAJUKAN'); navigatePiutang({ status: 'DIAJUKAN', page: 1 }); }}
                                                 className={`px-3 py-1.5 rounded-lg font-semibold transition cursor-pointer ${statusFilter === 'DIAJUKAN' ? 'bg-white text-blue-700 shadow-xs font-bold' : 'text-slate-500 hover:text-slate-800'}`}
                                             >
                                                 Diajukan
                                             </button>
                                             <button
                                                 type="button"
-                                                onClick={() => { setStatusFilter('RETUR'); setCurrentPage(1); }}
+                                                onClick={() => { setStatusFilter('RETUR'); navigatePiutang({ status: 'RETUR', page: 1 }); }}
                                                 className={`px-3 py-1.5 rounded-lg font-semibold transition cursor-pointer ${statusFilter === 'RETUR' ? 'bg-white text-rose-700 shadow-xs font-bold' : 'text-slate-500 hover:text-slate-800'}`}
                                             >
                                                 Ada Retur
                                             </button>
                                             <button
                                                 type="button"
-                                                onClick={() => { setStatusFilter('LUNAS'); setCurrentPage(1); }}
+                                                onClick={() => { setStatusFilter('LUNAS'); navigatePiutang({ status: 'LUNAS', page: 1 }); }}
                                                 className={`px-3 py-1.5 rounded-lg font-semibold transition cursor-pointer ${statusFilter === 'LUNAS' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-500 hover:text-slate-800'}`}
                                             >
                                                 Lunas
@@ -1067,8 +1188,9 @@ export default function Piutang({ piutangPenjualan = [], debtors = [], kasBankAc
                                         <button
                                             type="button"
                                             onClick={() => {
-                                                setSortCreatedAt((prev) => (prev === 'asc' ? 'desc' : 'asc'));
-                                                setCurrentPage(1);
+                                                const nextOrder = sortCreatedAt === 'asc' ? 'desc' : 'asc';
+                                                setSortCreatedAt(nextOrder);
+                                                navigatePiutang({ sort_order: nextOrder, page: 1 });
                                             }}
                                             className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold border transition cursor-pointer ${sortCreatedAt === 'asc'
                                                     ? 'bg-amber-50 border-amber-300 text-amber-800 font-bold shadow-2xs'
@@ -1108,7 +1230,7 @@ export default function Piutang({ piutangPenjualan = [], debtors = [], kasBankAc
                                                 <div className="absolute left-0 mt-1.5 w-60 bg-white border border-slate-200 rounded-xl shadow-xl z-50 py-1 divide-y divide-slate-100 text-xs animate-in fade-in zoom-in-95 duration-150">
                                                     <button
                                                         type="button"
-                                                        onClick={() => { setDueFilter('all'); setIsDueDropdownOpen(false); setCurrentPage(1); }}
+                                                        onClick={() => { setDueFilter('all'); setIsDueDropdownOpen(false); navigatePiutang({ due_mode: 'all', page: 1 }); }}
                                                         className={`w-full text-left px-3.5 py-2 hover:bg-slate-50 flex items-center justify-between cursor-pointer ${dueFilter === 'all' ? 'font-bold text-amber-700 bg-amber-50/50' : 'text-slate-700'}`}
                                                     >
                                                         <span>Semua Jatuh Tempo</span>
@@ -1116,7 +1238,7 @@ export default function Piutang({ piutangPenjualan = [], debtors = [], kasBankAc
                                                     </button>
                                                     <button
                                                         type="button"
-                                                        onClick={() => { setDueFilter('overdue'); setIsDueDropdownOpen(false); setCurrentPage(1); }}
+                                                        onClick={() => { setDueFilter('overdue'); setIsDueDropdownOpen(false); navigatePiutang({ due_mode: 'overdue', page: 1 }); }}
                                                         className={`w-full text-left px-3.5 py-2 hover:bg-red-50 flex items-center justify-between text-red-700 cursor-pointer ${dueFilter === 'overdue' ? 'font-bold bg-red-50' : ''}`}
                                                     >
                                                         <div className="flex items-center gap-1.5">
@@ -1127,7 +1249,7 @@ export default function Piutang({ piutangPenjualan = [], debtors = [], kasBankAc
                                                     </button>
                                                     <button
                                                         type="button"
-                                                        onClick={() => { setDueFilter('due_soon'); setIsDueDropdownOpen(false); setCurrentPage(1); }}
+                                                        onClick={() => { setDueFilter('due_soon'); setIsDueDropdownOpen(false); navigatePiutang({ due_mode: 'due_soon', page: 1 }); }}
                                                         className={`w-full text-left px-3.5 py-2 hover:bg-amber-50 flex items-center justify-between text-amber-800 cursor-pointer ${dueFilter === 'due_soon' ? 'font-bold bg-amber-50' : ''}`}
                                                     >
                                                         <div className="flex items-center gap-1.5">
@@ -1138,7 +1260,7 @@ export default function Piutang({ piutangPenjualan = [], debtors = [], kasBankAc
                                                     </button>
                                                     <button
                                                         type="button"
-                                                        onClick={() => { setDueFilter('due_nearest'); setIsDueDropdownOpen(false); setCurrentPage(1); }}
+                                                        onClick={() => { setDueFilter('due_nearest'); setIsDueDropdownOpen(false); navigatePiutang({ due_mode: 'due_nearest', page: 1 }); }}
                                                         className={`w-full text-left px-3.5 py-2 hover:bg-slate-50 flex items-center justify-between cursor-pointer ${dueFilter === 'due_nearest' ? 'font-bold text-amber-700 bg-amber-50/50' : 'text-slate-700'}`}
                                                     >
                                                         <span>Urutkan Tempo Terdekat</span>
@@ -1146,7 +1268,7 @@ export default function Piutang({ piutangPenjualan = [], debtors = [], kasBankAc
                                                     </button>
                                                     <button
                                                         type="button"
-                                                        onClick={() => { setDueFilter('due_furthest'); setIsDueDropdownOpen(false); setCurrentPage(1); }}
+                                                        onClick={() => { setDueFilter('due_furthest'); setIsDueDropdownOpen(false); navigatePiutang({ due_mode: 'due_furthest', page: 1 }); }}
                                                         className={`w-full text-left px-3.5 py-2 hover:bg-slate-50 flex items-center justify-between cursor-pointer ${dueFilter === 'due_furthest' ? 'font-bold text-amber-700 bg-amber-50/50' : 'text-slate-700'}`}
                                                     >
                                                         <span>Urutkan Tempo Terjauh</span>
@@ -1166,7 +1288,7 @@ export default function Piutang({ piutangPenjualan = [], debtors = [], kasBankAc
                                             <span>Import Pembayaran</span>
                                         </button>
                                         <a
-                                            href={`/finance/export/piutang?search=${encodeURIComponent(searchTerm)}&status=${encodeURIComponent(statusFilter === 'ALL' ? '' : statusFilter)}&debtor_id=${encodeURIComponent(debtorFilter)}&sort_by=${dueFilter.startsWith('due_') ? 'due_date' : 'created_at'}&sort_order=${sortCreatedAt}&due_mode=${encodeURIComponent(dueFilter)}`}
+                                            href={`/finance/export/piutang?search=${encodeURIComponent(searchTerm)}&status=${encodeURIComponent(statusFilter === 'ALL' ? '' : statusFilter)}&debtor_id=${encodeURIComponent(debtorFilter)}&sort_by=${dueFilter.startsWith('due_') ? 'due_date' : 'created_at'}&sort_order=${sortCreatedAt}&due_mode=${encodeURIComponent(dueFilter)}&start_date=${encodeURIComponent(startDate)}&end_date=${encodeURIComponent(endDate)}`}
                                             className="inline-flex items-center gap-1.5 px-3 py-2 bg-emerald-50 hover:bg-emerald-100/80 text-emerald-800 border border-emerald-200 rounded-xl text-xs font-semibold transition shadow-2xs cursor-pointer"
                                             title="Export data piutang ke Excel (.xlsx) dengan kolom retur penjualan dan sisa piutang bersih"
                                         >
@@ -1194,10 +1316,11 @@ export default function Piutang({ piutangPenjualan = [], debtors = [], kasBankAc
                                         accent="amber"
                                         onPreset={handleDatePreset}
                                         onChange={([start, end]) => {
+                                            const nextPreset = start || end ? 'custom' : 'all';
                                             setStartDate(start);
                                             setEndDate(end);
-                                            setDatePreset(start || end ? 'custom' : 'all');
-                                            setCurrentPage(1);
+                                            setDatePreset(nextPreset);
+                                            navigatePiutang({ date_preset: nextPreset, start_date: start, end_date: end, page: 1 });
                                         }}
                                     />
                                 </div>
@@ -1211,7 +1334,7 @@ export default function Piutang({ piutangPenjualan = [], debtors = [], kasBankAc
                             </div>
 
                             {/* Tabel Piutang Penjualan */}
-                            <div className="bg-white border border-slate-200 rounded-2xl shadow-xs overflow-hidden">
+                            <div className={`bg-white border border-slate-200 rounded-2xl shadow-xs overflow-hidden transition-opacity ${isLoadingList ? 'opacity-60 pointer-events-none' : ''}`}>
                                 <div className="overflow-x-auto">
                                     <table className="w-full text-left border-collapse text-xs">
                                         <thead>
@@ -1255,7 +1378,7 @@ export default function Piutang({ piutangPenjualan = [], debtors = [], kasBankAc
                                                     return (
                                                         <tr
                                                             key={item.id}
-                                                            onClick={() => setDrawerPiutang(item)}
+                                                            onClick={() => openPiutangDrawer(item)}
                                                             className="hover:bg-amber-50/40 cursor-pointer transition group"
                                                         >
                                                             <td className="px-4 py-3.5" onClick={(e) => e.stopPropagation()}>
@@ -1281,7 +1404,7 @@ export default function Piutang({ piutangPenjualan = [], debtors = [], kasBankAc
                                                                     type="button"
                                                                     onClick={(e) => {
                                                                         e.stopPropagation();
-                                                                        setDetailViewPiutang(item);
+                                                                        openPiutangDetail(item);
                                                                     }}
                                                                     className="font-bold text-amber-700 hover:text-amber-800 hover:underline transition text-left cursor-pointer"
                                                                 >
@@ -1372,7 +1495,7 @@ export default function Piutang({ piutangPenjualan = [], debtors = [], kasBankAc
                                                                     )}
                                                                     <button
                                                                         type="button"
-                                                                        onClick={() => setDetailViewPiutang(item)}
+                                                                        onClick={() => openPiutangDetail(item)}
                                                                         className="px-2.5 py-1 border border-slate-200 text-slate-600 hover:bg-slate-100 rounded-lg text-xs font-semibold transition cursor-pointer"
                                                                     >
                                                                         Detil
@@ -1388,30 +1511,32 @@ export default function Piutang({ piutangPenjualan = [], debtors = [], kasBankAc
                                 </div>
 
                                 {/* Pagination */}
-                                {totalPages > 1 && (
+                                {(totalPages > 1 || totalFilteredItems > 0) && (
                                     <div className="p-4 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
                                         <div>
-                                            Menampilkan {(currentPage - 1) * itemsPerPage + 1} - {Math.min(currentPage * itemsPerPage, filteredPiutang.length)} dari {filteredPiutang.length} transaksi
+                                            Menampilkan {pageFrom} - {pageTo} dari {totalFilteredItems} transaksi
                                         </div>
-                                        <div className="flex items-center gap-1">
-                                            <button
-                                                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-                                                disabled={currentPage === 1}
-                                                className="p-1.5 rounded-lg border border-slate-200 disabled:opacity-40 hover:bg-slate-50 cursor-pointer"
-                                            >
-                                                <ChevronLeft className="w-4 h-4" />
-                                            </button>
-                                            <span className="px-3 py-1 font-semibold text-slate-800">
-                                                {currentPage} / {totalPages}
-                                            </span>
-                                            <button
-                                                onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-                                                disabled={currentPage === totalPages}
-                                                className="p-1.5 rounded-lg border border-slate-200 disabled:opacity-40 hover:bg-slate-50 cursor-pointer"
-                                            >
-                                                <ChevronRight className="w-4 h-4" />
-                                            </button>
-                                        </div>
+                                        {totalPages > 1 && (
+                                            <div className="flex items-center gap-1">
+                                                <button
+                                                    onClick={() => navigatePiutang({ page: Math.max(1, currentPage - 1) })}
+                                                    disabled={currentPage <= 1 || isLoadingList}
+                                                    className="p-1.5 rounded-lg border border-slate-200 disabled:opacity-40 hover:bg-slate-50 cursor-pointer"
+                                                >
+                                                    <ChevronLeft className="w-4 h-4" />
+                                                </button>
+                                                <span className="px-3 py-1 font-semibold text-slate-800">
+                                                    {currentPage} / {totalPages}
+                                                </span>
+                                                <button
+                                                    onClick={() => navigatePiutang({ page: Math.min(totalPages, currentPage + 1) })}
+                                                    disabled={currentPage >= totalPages || isLoadingList}
+                                                    className="p-1.5 rounded-lg border border-slate-200 disabled:opacity-40 hover:bg-slate-50 cursor-pointer"
+                                                >
+                                                    <ChevronRight className="w-4 h-4" />
+                                                </button>
+                                            </div>
+                                        )}
                                     </div>
                                 )}
                             </div>
@@ -1430,7 +1555,7 @@ export default function Piutang({ piutangPenjualan = [], debtors = [], kasBankAc
                                                 type="text"
                                                 placeholder="Cari no. retur, faktur, debitur, obat..."
                                                 value={returSearchTerm}
-                                                onChange={(e) => { setReturSearchTerm(e.target.value); setReturCurrentPage(1); }}
+                                                onChange={(e) => setReturSearchTerm(e.target.value)}
                                                 className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-rose-500 focus:bg-white focus:outline-none"
                                             />
                                         </div>
@@ -1439,7 +1564,10 @@ export default function Piutang({ piutangPenjualan = [], debtors = [], kasBankAc
                                         <DebtorCombobox
                                             debtors={debtors}
                                             selectedDebtorId={returDebtorFilter}
-                                            onSelectDebtor={(val) => { setReturDebtorFilter(val); setReturCurrentPage(1); }}
+                                            onSelectDebtor={(val) => {
+                                                setReturDebtorFilter(val);
+                                                navigatePiutang({ tab: 'retur', retur_debtor_id: val, retur_page: 1 });
+                                            }}
                                             placeholder="Filter Debitur (Instansi)..."
                                         />
                                     </div>
@@ -1460,10 +1588,11 @@ export default function Piutang({ piutangPenjualan = [], debtors = [], kasBankAc
                                         accent="rose"
                                         onPreset={handleDatePreset}
                                         onChange={([start, end]) => {
+                                            const nextPreset = start || end ? 'custom' : 'all';
                                             setStartDate(start);
                                             setEndDate(end);
-                                            setDatePreset(start || end ? 'custom' : 'all');
-                                            setReturCurrentPage(1);
+                                            setDatePreset(nextPreset);
+                                            navigatePiutang({ tab: 'retur', date_preset: nextPreset, start_date: start, end_date: end, retur_page: 1 });
                                         }}
                                     />
                                 </div>
@@ -1499,7 +1628,6 @@ export default function Piutang({ piutangPenjualan = [], debtors = [], kasBankAc
                                                 </tr>
                                             ) : (
                                                 paginatedCreditReturns.map((ret) => {
-                                                    const matchingTx = piutangPenjualan.find((p) => p.id === ret.transaction_id);
                                                     return (
                                                         <tr key={ret.id} className="hover:bg-rose-50/30 transition">
                                                             <td className="px-4 py-3.5">
@@ -1507,10 +1635,10 @@ export default function Piutang({ piutangPenjualan = [], debtors = [], kasBankAc
                                                                 <div className="text-[11px] text-slate-400 mt-0.5">{ret.tanggal}</div>
                                                             </td>
                                                             <td className="px-4 py-3.5">
-                                                                {matchingTx ? (
+                                                                {ret.transaction_id ? (
                                                                     <button
                                                                         type="button"
-                                                                        onClick={() => setDetailViewPiutang(matchingTx)}
+                                                                        onClick={() => openPiutangDetailById(ret.transaction_id, ret)}
                                                                         className="font-bold text-amber-700 hover:text-amber-800 hover:underline transition text-left cursor-pointer"
                                                                         title="Klik untuk melihat rincian faktur piutang asal"
                                                                     >
@@ -1545,10 +1673,10 @@ export default function Piutang({ piutangPenjualan = [], debtors = [], kasBankAc
                                                                 </span>
                                                             </td>
                                                             <td className="px-4 py-3.5 text-center">
-                                                                {matchingTx ? (
+                                                                {ret.transaction_id ? (
                                                                     <button
                                                                         type="button"
-                                                                        onClick={() => setDetailViewPiutang(matchingTx)}
+                                                                        onClick={() => openPiutangDetailById(ret.transaction_id, ret)}
                                                                         className="px-2.5 py-1 border border-slate-200 hover:border-amber-300 text-slate-600 hover:text-amber-800 hover:bg-amber-50 rounded-lg text-xs font-semibold transition cursor-pointer"
                                                                     >
                                                                         Buka Faktur
@@ -1566,30 +1694,32 @@ export default function Piutang({ piutangPenjualan = [], debtors = [], kasBankAc
                                 </div>
 
                                 {/* Pagination Retur */}
-                                {returTotalPages > 1 && (
+                                {(returTotalPages > 1 || returTotalItems > 0) && (
                                     <div className="p-4 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
                                         <div>
-                                            Menampilkan {(returCurrentPage - 1) * returItemsPerPage + 1} - {Math.min(returCurrentPage * returItemsPerPage, filteredCreditReturns.length)} dari {filteredCreditReturns.length} data retur kredit
+                                            Menampilkan {returPageFrom} - {returPageTo} dari {returTotalItems} data retur kredit
                                         </div>
-                                        <div className="flex items-center gap-1">
-                                            <button
-                                                onClick={() => setReturCurrentPage((p) => Math.max(1, p - 1))}
-                                                disabled={returCurrentPage === 1}
-                                                className="p-1.5 rounded-lg border border-slate-200 disabled:opacity-40 hover:bg-slate-50 cursor-pointer"
-                                            >
-                                                <ChevronLeft className="w-4 h-4" />
-                                            </button>
-                                            <span className="px-3 py-1 font-semibold text-slate-800">
-                                                {returCurrentPage} / {returTotalPages}
-                                            </span>
-                                            <button
-                                                onClick={() => setReturCurrentPage((p) => Math.min(returTotalPages, p + 1))}
-                                                disabled={returCurrentPage === returTotalPages}
-                                                className="p-1.5 rounded-lg border border-slate-200 disabled:opacity-40 hover:bg-slate-50 cursor-pointer"
-                                            >
-                                                <ChevronRight className="w-4 h-4" />
-                                            </button>
-                                        </div>
+                                        {returTotalPages > 1 && (
+                                            <div className="flex items-center gap-1">
+                                                <button
+                                                    onClick={() => navigatePiutang({ tab: 'retur', retur_page: Math.max(1, returCurrentPage - 1) })}
+                                                    disabled={returCurrentPage <= 1 || isLoadingList}
+                                                    className="p-1.5 rounded-lg border border-slate-200 disabled:opacity-40 hover:bg-slate-50 cursor-pointer"
+                                                >
+                                                    <ChevronLeft className="w-4 h-4" />
+                                                </button>
+                                                <span className="px-3 py-1 font-semibold text-slate-800">
+                                                    {returCurrentPage} / {returTotalPages}
+                                                </span>
+                                                <button
+                                                    onClick={() => navigatePiutang({ tab: 'retur', retur_page: Math.min(returTotalPages, returCurrentPage + 1) })}
+                                                    disabled={returCurrentPage >= returTotalPages || isLoadingList}
+                                                    className="p-1.5 rounded-lg border border-slate-200 disabled:opacity-40 hover:bg-slate-50 cursor-pointer"
+                                                >
+                                                    <ChevronRight className="w-4 h-4" />
+                                                </button>
+                                            </div>
+                                        )}
                                     </div>
                                 )}
                             </div>
@@ -1884,7 +2014,7 @@ export default function Piutang({ piutangPenjualan = [], debtors = [], kasBankAc
                 onClose={() => setDrawerPiutang(null)}
                 onExpand={(item) => {
                     setDrawerPiutang(null);
-                    setDetailViewPiutang(item);
+                    openPiutangDetail(item);
                 }}
                 title="Rincian Transaksi Piutang"
                 subtitle={(item) => item.nomor}
@@ -1906,8 +2036,9 @@ export default function Piutang({ piutangPenjualan = [], debtors = [], kasBankAc
                         <button
                             type="button"
                             onClick={() => {
+                                const target = item;
                                 setDrawerPiutang(null);
-                                setDetailViewPiutang(item);
+                                openPiutangDetail(target);
                             }}
                             className="w-full py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-semibold transition text-center cursor-pointer"
                         >
@@ -1968,7 +2099,16 @@ export default function Piutang({ piutangPenjualan = [], debtors = [], kasBankAc
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-slate-100">
-                                        {(item.items || []).map((it, idx) => (
+                                        {isLoadingDetail && !(item.items && item.items.length > 0) ? (
+                                            <tr>
+                                                <td colSpan={4} className="p-4 text-center text-slate-500">
+                                                    <span className="inline-flex items-center gap-1.5">
+                                                        <Loader2 className="w-3.5 h-3.5 animate-spin text-amber-600" />
+                                                        <span>Memuat rincian item obat...</span>
+                                                    </span>
+                                                </td>
+                                            </tr>
+                                        ) : (item.items || []).map((it, idx) => (
                                             <tr key={idx}>
                                                 <td className="p-3">
                                                     <div className="font-semibold text-slate-800">{it.nama}</div>
@@ -2085,7 +2225,10 @@ export default function Piutang({ piutangPenjualan = [], debtors = [], kasBankAc
                 secondaryActionLabel={allSelectedPiutangSubmitted ? "Batalkan Pengajuan" : "Ajukan Pelunasan"}
                 secondaryActionColor={allSelectedPiutangSubmitted ? "slate" : "amber"}
                 onSecondaryAction={() => handleBulkSubmitPiutang(!allSelectedPiutangSubmitted)}
-                onClear={() => setSelectedPiutangIds([])}
+                onClear={() => {
+                    setSelectedPiutangIds([]);
+                    setSelectedItemsMap({});
+                }}
                 isSubmitting={isSubmittingBulk}
                 themeColor="amber"
             />

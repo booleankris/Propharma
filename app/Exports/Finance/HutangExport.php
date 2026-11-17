@@ -73,79 +73,14 @@ class HutangExport implements FromArray, WithStyles, WithColumnWidths, WithTitle
             ],
         ];
 
-        // 2. Query Data
-        Receiving::syncPostedZeroStatus($this->targetPharmacyIds);
-
-        $query = Receiving::with([
-            'receiving_details' => function ($q) {
-                $q
-                    ->where('invoice_payment', 'KREDIT')
-                    ->postedToStock()
-                    ->with([
-                        'creditor',
-                        'payments',
-                        'receiving_items' => fn ($ri) => $ri->whereNotNull('batches_id')->with('order_items.medicines'),
-                    ]);
-            },
-            'pharmacy',
-        ])
-            ->whereIn('pharmacy_id', $this->targetPharmacyIds)
-            ->whereHas('receiving_details', function ($q) {
-                $q->where('invoice_payment', 'KREDIT')->postedToStock();
-            });
-
-        if (!empty($this->filters['search'])) {
-            $s = trim($this->filters['search']);
-            $query->whereHas('receiving_details', function ($q) use ($s) {
-                $q
-                    ->where('invoice_number', 'like', "%{$s}%")
-                    ->orWhere('receiving_details_code', 'like', "%{$s}%")
-                    ->orWhereHas('creditor', function ($qc) use ($s) {
-                        $qc->where('name', 'like', "%{$s}%")->orWhere('code', 'like', "%{$s}%");
-                    });
-            });
-        }
-
-        if (!empty($this->filters['pbf'])) {
-            $p = $this->filters['pbf'];
-            $query->whereHas('receiving_details.creditor', function ($qc) use ($p) {
-                $qc->where('name', 'like', "%{$p}%")->orWhere('code', 'like', "%{$p}%");
-            });
-        }
-
-        $query->orderBy('date', ($this->filters['sort_order'] ?? 'desc') === 'asc' ? 'asc' : 'desc')->orderBy('id', 'desc');
-
-        $receivings = $query->get();
-
-        // Kumpulkan detail IDs dan invoice numbers untuk eager query retur pembelian
-        $allDetailIds = [];
-        $allInvoiceNumbers = [];
-        foreach ($receivings as $rcv) {
-            foreach ($rcv->receiving_details as $detail) {
-                $allDetailIds[] = $detail->id;
-                if (!empty($detail->invoice_number)) {
-                    $allInvoiceNumbers[] = trim($detail->invoice_number);
-                }
-            }
-        }
-        $allInvoiceNumbers = array_values(array_filter(array_unique($allInvoiceNumbers)));
-
-        $returnsQuery = DB::table('purchase_return_items as pri')
-            ->join('purchase_returns as pr', 'pr.id', '=', 'pri.purchase_return_id')
-            ->where(function ($q) use ($allDetailIds, $allInvoiceNumbers) {
-                if (!empty($allDetailIds)) {
-                    $q->whereIn('pr.receiving_id', $allDetailIds);
-                }
-                if (!empty($allInvoiceNumbers)) {
-                    $q->orWhereIn('pr.invoice_number', $allInvoiceNumbers);
-                }
-            })
-            ->where('pr.status', '!=', 'dibatalkan')
-            ->select('pri.id', 'pri.subtotal', 'pri.status', 'pr.receiving_id as pr_receiving_id', 'pr.invoice_number as pr_invoice_number')
-            ->get();
-
-        $returnsByDetailId = $returnsQuery->filter(fn($r) => !empty($r->pr_receiving_id))->groupBy('pr_receiving_id');
-        $returnsByInvoiceNumber = $returnsQuery->filter(fn($r) => !empty($r->pr_invoice_number))->groupBy(fn($r) => strtoupper(trim((string) $r->pr_invoice_number)));
+        // 2. Query Data via PayablesReceivablesService (chunked lean queries, without nested model hydration)
+        $hutangRows = app(\App\Services\Finance\PayablesReceivablesService::class)->getHutangDataset(
+            $this->targetPharmacyIds,
+            $this->filters,
+            false,
+            null,
+            1
+        )['rows'];
 
         $no = 1;
         $totalSubtotalSemua = 0;
@@ -156,120 +91,48 @@ class HutangExport implements FromArray, WithStyles, WithColumnWidths, WithTitle
         $totalTerbayarSemua = 0;
         $totalSisaSemua = 0;
 
-        foreach ($receivings as $rcv) {
-            foreach ($rcv->receiving_details as $detail) {
-                $items = $detail->receiving_items ?? collect();
-                $ppnType = strtoupper(trim($detail->invoice_ppn ?? $detail->creditor?->ppn_type ?? 'TANPA'));
-                $invoiceAmounts = ReceivingInvoiceTotals::calculate($items, $ppnType);
-                $subtotal = $invoiceAmounts['subtotal'];
-                $ppn = $invoiceAmounts['ppn'];
-                $finalTotal = $invoiceAmounts['total'];
+        foreach ($hutangRows as $item) {
+            $subtotal = (float) ($item['subtotal'] ?? 0);
+            $ppn = (float) ($item['ppn'] ?? 0);
+            $finalTotal = (float) ($item['total'] ?? 0);
+            $totalRetur = (float) ($item['total_retur'] ?? 0);
+            $netTotal = (float) ($item['net_total'] ?? 0);
+            $totalPaid = (float) ($item['terbayar'] ?? 0);
+            $sisa = (float) ($item['sisa'] ?? 0);
 
-                // Hitung retur pembelian
-                $matchedReturns = collect();
-                if (isset($returnsByDetailId[$detail->id])) {
-                    $matchedReturns = $matchedReturns->merge($returnsByDetailId[$detail->id]);
-                }
-                $invNorm = strtoupper(trim((string) $detail->invoice_number));
-                if ($invNorm !== '' && isset($returnsByInvoiceNumber[$invNorm])) {
-                    $matchedReturns = $matchedReturns->merge($returnsByInvoiceNumber[$invNorm]);
-                }
-                $matchedReturns = $matchedReturns->unique('id');
+            $rawStatus = (string) ($item['status'] ?? 'Belum Dibayar');
+            $statusLabel = $rawStatus === 'Belum Dibayar' ? 'BELUM LUNAS' : strtoupper($rawStatus);
 
-                $sudahPotongRetur = (float) $matchedReturns->where('status', 'sudah_potong')->sum('subtotal');
-                $financeRetur = (float) $detail->payments->where('payment_type', 'RETUR')->sum('amount');
-                $totalRetur = round(max($sudahPotongRetur, $financeRetur), 2);
-                $netTotal = round(max(0, $finalTotal - $totalRetur), 2);
+            $tglTerima = !empty($item['raw_tanggal_terima'])
+                ? Carbon::parse($item['raw_tanggal_terima'])->format('d/m/Y')
+                : ($item['tglKirim'] ?? '-');
+            $tempoDate = $item['jatuhTempo'] ?? '-';
 
-                $paidCashBank = (float) $detail->payments->where('payment_type', '!=', 'RETUR')->sum('amount');
-                $totalPaid = round(min($netTotal, $paidCashBank), 2);
-                $sisa = round(max(0, $netTotal - $totalPaid), 2);
-                $isLunas = ($sisa < 0.005 && $finalTotal > 0) || ((int) $rcv->status === 3 && $sisa <= 0.005);
-                $sisa = $isLunas ? 0 : $sisa;
+            $totalSubtotalSemua += $subtotal;
+            $totalPpnSemua += $ppn;
+            $totalTagihanSemua += $finalTotal;
+            $totalReturSemua += $totalRetur;
+            $totalNetSemua += $netTotal;
+            $totalTerbayarSemua += $totalPaid;
+            $totalSisaSemua += $sisa;
 
-                if ($isLunas) {
-                    if ($totalRetur >= $finalTotal && $finalTotal > 0) {
-                        $statusLabel = 'DIRETUR PENUH';
-                    } elseif ($totalRetur > 0) {
-                        $statusLabel = 'LUNAS (ADA RETUR)';
-                    } else {
-                        $statusLabel = 'LUNAS';
-                    }
-                } else {
-                    if ($totalPaid > 0) {
-                        $statusLabel = 'DIBAYAR SEBAGIAN';
-                    } elseif ($totalRetur > 0) {
-                        $statusLabel = 'DIRETUR SEBAGIAN';
-                    } else {
-                        $statusLabel = 'BELUM LUNAS';
-                    }
-                }
-
-                if (!empty($this->filters['status'])) {
-                    if ($this->filters['status'] === 'LUNAS' && !$isLunas)
-                        continue;
-                    if ($this->filters['status'] === 'BELUM_LUNAS' && $isLunas)
-                        continue;
-                    if ($this->filters['status'] === 'DIAJUKAN' && (empty($detail->is_submitted) || $isLunas))
-                        continue;
-                    if ($this->filters['status'] === 'RETUR' && $totalRetur <= 0 && !str_contains($statusLabel, 'RETUR'))
-                        continue;
-                }
-
-                $tglTerima = $this->safeFormatDate($detail->created_at ?? $rcv->date);
-                $tempoDate = $this->safeFormatDate($detail->invoice_due);
-                $dateField = $this->filters['date_field'] ?? 'due';
-                $filterDate = match ($dateField) {
-                    'invoice' => $detail->invoice_date,
-                    'received' => $detail->created_at ?? $rcv->date,
-                    default => $detail->invoice_due,
-                };
-                $filterDate = $this->safeParseDate($filterDate)?->format('Y-m-d') ?? '';
-                if (!empty($this->filters['start_date']) && (!$filterDate || $filterDate < $this->filters['start_date'])) {
-                    continue;
-                }
-                if (!empty($this->filters['end_date']) && (!$filterDate || $filterDate > $this->filters['end_date'])) {
-                    continue;
-                }
-
-                $dueMode = $this->filters['due_mode'] ?? 'all';
-                $dueDate = $this->safeParseDate($detail->invoice_due);
-                if ($dueMode === 'overdue' && ($isLunas || !$dueDate || $dueDate->endOfDay()->isFuture())) {
-                    continue;
-                }
-                if ($dueMode === 'due_soon') {
-                    $daysRemaining = $dueDate ? (int) Carbon::now()->startOfDay()->diffInDays($dueDate->copy()->startOfDay(), false) : null;
-                    if ($isLunas || $daysRemaining === null || $daysRemaining < 0 || $daysRemaining > 7) {
-                        continue;
-                    }
-                }
-
-                $totalSubtotalSemua += $subtotal;
-                $totalPpnSemua += $ppn;
-                $totalTagihanSemua += $finalTotal;
-                $totalReturSemua += $totalRetur;
-                $totalNetSemua += $netTotal;
-                $totalTerbayarSemua += $totalPaid;
-                $totalSisaSemua += $sisa;
-
-                $rows[] = [
-                    $no++,
-                    $rcv->invoice_number ?: ($detail->invoice_number ?: '-'),
-                    $detail->creditor->name ?? '-',
-                    $detail->receiving_details_code ?: ($rcv->code ?: '-'),
-                    $rcv->pharmacy->name ?? '-',
-                    $tglTerima,
-                    $tempoDate,
-                    $statusLabel,
-                    $subtotal,
-                    $ppn,
-                    $finalTotal,
-                    $totalRetur,
-                    $netTotal,
-                    $totalPaid,
-                    $sisa,
-                ];
-            }
+            $rows[] = [
+                $no++,
+                $item['nomor'] ?: '-',
+                $item['vendor'] ?: '-',
+                $item['referensi'] ?: '-',
+                $item['gudang'] ?: '-',
+                $tglTerima,
+                $tempoDate,
+                $statusLabel,
+                $subtotal,
+                $ppn,
+                $finalTotal,
+                $totalRetur,
+                $netTotal,
+                $totalPaid,
+                $sisa,
+            ];
         }
 
         $this->dataRowCount = $no - 1;

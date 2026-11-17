@@ -177,24 +177,73 @@ class FinanceController extends Controller
     /**
      * Halaman Pengelolaan Hutang Dagang (Faktur Pembelian Kredit).
      */
+    protected function payablesReceivablesService(): \App\Services\Finance\PayablesReceivablesService
+    {
+        return app(\App\Services\Finance\PayablesReceivablesService::class);
+    }
+
+    /**
+     * Halaman Hutang Dagang dengan server-side pagination, filter, dan lazy detail loading.
+     */
     public function hutang(Request $request)
     {
         if ($request->filled('pharmacy_id') && auth()->check() && (auth()->user()->hasRole('HO') || auth()->user()->hasRole('administrator') || auth()->user()->hasRole('General Manager'))) {
             session(['ho_pharmacy_id' => (int) $request->pharmacy_id]);
         }
 
-        $hutangDagang = $this->getHutangData();
+        $filters = [
+            'search' => (string) $request->query('search', ''),
+            'pbf' => (string) $request->query('pbf', ''),
+            'status' => (string) $request->query('status', 'ALL'),
+            'due_mode' => (string) $request->query('due_mode', 'all'),
+            'date_field' => (string) $request->query('date_field', 'due'),
+            'date_preset' => (string) $request->query('date_preset', 'all'),
+            'start_date' => (string) $request->query('start_date', ''),
+            'end_date' => (string) $request->query('end_date', ''),
+            'sort_order' => strtolower((string) $request->query('sort_order', 'desc')) === 'asc' ? 'asc' : 'desc',
+        ];
+        $perPage = max(5, min(100, (int) $request->query('per_page', 10)));
+        $page = max(1, (int) $request->query('page', 1));
+
+        $dataset = $this->payablesReceivablesService()->getHutangDataset(
+            $this->getTargetPharmacyIds(),
+            $filters,
+            false,
+            $perPage,
+            $page
+        );
+
         $creditors = Creditor::orderBy('name')->get(['code', 'name']);
         $kasBankAccounts = $this->branchKasBankAccountsQuery()->orderBy('code')->get();
-        $stats = $this->getStats($hutangDagang, null, null);
+        $stats = $this->getStats($dataset['stats'], null, null);
 
         return Inertia::render('Finance/Hutang', [
-            'hutangDagang' => $hutangDagang,
+            'hutangDagang' => $dataset['rows'],
+            'pagination' => $dataset['pagination'],
+            'dueStats' => $dataset['dueStats'],
+            'filters' => $filters,
             'creditors' => $creditors,
             'kasBankAccounts' => $kasBankAccounts,
             'stats' => $stats,
             'branchContext' => $this->getBranchContext(),
         ]);
+    }
+
+    /**
+     * Endpoint JSON on-demand untuk memuat detail item, pembayaran, & retur 1 faktur Hutang Dagang.
+     */
+    public function hutangDetail($id)
+    {
+        $detail = $this->payablesReceivablesService()->getHutangDetail(
+            (int) $id,
+            $this->getTargetPharmacyIds()
+        );
+
+        if (!$detail) {
+            return response()->json(['message' => 'Faktur hutang tidak ditemukan.'], 404);
+        }
+
+        return response()->json(['data' => $detail]);
     }
 
     /**
@@ -495,20 +544,73 @@ class FinanceController extends Controller
             session(['ho_pharmacy_id' => (int) $request->pharmacy_id]);
         }
 
-        $piutangPenjualan = $this->getPiutangData();
-        $creditReturns = $this->getCreditReturnsData();
+        $targetPharmacyIds = $this->getTargetPharmacyIds();
+        $filters = [
+            'tab' => in_array($request->query('tab', 'faktur'), ['faktur', 'retur'], true) ? $request->query('tab', 'faktur') : 'faktur',
+            'search' => (string) $request->query('search', ''),
+            'debtor_id' => (string) $request->query('debtor_id', ''),
+            'status' => (string) $request->query('status', 'ALL'),
+            'due_mode' => (string) $request->query('due_mode', 'all'),
+            'date_preset' => (string) $request->query('date_preset', 'all'),
+            'start_date' => (string) $request->query('start_date', ''),
+            'end_date' => (string) $request->query('end_date', ''),
+            'sort_order' => strtolower((string) $request->query('sort_order', 'desc')) === 'asc' ? 'asc' : 'desc',
+            'retur_search' => (string) $request->query('retur_search', ''),
+            'retur_debtor_id' => (string) $request->query('retur_debtor_id', ''),
+        ];
+
+        $perPage = max(5, min(100, (int) $request->query('per_page', 10)));
+        $page = max(1, (int) $request->query('page', 1));
+        $returPerPage = max(5, min(100, (int) $request->query('retur_per_page', 10)));
+        $returPage = max(1, (int) $request->query('retur_page', 1));
+
+        $dataset = $this->payablesReceivablesService()->getPiutangDataset(
+            $targetPharmacyIds,
+            $filters,
+            false,
+            $perPage,
+            $page
+        );
+        $returDataset = $this->payablesReceivablesService()->getCreditReturnsDataset(
+            $targetPharmacyIds,
+            $filters,
+            $returPerPage,
+            $returPage
+        );
+
         $debtors = Debtors::orderBy('name')->get(['id', 'code', 'name', 'phone', 'city']);
         $kasBankAccounts = $this->branchKasBankAccountsQuery()->orderBy('code')->get();
-        $stats = $this->getStats(null, null, $piutangPenjualan);
+        $stats = $this->getStats(null, null, $dataset['stats']);
 
         return Inertia::render('Finance/Piutang', [
-            'piutangPenjualan' => $piutangPenjualan,
-            'creditReturns' => $creditReturns,
+            'piutangPenjualan' => $dataset['rows'],
+            'pagination' => $dataset['pagination'],
+            'dueStats' => $dataset['dueStats'],
+            'creditReturns' => $returDataset['rows'],
+            'returPagination' => $returDataset['pagination'],
+            'filters' => $filters,
             'debtors' => $debtors,
             'kasBankAccounts' => $kasBankAccounts,
             'stats' => $stats,
             'branchContext' => $this->getBranchContext(),
         ]);
+    }
+
+    /**
+     * Endpoint JSON on-demand untuk memuat detail item, pembayaran, & retur 1 faktur Piutang.
+     */
+    public function piutangDetail($id)
+    {
+        $detail = $this->payablesReceivablesService()->getPiutangDetail(
+            (int) $id,
+            $this->getTargetPharmacyIds()
+        );
+
+        if (!$detail) {
+            return response()->json(['message' => 'Transaksi piutang tidak ditemukan.'], 404);
+        }
+
+        return response()->json(['data' => $detail]);
     }
 
     /**
@@ -1878,80 +1980,38 @@ class FinanceController extends Controller
             $closingAccountRows[] = $row + ['balance' => $closingBalance];
         }
 
-        $creditTransactions = MedicineTransactions::query()
-            ->with(['debtors:id,name', 'transactions:id,transaction_id,final_price,total_price'])
-            ->withSum(['payments as finance_paid' => fn($query) => $query->where('payment_type', 'PIUTANG')], 'amount')
-            ->where('pharmacy_id', $pharmacyId)
-            ->where('status', 1)
-            ->whereIn('transaction_type', ['KREDIT', 'RESEP KREDIT', 'RETUR KREDIT'])
-            ->get(['id', 'debtor_id', 'transaction_type', 'subtotal', 'paid']);
-
+        $piutangRows = $this->payablesReceivablesService()->getPiutangDataset($pharmacyIds, [], false)['rows'];
         $receivablesByDebtor = [];
-        $creditReturnsByDebtor = [];
-        foreach ($creditTransactions as $transaction) {
-            if ($transaction->transaction_type === 'RETUR KREDIT') {
-                $debtorKey = (string) ((int) ($transaction->debtor_id ?? 0));
-                $creditReturnsByDebtor[$debtorKey] = ($creditReturnsByDebtor[$debtorKey] ?? 0) + abs((float) $transaction->subtotal);
+        foreach ($piutangRows as $row) {
+            $outstanding = (float) ($row['sisa'] ?? 0);
+            if ($outstanding <= 0) {
                 continue;
             }
-            $total = (float) $transaction->subtotal;
-            if ($total <= 0) {
-                $total = (float) $transaction->transactions->sum(fn($item) => $item->final_price ?: $item->total_price);
-            }
-            $total = max(0, $total);
-            $paid = min($total, max((float) ($transaction->finance_paid ?? 0), (float) ($transaction->paid ?? 0)));
-            $outstanding = max(0, $total - $paid);
-            $debtorId = (int) ($transaction->debtor_id ?? 0);
-            $key = (string) $debtorId;
+            $key = (string) ((int) ($row['debtor_id'] ?? 0));
             if (!isset($receivablesByDebtor[$key])) {
                 $receivablesByDebtor[$key] = [
-                    'name' => $transaction->debtors?->name ?: 'Debitur tidak tercatat',
+                    'name' => ($row['debtor'] ?? '') ?: 'Debitur tidak tercatat',
                     'amount' => 0.0,
                 ];
             }
             $receivablesByDebtor[$key]['amount'] += $outstanding;
         }
-        foreach ($creditReturnsByDebtor as $debtorKey => $returnAmount) {
-            if (isset($receivablesByDebtor[$debtorKey])) {
-                $receivablesByDebtor[$debtorKey]['amount'] = max(0, $receivablesByDebtor[$debtorKey]['amount'] - $returnAmount);
-            }
-        }
         $receivablesByDebtor = array_values(array_filter($receivablesByDebtor, fn($row) => $row['amount'] > 0));
         usort($receivablesByDebtor, fn($a, $b) => $b['amount'] <=> $a['amount']);
         $totalReceivables = array_sum(array_column($receivablesByDebtor, 'amount'));
 
+        $hutangRows = $this->payablesReceivablesService()->getHutangDataset($pharmacyIds, [], false, null, 1, false)['rows'];
         $payablesByCreditor = [];
-        $creditDetails = ReceivingDetails::with([
-            'receiving:id,pharmacy_id,status',
-            'creditor:code,name,ppn_type',
-            'receiving_items' => fn($query) => $query
-                ->whereNotNull('batches_id')
-                ->select(['id', 'receiving_details_id', 'total', 'raw_price', 'qty_received', 'qty', 'discount', 'extra_discount']),
-            'payments:id,receiving_detail_id,amount',
-        ])
-            ->whereRaw('UPPER(TRIM(COALESCE(invoice_payment, ""))) = ?', ['KREDIT'])
-            ->postedToStock()
-            ->whereHas('receiving', fn($query) => $query->whereIn('pharmacy_id', $pharmacyIds))
-            ->get();
-        foreach ($creditDetails as $detail) {
-            $subtotal = 0.0;
-            foreach ($detail->receiving_items as $item) {
-                $lineTotal = (float) ($item->total ?? 0);
-                if ($lineTotal <= 0)
-                    $lineTotal = (float) $item->raw_price * (float) $item->qty_received;
-                $subtotal += $lineTotal;
-            }
-            $ppnType = strtoupper(trim((string) ($detail->invoice_ppn ?? $detail->creditor?->ppn_type ?? 'TANPA')));
-            $invoiceTotal = ReceivingInvoiceTotals::calculate($detail->receiving_items, $ppnType)['total'];
-            $outstanding = max(0, $invoiceTotal - (float) $detail->payments->sum('amount'));
-            if ($outstanding <= 0)
+        foreach ($hutangRows as $row) {
+            $outstanding = (float) ($row['sisa'] ?? 0);
+            if ($outstanding <= 0) {
                 continue;
-
-            $creditorCode = (string) ($detail->creditor_code ?? '');
+            }
+            $creditorCode = (string) ($row['vendor_code'] ?? '');
             $key = $creditorCode !== '' ? $creditorCode : 'unknown';
             if (!isset($payablesByCreditor[$key])) {
                 $payablesByCreditor[$key] = [
-                    'name' => $detail->creditor?->name ?: ($creditorCode !== '' ? "Supplier {$creditorCode}" : 'Supplier tidak tercatat'),
+                    'name' => ($row['vendor'] ?? '') ?: ($creditorCode !== '' ? "Supplier {$creditorCode}" : 'Supplier tidak tercatat'),
                     'amount' => 0.0,
                 ];
             }
@@ -2236,266 +2296,13 @@ class FinanceController extends Controller
      */
     protected function getHutangData()
     {
-        $targetPharmacyIds = $this->getTargetPharmacyIds();
-        Receiving::syncPostedZeroStatus($targetPharmacyIds);
-
-        $receivingsKredit = Receiving::with([
-            'receiving_details' => function ($query) {
-                $query->where('invoice_payment', 'KREDIT')->postedToStock();
-            },
-            'receiving_details.creditor',
-            'receiving_details.payments.account',
-            'receiving_details.payments.creator',
-            'receiving_details.receiving_items' => fn($query) => $query->whereNotNull('batches_id')->with('order_items.medicines'),
-            'pharmacy'
-        ])
-            ->whereIn('pharmacy_id', $targetPharmacyIds)
-            ->whereHas('receiving_details', function ($query) {
-                $query->where('invoice_payment', 'KREDIT')->postedToStock();
-            })
-            ->latest('updated_at')
-            ->get();
-
-        // Kumpulkan detail IDs dan invoice numbers untuk eager query retur pembelian
-        $allDetailIds = [];
-        $allInvoiceNumbers = [];
-        foreach ($receivingsKredit as $rec) {
-            foreach ($rec->receiving_details as $detail) {
-                $allDetailIds[] = $detail->id;
-                if (!empty($detail->invoice_number)) {
-                    $allInvoiceNumbers[] = trim($detail->invoice_number);
-                }
-            }
-        }
-        $allInvoiceNumbers = array_values(array_filter(array_unique($allInvoiceNumbers)));
-
-        $returnsQuery = DB::table('purchase_return_items as pri')
-            ->join('purchase_returns as pr', 'pr.id', '=', 'pri.purchase_return_id')
-            ->where(function ($q) use ($allDetailIds, $allInvoiceNumbers) {
-                if (!empty($allDetailIds)) {
-                    $q->whereIn('pr.receiving_id', $allDetailIds);
-                }
-                if (!empty($allInvoiceNumbers)) {
-                    $q->orWhereIn('pr.invoice_number', $allInvoiceNumbers);
-                }
-            })
-            ->where('pr.status', '!=', 'dibatalkan')
-            ->select(
-                'pri.id',
-                'pri.purchase_return_id',
-                'pri.medicine_id',
-                'pri.medicine_name',
-                'pri.batch_number',
-                'pri.expired_date',
-                'pri.qty',
-                'pri.unit',
-                'pri.unit_price',
-                'pri.subtotal',
-                'pri.status',
-                'pri.status_date',
-                'pri.deduction_date',
-                'pri.deduction_note',
-                'pri.reason',
-                'pri.notes',
-                'pr.return_no',
-                'pr.receiving_id as pr_receiving_id',
-                'pr.invoice_number as pr_invoice_number',
-                'pr.created_at as pr_created_at'
-            )
-            ->get();
-
-        $returnsByDetailId = $returnsQuery->filter(fn($r) => !empty($r->pr_receiving_id))->groupBy('pr_receiving_id');
-        $returnsByInvoiceNumber = $returnsQuery->filter(fn($r) => !empty($r->pr_invoice_number))->groupBy(fn($r) => strtoupper(trim((string) $r->pr_invoice_number)));
-
-        $hutangDagang = [];
-        foreach ($receivingsKredit as $rec) {
-            foreach ($rec->receiving_details as $detail) {
-                if ($detail->invoice_payment !== 'KREDIT')
-                    continue;
-
-                $vendorName = $detail->creditor->name ?? ($detail->creditor_code ?: 'PBF / Vendor');
-                $itemsList = [];
-                $ppnType = strtoupper(trim($detail->invoice_ppn ?? $detail->creditor?->ppn_type ?? 'TANPA'));
-                $formatDiscount = static function ($value) {
-                    $value = (float) $value;
-                    return $value > 100
-                        ? 'Rp ' . number_format($value, 0, ',', '.')
-                        : rtrim(rtrim(number_format($value, 2, '.', ''), '0'), '.') . '%';
-                };
-
-                foreach ($detail->receiving_items as $item) {
-                    $medName = $item->order_items->medicines->name ?? 'Obat';
-                    $sku = $item->order_items->medicines->code ?? ('SKU-' . $item->id);
-                    $qty = (float) ($item->qty_received ?? 0);
-                    $harga = (float) ($item->raw_price ?? ($item->order_items->price ?? 0));
-                    $diskon = (float) ($item->discount ?? 0);
-                    $extraDiskon = (float) ($item->extra_discount ?? 0);
-                    $lineAmounts = ReceivingInvoiceTotals::lineAmounts($item, $ppnType);
-
-                    $itemsList[] = [
-                        'sku' => $sku,
-                        'nama' => $medName,
-                        'qty' => $qty,
-                        'satuan' => $item->order_items->medicines->unit ?? 'Pcs',
-                        'diskon' => $formatDiscount($diskon),
-                        'extraDiskon' => $formatDiscount($extraDiskon),
-                        'harga' => $harga,
-                        'pajak' => $ppnType,
-                        'jumlah' => $lineAmounts['total'],
-                    ];
-                }
-
-                $invoiceAmounts = ReceivingInvoiceTotals::calculate($detail->receiving_items, $ppnType);
-                $subtotal = $invoiceAmounts['subtotal'];
-                $ppnNominal = $invoiceAmounts['ppn'];
-                $total = $invoiceAmounts['total'];
-
-                // Cari riwayat retur pembelian terkait
-                $matchedReturns = collect();
-                if (isset($returnsByDetailId[$detail->id])) {
-                    $matchedReturns = $matchedReturns->merge($returnsByDetailId[$detail->id]);
-                }
-                $invNorm = strtoupper(trim((string) $detail->invoice_number));
-                if ($invNorm !== '' && isset($returnsByInvoiceNumber[$invNorm])) {
-                    $matchedReturns = $matchedReturns->merge($returnsByInvoiceNumber[$invNorm]);
-                }
-                $matchedReturns = $matchedReturns->unique('id')->values();
-
-                $retursList = [];
-                $sudahPotongTotal = 0;
-                foreach ($matchedReturns as $retItem) {
-                    $subtotalRetur = (float) $retItem->subtotal;
-                    if ($retItem->status === 'sudah_potong') {
-                        $sudahPotongTotal += $subtotalRetur;
-                    }
-                    $tglRetur = $retItem->deduction_date ?: ($retItem->status_date ?: ($retItem->pr_created_at ? substr($retItem->pr_created_at, 0, 10) : null));
-                    $retursList[] = [
-                        'id' => $retItem->id,
-                        'purchase_return_id' => $retItem->purchase_return_id,
-                        'code' => $retItem->return_no ?: ('RET-' . $retItem->purchase_return_id),
-                        'tanggal' => $tglRetur ? \Carbon\Carbon::parse($tglRetur)->format('d/m/Y') : '-',
-                        'raw_date' => $tglRetur,
-                        'nama' => $retItem->medicine_name ?? 'Obat',
-                        'batch_number' => $retItem->batch_number ?? '-',
-                        'expired_date' => $retItem->expired_date ? \Carbon\Carbon::parse($retItem->expired_date)->format('d/m/Y') : '-',
-                        'qty' => (float) $retItem->qty,
-                        'satuan' => $retItem->unit ?? 'Pcs',
-                        'harga' => (float) $retItem->unit_price,
-                        'subtotal' => $subtotalRetur,
-                        'nominal' => $subtotalRetur,
-                        'status' => $retItem->status,
-                        'status_label' => match ($retItem->status) {
-                            'sudah_potong' => 'Sudah Potong Tagihan',
-                            'sudah_diambil' => 'Sudah Diambil PBF',
-                            'dikonfirmasi' => 'Dikonfirmasi',
-                            'barang_kembali_pmi' => 'Barang Kembali PMI',
-                            default => 'Diajukan',
-                        },
-                        'reason' => $retItem->reason ?: '-',
-                        'deduction_note' => $retItem->deduction_note ?: '-',
-                        'notes' => $retItem->notes ?: '-',
-                    ];
-                }
-
-                $paidCashBank = 0;
-                $paidReturFinance = 0;
-                $paymentHistory = [];
-
-                foreach ($detail->payments as $payment) {
-                    if ($payment->payment_type === 'RETUR') {
-                        $paidReturFinance += (float) $payment->amount;
-                    } else {
-                        $paidCashBank += (float) $payment->amount;
-                    }
-                    $paymentHistory[] = [
-                        'id' => $payment->id,
-                        'tanggal' => \Carbon\Carbon::parse($payment->payment_date)->format('d/m/Y'),
-                        'nominal' => (float) $payment->amount,
-                        'tipe' => $payment->payment_type,
-                        'noReferensi' => $payment->reference_number ?: '-',
-                        'catatan' => $payment->notes ?: '-',
-                        'akunId' => $payment->account_id,
-                        'akunNama' => $payment->account->name ?? 'Kas & Bank',
-                        'akunKode' => $payment->account->code ?? '',
-                        'akunKategori' => $payment->account->category ?? 'Kas & Bank',
-                        'diprosesOleh' => $payment->creator->name ?? ($payment->creator->username ?? 'Staf Finance'),
-                        'waktuAudit' => \Carbon\Carbon::parse($payment->created_at)->format('d M Y, H:i'),
-                    ];
-                }
-
-                $totalRetur = round(max($paidReturFinance, $sudahPotongTotal), 2);
-                $netTotal = round(max(0, $total - $totalRetur), 2);
-                $totalTerbayar = round(min($netTotal, $paidCashBank), 2);
-                $sisa = round(max(0, $netTotal - $totalTerbayar), 2);
-
-                $isLunas = ($sisa < 0.005 && $total > 0) || ((int) $rec->status === 3 && $sisa <= 0.005);
-                $sisa = $isLunas ? 0 : $sisa;
-
-                $statusLabel = 'Belum Dibayar';
-                if ($isLunas) {
-                    if ($totalRetur >= $total && $total > 0) {
-                        $statusLabel = 'Diretur Penuh';
-                    } elseif ($totalRetur > 0) {
-                        $statusLabel = 'Lunas (Ada Retur)';
-                    } else {
-                        $statusLabel = 'Lunas';
-                    }
-                } else {
-                    if ($totalTerbayar > 0) {
-                        $statusLabel = 'Dibayar Sebagian';
-                    } elseif ($totalRetur > 0) {
-                        $statusLabel = 'Diretur Sebagian';
-                    } else {
-                        $statusLabel = 'Belum Dibayar';
-                    }
-                }
-
-                $invoiceDate = $this->normalizeFinanceDate($detail->invoice_date);
-                $dueDate = $this->normalizeFinanceDate($detail->invoice_due);
-                $dueCarbon = $dueDate ? \Carbon\Carbon::parse($dueDate)->endOfDay() : null;
-                $isOverdue = ($dueCarbon && !$isLunas) ? $dueCarbon->isPast() : false;
-                $daysOverdue = ($isOverdue && $dueCarbon) ? (int) $dueCarbon->diffInDays(now()) : 0;
-                $daysRemaining = (!$isOverdue && $dueCarbon && !$isLunas) ? (int) now()->diffInDays($dueCarbon) : 0;
-
-                $hutangDagang[] = [
-                    'id' => $detail->id,
-                    'receiving_id' => $rec->id,
-                    'nomor' => $detail->invoice_number ?: $rec->code,
-                    'vendor' => $vendorName,
-                    'vendor_code' => $detail->creditor_code ?: ($detail->creditor->code ?? ''),
-                    'referensi' => $detail->receiving_details_code ?: $rec->code,
-                    'tanggal' => $invoiceDate ? \Carbon\Carbon::parse($invoiceDate)->format('d/m/Y') : ($rec->date ?: '-'),
-                    'raw_tanggal' => $invoiceDate,
-                    'raw_tanggal_terima' => $this->normalizeFinanceDate($detail->created_at ?: $rec->date),
-                    'jatuhTempo' => $dueCarbon ? $dueCarbon->format('d/m/Y') : '-',
-                    'raw_jatuh_tempo' => $dueCarbon ? $dueCarbon->format('Y-m-d') : null,
-                    'is_overdue' => $isOverdue,
-                    'days_overdue' => $daysOverdue,
-                    'days_remaining' => $daysRemaining,
-                    'tanggalBayar' => $isLunas
-                        ? ($detail->payments->sortByDesc('payment_date')->first()?->payment_date
-                            ? \Carbon\Carbon::parse($detail->payments->sortByDesc('payment_date')->first()->payment_date)->format('d/m/Y')
-                            : \Carbon\Carbon::parse($rec->updated_at)->format('d/m/Y'))
-                        : '',
-                    'status' => $statusLabel,
-                    'subtotal' => $subtotal,
-                    'ppn' => $ppnNominal,
-                    'total' => $total,
-                    'total_retur' => $totalRetur,
-                    'net_total' => $netTotal,
-                    'terbayar' => $totalTerbayar,
-                    'sisa' => $sisa,
-                    'returs' => $retursList,
-                    'gudang' => $rec->pharmacy->name ?? 'Gudang Utama',
-                    'tglKirim' => $rec->date ?: '-',
-                    'items' => $itemsList,
-                    'payments' => $paymentHistory,
-                    'is_submitted' => (bool) ($detail->is_submitted ?? false),
-                    'lastModified' => \Carbon\Carbon::parse($rec->updated_at)->format('d M Y H:i'),
-                ];
-            }
-        }
-        return $hutangDagang;
+        return $this->payablesReceivablesService()->getHutangDataset(
+            $this->getTargetPharmacyIds(),
+            [],
+            true,
+            null,
+            1
+        )['rows'];
     }
 
     /**
@@ -2610,172 +2417,13 @@ class FinanceController extends Controller
      */
     protected function getPiutangData()
     {
-        $targetPharmacyIds = $this->getTargetPharmacyIds();
-
-        $creditTransactions = MedicineTransactions::with([
-            'debtors',
-            'doctors',
-            'patients',
-            'pharmacy',
-            'payments.account',
-            'payments.creator',
-            'transactions.medicine',
-            'returs.medicine',
-        ])
-            ->whereIn('transaction_type', ['KREDIT', 'RESEP KREDIT'])
-            ->where('status', 1)
-            ->whereIn('pharmacy_id', $targetPharmacyIds)
-            ->latest('id')
-            ->take(300)
-            ->get();
-
-        $piutangPenjualan = [];
-        foreach ($creditTransactions as $tx) {
-            $debtorName = $tx->debtors->name ?? ($tx->patient_id ? ('Pasien: ' . ($tx->patients->name ?? 'Umum')) : 'Pelanggan Umum');
-            $itemsList = [];
-            $calcSubtotal = 0;
-
-            foreach ($tx->transactions as $cart) {
-                $medName = $cart->medicine->name ?? 'Obat';
-                $sku = $cart->medicine->code ?? ('SKU-' . $cart->medicine_id);
-                $qty = (float) ($cart->quantity ?? 0);
-                $harga = (float) ($cart->item_price ?? 0);
-                $diskon = (float) ($cart->discount ?? 0);
-                $finalPrice = (float) ($cart->final_price ?: ($cart->total_price ?: ($qty * $harga)));
-
-                $calcSubtotal += $finalPrice;
-
-                $itemsList[] = [
-                    'id' => $cart->id,
-                    'sku' => $sku,
-                    'nama' => $medName,
-                    'qty' => $qty,
-                    'satuan' => $cart->medicine->unit ?? ($cart->package ?? 'Pcs'),
-                    'diskon' => $diskon . '%',
-                    'harga' => $harga,
-                    'pajak' => 'NON',
-                    'jumlah' => $finalPrice,
-                ];
-            }
-
-            // Riwayat Retur Kredit untuk faktur ini
-            $retursList = [];
-            $totalRetur = 0;
-            foreach ($tx->returs as $ret) {
-                $retNominal = (float) ($ret->total_retur ?? 0);
-                $totalRetur += $retNominal;
-                $retCreated = $ret->created_at ? \Carbon\Carbon::parse($ret->created_at) : null;
-                $retursList[] = [
-                    'id' => $ret->id,
-                    'code' => $ret->code ?: ('RT-' . $ret->id),
-                    'tanggal' => $retCreated ? $retCreated->format('d/m/Y') : '-',
-                    'raw_created_at' => $retCreated ? $retCreated->format('Y-m-d H:i:s') : null,
-                    'medicine_id' => $ret->medicine_id,
-                    'nama' => $ret->medicine->name ?? 'Obat',
-                    'sku' => $ret->medicine->code ?? ('SKU-' . $ret->medicine_id),
-                    'satuan' => $ret->medicine->unit ?? 'Pcs',
-                    'qty' => (float) ($ret->qty_retur ?? 0),
-                    'nominal' => $retNominal,
-                ];
-            }
-            $totalRetur = round($totalRetur, 2);
-
-            $total = (float) ($tx->subtotal > 0 ? $tx->subtotal : $calcSubtotal);
-            $total = round($total, 2);
-            $netTotal = round(max(0, $total - $totalRetur), 2);
-
-            $paymentHistory = [];
-            $totalTerbayarViaFinance = 0;
-            foreach ($tx->payments as $payment) {
-                $totalTerbayarViaFinance += (float) $payment->amount;
-                $paymentHistory[] = [
-                    'id' => $payment->id,
-                    'tanggal' => \Carbon\Carbon::parse($payment->payment_date)->format('d/m/Y'),
-                    'nominal' => (float) $payment->amount,
-                    'noReferensi' => $payment->reference_number ?: '-',
-                    'catatan' => $payment->notes ?: '-',
-                    'akunNama' => $payment->account->name ?? 'Kas & Bank',
-                    'akunKode' => $payment->account->code ?? '-',
-                    'akunKategori' => $payment->account->category ?? 'Kas & Bank',
-                    'noRekening' => $payment->account->account_number ?? '-',
-                    'diprosesOleh' => $payment->creator->name ?? 'Staf Finance',
-                    'waktuAudit' => \Carbon\Carbon::parse($payment->created_at)->format('d M Y H:i'),
-                ];
-            }
-
-            $legacyPaid = (float) ($tx->paid ?? 0);
-            $totalTerbayar = round(max($totalTerbayarViaFinance, $legacyPaid), 2);
-            if ($totalTerbayar > $netTotal) {
-                $totalTerbayar = $netTotal;
-            }
-            $sisa = round(max(0, $netTotal - $totalTerbayar), 2);
-
-            $isLunas = ($sisa < 0.005);
-            $sisa = $isLunas ? 0 : $sisa;
-
-            if ($isLunas) {
-                if ($totalRetur >= $total && $total > 0) {
-                    $statusLabel = 'Diretur Penuh';
-                } elseif ($totalRetur > 0) {
-                    $statusLabel = 'Lunas (Ada Retur)';
-                } else {
-                    $statusLabel = 'Lunas';
-                }
-            } else {
-                if ($totalTerbayar > 0) {
-                    $statusLabel = 'Dibayar Sebagian';
-                } elseif ($totalRetur > 0) {
-                    $statusLabel = 'Diretur Sebagian';
-                } else {
-                    $statusLabel = 'Belum Bayar';
-                }
-            }
-
-            $createdCarbon = $tx->created_at ? \Carbon\Carbon::parse($tx->created_at) : null;
-            $dueCarbon = $createdCarbon ? $createdCarbon->copy()->addDays(30) : null;
-            $isOverdue = ($dueCarbon && !$isLunas) ? $dueCarbon->isPast() : false;
-            $daysOverdue = ($isOverdue && $dueCarbon) ? (int) $dueCarbon->diffInDays(now()) : 0;
-            $daysRemaining = (!$isOverdue && $dueCarbon && !$isLunas) ? (int) now()->diffInDays($dueCarbon) : 0;
-            $tanggalLunas = '';
-            if ($isLunas) {
-                $lastPayment = $tx->payments->sortByDesc('payment_date')->first();
-                $tanggalLunas = $lastPayment?->payment_date
-                    ? \Carbon\Carbon::parse($lastPayment->payment_date)->format('d/m/Y')
-                    : ($tx->updated_at ? \Carbon\Carbon::parse($tx->updated_at)->format('d/m/Y') : '');
-            }
-
-            $piutangPenjualan[] = [
-                'id' => $tx->id,
-                'nomor' => $tx->transaction_code ?: ('TRX-' . $tx->id),
-                'debtor' => $debtorName,
-                'debtor_id' => $tx->debtor_id,
-                'debtor_code' => $tx->debtors->code ?? '-',
-                'dokter' => $tx->doctors->name ?? '-',
-                'pasien' => $tx->patients->name ?? '-',
-                'apotek' => $tx->pharmacy->name ?? 'Apotek Utama',
-                'tanggal' => $createdCarbon ? $createdCarbon->format('d/m/Y') : '-',
-                'raw_created_at' => $createdCarbon ? $createdCarbon->format('Y-m-d H:i:s') : null,
-                'jatuhTempo' => $dueCarbon ? $dueCarbon->format('d/m/Y') : '-',
-                'raw_jatuh_tempo' => $dueCarbon ? $dueCarbon->format('Y-m-d') : null,
-                'is_overdue' => $isOverdue,
-                'days_overdue' => $daysOverdue,
-                'days_remaining' => $daysRemaining,
-                'status' => $statusLabel,
-                'tanggalLunas' => $tanggalLunas,
-                'subtotal' => $total,
-                'total' => $total,
-                'total_retur' => $totalRetur,
-                'net_total' => $netTotal,
-                'terbayar' => $totalTerbayar,
-                'sisa' => $sisa,
-                'items' => $itemsList,
-                'payments' => $paymentHistory,
-                'returs' => $retursList,
-                'is_submitted' => (bool) ($tx->is_submitted ?? false),
-                'lastModified' => $tx->updated_at ? \Carbon\Carbon::parse($tx->updated_at)->format('d M Y H:i') : '-',
-            ];
-        }
-        return $piutangPenjualan;
+        return $this->payablesReceivablesService()->getPiutangDataset(
+            $this->getTargetPharmacyIds(),
+            [],
+            true,
+            null,
+            1
+        )['rows'];
     }
 
     /**
@@ -2783,55 +2431,12 @@ class FinanceController extends Controller
      */
     protected function getCreditReturnsData()
     {
-        $targetPharmacyIds = $this->getTargetPharmacyIds();
-
-        $returs = Retur::with([
-            'medicine',
-            'transaction.debtors',
-            'transaction.patients',
-            'transaction.doctors',
-            'transaction.pharmacy',
-        ])
-            ->whereHas('transaction', function ($q) use ($targetPharmacyIds) {
-                $q
-                    ->whereIn('transaction_type', ['KREDIT', 'RESEP KREDIT'])
-                    ->whereIn('pharmacy_id', $targetPharmacyIds);
-            })
-            ->where('status', 1)
-            ->latest('id')
-            ->take(300)
-            ->get();
-
-        $creditReturns = [];
-        foreach ($returs as $ret) {
-            $tx = $ret->transaction;
-            $debtorName = $tx?->debtors?->name ?? ($tx?->patient_id ? ('Pasien: ' . ($tx->patients->name ?? 'Umum')) : 'Pelanggan Umum');
-            $createdCarbon = $ret->created_at ? \Carbon\Carbon::parse($ret->created_at) : null;
-
-            $creditReturns[] = [
-                'id' => $ret->id,
-                'code' => $ret->code ?: ('RT-' . $ret->id),
-                'transaction_id' => $ret->transaction_id,
-                'transaction_code' => $tx?->transaction_code ?: ('TRX-' . $ret->transaction_id),
-                'debtor' => $debtorName,
-                'debtor_id' => $tx?->debtor_id,
-                'debtor_code' => $tx?->debtors?->code ?? '-',
-                'dokter' => $tx?->doctors?->name ?? '-',
-                'pasien' => $tx?->patients?->name ?? '-',
-                'apotek' => $tx?->pharmacy?->name ?? 'Apotek Utama',
-                'tanggal' => $createdCarbon ? $createdCarbon->format('d/m/Y') : '-',
-                'raw_created_at' => $createdCarbon ? $createdCarbon->format('Y-m-d H:i:s') : null,
-                'medicine_id' => $ret->medicine_id,
-                'medicine_name' => $ret->medicine?->name ?? 'Obat',
-                'medicine_sku' => $ret->medicine?->code ?? ('SKU-' . $ret->medicine_id),
-                'satuan' => $ret->medicine?->unit ?? 'Pcs',
-                'qty_retur' => (float) ($ret->qty_retur ?? 0),
-                'total_retur' => (float) ($ret->total_retur ?? 0),
-                'status' => 'Selesai',
-            ];
-        }
-
-        return $creditReturns;
+        return $this->payablesReceivablesService()->getCreditReturnsDataset(
+            $this->getTargetPharmacyIds(),
+            [],
+            null,
+            1
+        )['rows'];
     }
 
     /**
@@ -4013,26 +3618,26 @@ class FinanceController extends Controller
         $targetPharmacyIds = $this->getTargetPharmacyIds();
         $cacheKey = 'finance_stats_summary_branch_v2_' . getActivePharmacyId() . '_' . implode('_', $targetPharmacyIds);
 
+        $isPrecomputedHutangStats = is_array($hutang) && array_key_exists('totalHutangCount', $hutang);
+        $isPrecomputedPiutangStats = is_array($piutang) && array_key_exists('totalPiutangCount', $piutang);
+
         // Jika data lengkap tidak disediakan, gunakan cache agar angka badge dan ringkasan selalu konsisten di semua halaman
         $isFullData = ($hutang !== null && $cash !== null && $piutang !== null);
         if (!$isFullData) {
             $cached = Cache::get($cacheKey);
             if ($cached && isset($cached['nilaiStok']) && isset($cached['countCashbondActive'])) {
                 if ($hutang !== null) {
-                    $cached = array_merge($cached, $this->summarizeHutangStats($hutang));
+                    $cached = array_merge($cached, $isPrecomputedHutangStats ? $hutang : $this->summarizeHutangStats($hutang));
+                }
+                if ($piutang !== null) {
+                    $cached = array_merge($cached, $isPrecomputedPiutangStats ? $piutang : $this->payablesReceivablesService()->summarizePiutangStats($piutang));
                 }
                 return $cached;
             }
         }
 
-        if ($hutang === null) {
-            $hutang = $this->getHutangData();
-        }
         if ($cash === null) {
             $cash = $this->getCashData();
-        }
-        if ($piutang === null) {
-            $piutang = $this->getPiutangData();
         }
 
         $totalSaldoKasBank = (float) $this->branchKasBankAccountsQuery()->sum('balance');
@@ -4077,7 +3682,9 @@ class FinanceController extends Controller
         $netCashflow = $kasMasuk - $kasKeluar;
 
         // Hutang Stats
-        $hutangStats = $this->summarizeHutangStats($hutang);
+        $hutangStats = $hutang === null
+            ? $this->payablesReceivablesService()->getHutangDataset($targetPharmacyIds, [], false)['stats']
+            : ($isPrecomputedHutangStats ? $hutang : $this->summarizeHutangStats($hutang));
 
         // Cash Stats
         $totalCashPurchases = array_sum(array_column($cash, 'total'));
@@ -4095,32 +3702,9 @@ class FinanceController extends Controller
         }
 
         // Piutang Stats
-        $totalPiutangBruto = 0;
-        $totalPiutangRetur = 0;
-        $totalPiutangTerbayar = 0;
-        $totalPiutangSisa = 0;
-        $countPiutangBelumBayar = 0;
-        $countPiutangDiajukan = 0;
-        $countPiutangLunas = 0;
-        $countPiutangDiretur = 0;
-
-        foreach ($piutang as $p) {
-            $totalPiutangBruto += (float) ($p['total'] ?? 0);
-            $totalPiutangRetur += (float) ($p['total_retur'] ?? 0);
-            $totalPiutangTerbayar += (float) ($p['terbayar'] ?? 0);
-            $totalPiutangSisa += (float) ($p['sisa'] ?? 0);
-
-            if (!empty($p['is_submitted']) && !in_array($p['status'], ['Lunas', 'Diretur Penuh'], true) && $p['sisa'] > 0.005) {
-                $countPiutangDiajukan++;
-            }
-            if ($p['status'] === 'Diretur Penuh') {
-                $countPiutangDiretur++;
-            } elseif ($p['status'] === 'Lunas' || $p['status'] === 'Lunas (Ada Retur)' || $p['sisa'] <= 0.005) {
-                $countPiutangLunas++;
-            } else {
-                $countPiutangBelumBayar++;
-            }
-        }
+        $piutangStats = $piutang === null
+            ? $this->payablesReceivablesService()->getPiutangDataset($targetPharmacyIds, [], false)['stats']
+            : ($isPrecomputedPiutangStats ? $piutang : $this->payablesReceivablesService()->summarizePiutangStats($piutang));
 
         $countBiayaTotal = (int) FinancePayment::where('payment_type', 'BIAYA')
             ->where(function ($sub) use ($targetPharmacyIds) {
@@ -4188,15 +3772,6 @@ class FinanceController extends Controller
             'countSudahPilihAkun' => $countSudahPilihAkun,
             'countBelumPilihAkun' => $countBelumPilihAkun,
             'totalNominalBelumPilihAkun' => $totalNominalBelumPilihAkun,
-            'totalPiutangBruto' => $totalPiutangBruto,
-            'totalPiutangRetur' => $totalPiutangRetur,
-            'totalPiutangTerbayar' => $totalPiutangTerbayar,
-            'totalPiutangSisa' => $totalPiutangSisa,
-            'totalSisaPiutang' => $totalPiutangSisa,
-            'countPiutangBelumBayar' => $countPiutangBelumBayar,
-            'countPiutangDiajukan' => $countPiutangDiajukan,
-            'countPiutangLunas' => $countPiutangLunas,
-            'countPiutangDiretur' => $countPiutangDiretur,
             'totalBiaya' => $kasKeluarBiaya,
             'countBiayaTotal' => $countBiayaTotal,
             'countBiayaMonth' => $countBiayaMonth,
@@ -4204,7 +3779,7 @@ class FinanceController extends Controller
             'countDiskonMonth' => $countDiskonMonth,
             'countCashbondActive' => $countCashbondActive,
             'totalCashbondActive' => $totalCashbondActive,
-        ], $hutangStats);
+        ], $piutangStats, $hutangStats);
 
         Cache::put($cacheKey, $stats, 60);
 
@@ -4216,42 +3791,7 @@ class FinanceController extends Controller
      */
     protected function summarizeHutangStats(array $hutang): array
     {
-        $countHutangBelumLunas = 0;
-        $countBelumBayar = 0;
-        $countSebagian = 0;
-        $countLunas = 0;
-        $countDiajukan = 0;
-        $totalHutangSisa = 0.0;
-
-        foreach ($hutang as $h) {
-            $sisa = (float) ($h['sisa'] ?? 0);
-            $status = $h['status'] ?? 'Belum Dibayar';
-            $isSettled = in_array($status, ['Lunas', 'Lunas (Ada Retur)', 'Diretur Penuh'], true);
-
-            $totalHutangSisa += $sisa;
-            if (!empty($h['is_submitted']) && !$isSettled) {
-                $countDiajukan++;
-            }
-            if ($isSettled) {
-                $countLunas++;
-            } elseif ($status === 'Dibayar Sebagian') {
-                $countSebagian++;
-                $countHutangBelumLunas++;
-            } else {
-                $countBelumBayar++;
-                $countHutangBelumLunas++;
-            }
-        }
-
-        return [
-            'totalHutangSisa' => round($totalHutangSisa, 2),
-            'totalSisaHutang' => round($totalHutangSisa, 2),
-            'countHutangBelumLunas' => $countHutangBelumLunas,
-            'countBelumBayar' => $countBelumBayar,
-            'countSebagian' => $countSebagian,
-            'countDiajukan' => $countDiajukan,
-            'countLunas' => $countLunas,
-        ];
+        return $this->payablesReceivablesService()->summarizeHutangStats($hutang);
     }
 
     /**
@@ -4262,7 +3802,9 @@ class FinanceController extends Controller
         Cache::forget('finance_stats_summary');
         $targetPharmacyIds = $this->getTargetPharmacyIds();
         $activeId = getActivePharmacyId();
-        Cache::forget('finance_stats_summary_branch_' . $activeId . '_' . implode('_', $targetPharmacyIds));
+        $branchSuffix = $activeId . '_' . implode('_', $targetPharmacyIds);
+        Cache::forget('finance_stats_summary_branch_' . $branchSuffix);
+        Cache::forget('finance_stats_summary_branch_v2_' . $branchSuffix);
         Cache::forget('finance_stats_summary_branch_v2_' . $activeId . '_' . implode('_', $targetPharmacyIds));
         $branches = [0, 1, 2, 3, 4, 5, 6, 9];
         foreach ($branches as $b) {
@@ -5306,12 +4848,12 @@ class FinanceController extends Controller
             if (!$paymentDate)
                 $errors[] = "Baris {$line}: Tanggal Bayar harus format YYYY-MM-DD atau DD/MM/YYYY.";
 
-            $matches = MedicineTransactions::where('transaction_type', 'KREDIT')
-                ->where('status', 1)
-                ->where('transaction_code', $invoiceNumber)
-                ->whereIn('pharmacy_id', $pharmacyIds)
-                ->with('transactions')
-                ->get();
+        $matchesQuery = MedicineTransactions::whereIn('transaction_type', ['KREDIT', 'RESEP KREDIT'])
+            ->where('transaction_code', $invoiceNumber)
+            ->whereIn('pharmacy_id', $pharmacyIds)
+            ->with('transactions');
+        \App\Support\LiphTransactionScope::applySalesStatus($matchesQuery);
+        $matches = $matchesQuery->get();
             if ($invoiceNumber !== '' && $matches->isEmpty()) {
                 $errors[] = "Baris {$line}: Faktur/Transaksi '{$invoiceNumber}' tidak ditemukan pada cabang yang dapat diakses.";
             } elseif ($matches->count() > 1) {
@@ -5393,6 +4935,9 @@ class FinanceController extends Controller
             'status' => $request->query('status', ''),
             'sort_order' => $request->query('sort_order', 'desc'),
             'due_mode' => $request->query('due_mode', 'all'),
+            'start_date' => $request->query('start_date', ''),
+            'end_date' => $request->query('end_date', ''),
+            'sort_by' => $request->query('sort_by', ''),
         ];
 
         return Excel::download(new PiutangExport($targetPharmacyIds, $filters, $activePharmacy), $filename);

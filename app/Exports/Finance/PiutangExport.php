@@ -88,37 +88,37 @@ class PiutangExport implements FromArray, WithStyles, WithColumnWidths, WithTitl
             ],
         ];
 
-        // 2. Query Data
-        $query = MedicineTransactions::with([
-            'debtors',
-            'doctors',
-            'patients',
-            'pharmacy',
-            'payments',
-            'transactions.medicine',
-            'returs',
-        ])
-            ->whereIn('transaction_type', ['KREDIT', 'RESEP KREDIT'])
-            ->where('status', 1)
-            ->whereIn('pharmacy_id', $this->targetPharmacyIds);
+        // 2. Query Data via PayablesReceivablesService (LiphTransactionScope + chunked aggregates)
+        $piutangRows = app(\App\Services\Finance\PayablesReceivablesService::class)->getPiutangDataset(
+            $this->targetPharmacyIds,
+            $this->filters,
+            false,
+            null,
+            1
+        )['rows'];
 
-        if (!empty($this->filters['search'])) {
-            $s = trim($this->filters['search']);
-            $query->where(function ($q) use ($s) {
-                $q
-                    ->where('transaction_code', 'like', "%{$s}%")
-                    ->orWhereHas('debtors', fn($qd) => $qd->where('name', 'like', "%{$s}%"))
-                    ->orWhereHas('patients', fn($qp) => $qp->where('name', 'like', "%{$s}%"))
-                    ->orWhereHas('doctors', fn($qdc) => $qdc->where('name', 'like', "%{$s}%"));
-            });
+        $cartItemsByTx = [];
+        $txIds = array_values(array_unique(array_map(fn($r) => (int) $r['id'], $piutangRows)));
+        foreach (array_chunk($txIds, 500) as $chunkIds) {
+            $carts = \Illuminate\Support\Facades\DB::table('medicine_cart as mc')
+                ->leftJoin('medicines as m', 'm.id', '=', 'mc.medicine_id')
+                ->whereIn('mc.transaction_id', $chunkIds)
+                ->select([
+                    'mc.transaction_id',
+                    'mc.quantity',
+                    'mc.item_price',
+                    'mc.discount',
+                    'mc.total_price',
+                    'mc.final_price',
+                    'm.name as medicine_name',
+                ])
+                ->orderBy('mc.id')
+                ->get();
+
+            foreach ($carts as $cart) {
+                $cartItemsByTx[(int) $cart->transaction_id][] = $cart;
+            }
         }
-
-        if (!empty($this->filters['debtor_id'])) {
-            $query->where('debtor_id', $this->filters['debtor_id']);
-        }
-
-        $sortOrder = strtolower($this->filters['sort_order'] ?? 'desc') === 'asc' ? 'asc' : 'desc';
-        $query->orderBy('created_at', $sortOrder);
 
         $no = 1;
         $totalSemua = 0;
@@ -127,78 +127,26 @@ class PiutangExport implements FromArray, WithStyles, WithColumnWidths, WithTitl
         $totalSisaSemua = 0;
         $detailRows = [];
 
-        foreach ($query->get() as $tx) {
-            $calcSubtotal = 0;
-            foreach ($tx->transactions as $cart) {
-                $qty = (float) ($cart->quantity ?? 0);
-                $harga = (float) ($cart->item_price ?? 0);
-                $calcSubtotal += (float) ($cart->final_price ?: ($cart->total_price ?: ($qty * $harga)));
-            }
+        foreach ($piutangRows as $item) {
+            $txId = (int) $item['id'];
+            $total = (float) ($item['total'] ?? 0);
+            $totalRetur = (float) ($item['total_retur'] ?? 0);
+            $totalTerbayar = (float) ($item['terbayar'] ?? 0);
+            $sisa = (float) ($item['sisa'] ?? 0);
+            $isLunas = in_array($item['status'] ?? '', ['Lunas', 'Lunas (Ada Retur)', 'Diretur Penuh'], true) || $sisa <= 0.005;
+            $statusLabel = strtoupper((string) ($item['status'] ?? 'BELUM BAYAR'));
 
-            $totalRetur = (float) $tx->returs->sum('total_retur');
-            $total = (float) ($tx->subtotal > 0 ? $tx->subtotal : $calcSubtotal);
-            $total = round($total, 2);
-            $totalRetur = round($totalRetur, 2);
-            $netTotal = round(max(0, $total - $totalRetur), 2);
-
-            $totalTerbayarViaFinance = (float) $tx->payments->sum('amount');
-            $legacyPaid = (float) ($tx->paid ?? 0);
-            $totalTerbayar = round(max($totalTerbayarViaFinance, $legacyPaid), 2);
-            if ($totalTerbayar > $netTotal)
-                $totalTerbayar = $netTotal;
-            $sisa = round(max(0, $netTotal - $totalTerbayar), 2);
-            $isLunas = ($sisa < 0.005);
-            $sisa = $isLunas ? 0 : $sisa;
+            $createdDate = $item['tanggal'] ?? '-';
+            $dueDateStr = $item['jatuhTempo'] ?? '-';
 
             if ($isLunas) {
-                if ($totalRetur >= $total && $total > 0) {
-                    $statusLabel = 'DIRETUR PENUH';
-                } elseif ($totalRetur > 0) {
-                    $statusLabel = 'LUNAS (ADA RETUR)';
-                } else {
-                    $statusLabel = 'LUNAS';
-                }
-            } else {
-                if ($totalTerbayar > 0) {
-                    $statusLabel = 'DIBAYAR SEBAGIAN';
-                } elseif ($totalRetur > 0) {
-                    $statusLabel = 'DIRETUR SEBAGIAN';
-                } else {
-                    $statusLabel = 'BELUM BAYAR';
-                }
-            }
-
-            if (!empty($this->filters['status'])) {
-                if ($this->filters['status'] === 'LUNAS' && !$isLunas)
-                    continue;
-                if ($this->filters['status'] === 'BELUM_LUNAS' && $isLunas)
-                    continue;
-                if ($this->filters['status'] === 'DIAJUKAN' && (empty($tx->is_submitted) || $isLunas))
-                    continue;
-            }
-
-            $createdDate = $tx->created_at ? $tx->created_at->format('d/m/Y') : '-';
-            $dueDate = $tx->created_at ? $tx->created_at->copy()->addDays(30) : null;
-            $dueDateStr = $dueDate ? $dueDate->format('d/m/Y') : '-';
-
-            $dueStatus = 'Aman';
-            if (!$isLunas && $dueDate) {
-                if ($dueDate->isPast()) {
-                    $days = (int) $dueDate->diffInDays(now());
-                    $dueStatus = "Lewat {$days} Hari";
-                } else {
-                    $days = (int) now()->diffInDays($dueDate);
-                    $dueStatus = "Sisa {$days} Hari";
-                }
-            } elseif ($isLunas) {
                 $dueStatus = 'Lunas';
-            }
-
-            if ($dueMode === 'overdue' && ($isLunas || !$dueDate || !$dueDate->isPast())) {
-                continue;
-            }
-            if ($dueMode === 'due_soon' && ($isLunas || !$dueDate || $dueDate->isPast() || now()->diffInDays($dueDate) > 7)) {
-                continue;
+            } elseif (!empty($item['is_overdue']) || ($item['days_overdue'] ?? 0) > 0) {
+                $dueStatus = 'Lewat ' . (int) ($item['days_overdue'] ?? 0) . ' Hari';
+            } elseif (!empty($item['raw_jatuh_tempo'])) {
+                $dueStatus = 'Sisa ' . (int) ($item['days_remaining'] ?? 0) . ' Hari';
+            } else {
+                $dueStatus = 'Aman';
             }
 
             $totalSemua += $total;
@@ -206,23 +154,26 @@ class PiutangExport implements FromArray, WithStyles, WithColumnWidths, WithTitl
             $totalTerbayarSemua += $totalTerbayar;
             $totalSisaSemua += $sisa;
 
-            $transactionNumber = $tx->transaction_code ?: ('TRX-' . $tx->id);
-            $debtorName = $tx->debtors->name ?? ($tx->patient_id ? ('Pasien: ' . ($tx->patients->name ?? 'Umum')) : 'Pelanggan Umum');
+            $transactionNumber = $item['nomor'] ?? ('TRX-' . $txId);
+            $debtorName = $item['debtor'] ?? 'Pelanggan Umum';
             $medicineNames = [];
             $quantities = [];
             $unitPrices = [];
-            foreach ($tx->transactions as $cart) {
-                $medicineNames[] = $cart->medicine->name ?? 'Obat';
-                $quantities[] = (string) (float) ($cart->quantity ?? 0);
-                $unitPrices[] = (string) (float) ($cart->item_price ?? 0);
+            foreach ($cartItemsByTx[$txId] ?? [] as $cart) {
+                $medName = $cart->medicine_name ?? 'Obat';
+                $qty = (float) ($cart->quantity ?? 0);
+                $harga = (float) ($cart->item_price ?? 0);
+                $medicineNames[] = $medName;
+                $quantities[] = (string) $qty;
+                $unitPrices[] = (string) $harga;
                 $detailRows[] = [
                     $transactionNumber,
                     $debtorName,
-                    $cart->medicine->name ?? 'Obat',
-                    (float) ($cart->quantity ?? 0),
-                    (float) ($cart->item_price ?? 0),
+                    $medName,
+                    $qty,
+                    $harga,
                     (float) ($cart->discount ?? 0),
-                    (float) ($cart->final_price ?? $cart->total_price ?? 0),
+                    (float) ($cart->final_price ?? $cart->total_price ?? ($qty * $harga)),
                 ];
             }
 
@@ -230,13 +181,13 @@ class PiutangExport implements FromArray, WithStyles, WithColumnWidths, WithTitl
                 $no++,
                 $transactionNumber,
                 $debtorName,
-                $tx->debtors->code ?? '-',
-                $tx->doctors->name ?? '-',
-                $tx->patients->name ?? '-',
+                $item['debtor_code'] ?? '-',
+                $item['dokter'] ?? '-',
+                $item['pasien'] ?? '-',
                 implode("\n", $medicineNames) ?: '-',
                 implode("\n", $quantities) ?: '0',
                 implode("\n", $unitPrices) ?: '0',
-                $tx->pharmacy->name ?? '-',
+                $item['apotek'] ?? '-',
                 $createdDate,
                 $dueDateStr,
                 $dueStatus,
