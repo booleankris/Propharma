@@ -502,9 +502,19 @@
             return data;
         }
 
+        function resolveSelectValue(sel, rawValue) {
+            if (String(rawValue) === 'default' && sel?.classList.contains('item-etalase-select')) {
+                const resolvedDefault = String(sel.dataset.defaultEtalaseId || '').trim();
+                if (resolvedDefault) {
+                    return resolvedDefault;
+                }
+            }
+            return String(rawValue);
+        }
+
         function applyEtalaseToSelect(sel, etalaseId) {
             if (!sel) return;
-            sel.value = String(etalaseId);
+            sel.value = resolveSelectValue(sel, etalaseId);
             window.syncEtalaseTriggerLabel(sel);
             if (sel.classList.contains('transfer-bulk-etalase-select')) {
                 sel.dispatchEvent(new Event('change', { bubbles: true }));
@@ -596,7 +606,7 @@
                 const isSelected = String(opt.value) === currentVal;
                 const btn = document.createElement('button');
                 btn.type = 'button';
-                btn.className = `etalase-popover-option w-full px-3 py-2 text-left text-xs flex items-center justify-between gap-2 hover:bg-indigo-50 transition-colors ${isSelected ? 'bg-indigo-50/70 text-indigo-700 font-semibold' : (opt.value === '' ? 'text-slate-400 italic' : 'text-slate-700')}`;
+                btn.className = `etalase-popover-option w-full px-3 py-2 text-left text-xs flex items-center justify-between gap-2 hover:bg-indigo-50 transition-colors ${isSelected ? 'bg-indigo-50/70 text-indigo-700 font-semibold' : (opt.value === '' ? 'text-slate-400 italic' : (opt.value === 'default' ? 'text-emerald-700 font-semibold bg-emerald-50/40' : 'text-slate-700'))}`;
 
                 const label = document.createElement('span');
                 label.className = 'truncate';
@@ -935,6 +945,8 @@
                     : (deletedId && String(sel.value) === deletedId ? '' : String(sel.value || ''));
 
                 const placeholder = sel.querySelector('option[value=""]')?.textContent || (isBulk ? '— Pilih Etalase —' : '— Tanpa / Pilih Etalase —');
+                const prevDefaultOpt = sel.querySelector('option[value="default"]');
+                const prevDefaultText = prevDefaultOpt?.textContent || '';
                 sel.replaceChildren();
 
                 const emptyOpt = document.createElement('option');
@@ -942,12 +954,34 @@
                 emptyOpt.textContent = placeholder;
                 sel.appendChild(emptyOpt);
 
+                if ((isBulk && cachedEtalases.length > 0) || (!isBulk && prevDefaultOpt)) {
+                    const defaultOpt = document.createElement('option');
+                    defaultOpt.value = 'default';
+                    defaultOpt.textContent = isBulk ? 'Default (Riwayat / Acak)' : (prevDefaultText || 'Default (Riwayat / Acak)');
+                    sel.appendChild(defaultOpt);
+                }
+
                 cachedEtalases.forEach((et) => {
                     const opt = document.createElement('option');
                     opt.value = String(et.id);
                     opt.textContent = et.name;
                     sel.appendChild(opt);
                 });
+
+                if (!isBulk && cachedEtalases.length > 0) {
+                    const defId = String(sel.dataset.defaultEtalaseId || '');
+                    const defStillValid = defId && cachedEtalases.some((et) => String(et.id) === defId);
+                    if (!defStillValid) {
+                        sel.dataset.defaultEtalaseId = String(cachedEtalases[Math.floor(Math.random() * cachedEtalases.length)].id);
+                        sel.dataset.defaultEtalaseSource = 'random';
+                    }
+                    const refreshedDefOpt = sel.querySelector('option[value="default"]');
+                    const resolvedDef = cachedEtalases.find((et) => String(et.id) === String(sel.dataset.defaultEtalaseId));
+                    if (refreshedDefOpt && resolvedDef) {
+                        const prefix = sel.dataset.defaultEtalaseSource === 'previous' ? 'Sebelumnya' : 'Acak';
+                        refreshedDefOpt.textContent = `Default (${prefix}: ${resolvedDef.name})`;
+                    }
+                }
 
                 const exists = [...sel.options].some((o) => o.value === prevVal);
                 sel.value = exists ? prevVal : '';
@@ -1097,7 +1131,9 @@
                 if (!transferId) return;
                 document.querySelectorAll(`.item-etalase-select[data-transfer-id="${transferId}"]`).forEach((sel) => {
                     if (String(sel.dataset.itemStatus || '0') === '0') {
-                        sel.value = target.value;
+                        sel.value = target.value === 'default'
+                            ? (sel.dataset.defaultEtalaseId || 'default')
+                            : target.value;
                         window.syncEtalaseTriggerLabel(sel);
                     }
                 });
@@ -1105,6 +1141,9 @@
             }
 
             if (target.classList.contains('item-etalase-select')) {
+                if (target.value === 'default' && target.dataset.defaultEtalaseId) {
+                    target.value = target.dataset.defaultEtalaseId;
+                }
                 window.syncEtalaseTriggerLabel(target);
                 if (String(target.dataset.itemStatus) === '1' && e.isTrusted) {
                     window.saveAcceptedItemEtalase(target);

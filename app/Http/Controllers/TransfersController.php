@@ -140,7 +140,19 @@ class TransfersController extends Controller
         if ($pharmacyId > 0) {
             $hasSpecific = Items::where('pharmacy_id', $pharmacyId)->exists();
             if ($hasSpecific) {
-                $query->where('pharmacy_id', $pharmacyId);
+                $query->where(function ($q) use ($pharmacyId) {
+                    $q->where('pharmacy_id', $pharmacyId)
+                        ->orWhere(function ($sub) use ($pharmacyId) {
+                            $sub->whereNull('pharmacy_id')
+                                ->whereIn('id', function ($mti) use ($pharmacyId) {
+                                    $mti->select('mti.etalases_id')
+                                        ->from('medicine_transfer_items as mti')
+                                        ->join('batches as b', 'b.id', '=', 'mti.batches_id')
+                                        ->where('b.pharmacy_id', $pharmacyId)
+                                        ->whereNotNull('mti.etalases_id');
+                                });
+                        });
+                });
             } else {
                 $query->where(function ($q) use ($pharmacyId) {
                     $q->where('pharmacy_id', $pharmacyId)
@@ -172,6 +184,98 @@ class TransfersController extends Controller
             ->exists();
 
         return $exists ? $id : null;
+    }
+
+    /**
+     * Tentukan etalase default item berdasarkan etalases_id sebelumnya pada medicine_transfer_items
+     * untuk obat & cabang penerima yang sama; jika tidak ditemukan, pilih secara acak dari etalase cabang.
+     *
+     * @return array{id: ?int, name: ?string, source: ?string}
+     */
+    protected function resolveDefaultEtalaseForItem(
+        MedicineTransferItems $item,
+        int $pharmacyId,
+        $branchEtalases = null
+    ): array {
+        if ($pharmacyId <= 0 || isWarehousePharmacy($pharmacyId)) {
+            return ['id' => null, 'name' => null, 'source' => null];
+        }
+
+        $etalasesCollection = $branchEtalases !== null
+            ? collect($branchEtalases)
+            : $this->getEtalasesForPharmacy($pharmacyId);
+
+        if ($etalasesCollection->isEmpty()) {
+            return ['id' => null, 'name' => null, 'source' => null];
+        }
+
+        $etalasesById = $etalasesCollection->keyBy(fn($e) => (int) $e->id);
+        $validIds = $etalasesById->keys()->map(fn($id) => (int) $id)->values()->all();
+
+        $item->loadMissing('batches');
+        $medicineId = $item->batches?->medicine_id ?? $item->requested_medicine_id;
+
+        $foundId = null;
+        if ($medicineId && !empty($validIds)) {
+            $orderExpr = $this->hasTransferItemEtalaseAuditColumns()
+                ? 'COALESCE(medicine_transfer_items.etalase_updated_at, medicine_transfer_items.updated_at, medicine_transfer_items.created_at) DESC, medicine_transfer_items.id DESC'
+                : 'COALESCE(medicine_transfer_items.updated_at, medicine_transfer_items.created_at) DESC, medicine_transfer_items.id DESC';
+
+            // Prioritaskan riwayat item yang sudah diterima (status = 1) di cabang penerima
+            $foundId = MedicineTransferItems::query()
+                ->join('batches as b', 'b.id', '=', 'medicine_transfer_items.batches_id')
+                ->where('b.pharmacy_id', $pharmacyId)
+                ->where('b.medicine_id', $medicineId)
+                ->where('medicine_transfer_items.id', '!=', $item->id)
+                ->whereNotNull('medicine_transfer_items.etalases_id')
+                ->whereIn('medicine_transfer_items.etalases_id', $validIds)
+                ->where('medicine_transfer_items.status', 1)
+                ->orderByRaw($orderExpr)
+                ->value('medicine_transfer_items.etalases_id');
+
+            // Fallback ke riwayat item non-ditolak sebelumnya jika belum ada yang diterima di cabang penerima
+            if (!$foundId) {
+                $foundId = MedicineTransferItems::query()
+                    ->join('batches as b', 'b.id', '=', 'medicine_transfer_items.batches_id')
+                    ->where('b.pharmacy_id', $pharmacyId)
+                    ->where('b.medicine_id', $medicineId)
+                    ->where('medicine_transfer_items.id', '!=', $item->id)
+                    ->whereNotNull('medicine_transfer_items.etalases_id')
+                    ->whereIn('medicine_transfer_items.etalases_id', $validIds)
+                    ->where('medicine_transfer_items.status', '!=', 2)
+                    ->orderByRaw($orderExpr)
+                    ->value('medicine_transfer_items.etalases_id');
+            }
+
+            // Fallback ke riwayat medicine_transfer_items obat yang sama yang memiliki etalases_id valid milik cabang ini
+            if (!$foundId) {
+                $foundId = MedicineTransferItems::query()
+                    ->join('batches as b', 'b.id', '=', 'medicine_transfer_items.batches_id')
+                    ->where('b.medicine_id', $medicineId)
+                    ->where('medicine_transfer_items.id', '!=', $item->id)
+                    ->whereNotNull('medicine_transfer_items.etalases_id')
+                    ->whereIn('medicine_transfer_items.etalases_id', $validIds)
+                    ->where('medicine_transfer_items.status', '!=', 2)
+                    ->orderByRaw($orderExpr)
+                    ->value('medicine_transfer_items.etalases_id');
+            }
+        }
+
+        if ($foundId) {
+            $resolvedId = (int) $foundId;
+            return [
+                'id' => $resolvedId,
+                'name' => $etalasesById->get($resolvedId)?->name,
+                'source' => 'previous',
+            ];
+        }
+
+        $randomId = (int) $validIds[array_rand($validIds)];
+        return [
+            'id' => $randomId,
+            'name' => $etalasesById->get($randomId)?->name,
+            'source' => 'random',
+        ];
     }
 
     function generateItemsLogCode()
@@ -1037,7 +1141,12 @@ class TransfersController extends Controller
         }
 
         $rawEtalaseId = $request->input('etalases_id');
-        if ($rawEtalaseId === null || $rawEtalaseId === '') {
+        if ($rawEtalaseId === 'default') {
+            $chosenEtalaseId = $this->resolveDefaultEtalaseForItem($item, $currentPharmacyId)['id'];
+            if (!$chosenEtalaseId) {
+                return response()->json(['message' => 'Tidak ada etalase tujuan yang tersedia untuk cabang ini.'], 422);
+            }
+        } elseif ($rawEtalaseId === null || $rawEtalaseId === '') {
             $chosenEtalaseId = null;
         } else {
             $chosenEtalaseId = $this->resolveDestinationEtalaseId($rawEtalaseId, $currentPharmacyId);
@@ -1349,23 +1458,33 @@ class TransfersController extends Controller
             return redirect(url()->previous() . '#accepted')->with('message', 'PIN pribadi salah atau belum diisi. Penerimaan mutasi dibatalkan.');
         }
 
-        $defaultEtalaseId = $this->resolveDestinationEtalaseId($request->input('etalases_id'), (int) $currentPharmacyId);
+        $rawBulkEtalase = $request->input('etalases_id');
+        $isBulkDefault = ($rawBulkEtalase === 'default');
+        $defaultEtalaseId = $isBulkDefault ? null : $this->resolveDestinationEtalaseId($rawBulkEtalase, (int) $currentPharmacyId);
         $itemEtalases = (array) $request->input('item_etalases', []);
+        $branchEtalases = isWarehousePharmacy($currentPharmacyId)
+            ? collect()
+            : $this->getEtalasesForPharmacy((int) $currentPharmacyId);
 
         try {
-            DB::transaction(function () use ($transfer, $currentPharmacyId, $defaultEtalaseId, $itemEtalases) {
+            DB::transaction(function () use ($transfer, $currentPharmacyId, $defaultEtalaseId, $isBulkDefault, $itemEtalases, $branchEtalases) {
                 $now = Carbon::now();
                 $lockedTransfer = MedicineTransfers::whereKey($transfer->getKey())->lockForUpdate()->firstOrFail();
                 if ((int) $lockedTransfer->status === 1) {
                     return;
                 }
 
-                $pendingItems = $lockedTransfer->items()->where('status', 0)->lockForUpdate()->get();
+                $pendingItems = $lockedTransfer->items()->with('batches')->where('status', 0)->lockForUpdate()->get();
 
                 foreach ($pendingItems as $item) {
-                    $chosenEtalaseId = $this->resolveDestinationEtalaseId($itemEtalases[$item->id] ?? null, (int) $currentPharmacyId)
-                        ?: $defaultEtalaseId
-                        ?: $this->resolveDestinationEtalaseId($item->etalases_id, (int) $currentPharmacyId);
+                    $rawItemChoice = $itemEtalases[$item->id] ?? null;
+                    if ($rawItemChoice === 'default' || (($rawItemChoice === null || $rawItemChoice === '') && $isBulkDefault)) {
+                        $chosenEtalaseId = $this->resolveDefaultEtalaseForItem($item, (int) $currentPharmacyId, $branchEtalases)['id'];
+                    } else {
+                        $chosenEtalaseId = $this->resolveDestinationEtalaseId($rawItemChoice, (int) $currentPharmacyId)
+                            ?: $defaultEtalaseId
+                            ?: $this->resolveDestinationEtalaseId($item->etalases_id, (int) $currentPharmacyId);
+                    }
 
                     if (!isWarehousePharmacy($currentPharmacyId) && !$chosenEtalaseId) {
                         throw new \RuntimeException('Pilih etalase tujuan terlebih dahulu untuk semua obat sebelum menerima mutasi.');
@@ -1415,8 +1534,16 @@ class TransfersController extends Controller
         ];
 
         $etalases = $this->getEtalasesForPharmacy((int) $currentPharmacyId);
+        $itemDefaultEtalases = [];
+        if (!isWarehousePharmacy($currentPharmacyId) && $etalases->isNotEmpty()) {
+            foreach ($transfer->items as $it) {
+                if ((int) ($it->batches?->pharmacy_id) === (int) $currentPharmacyId && (int) $it->status !== 2) {
+                    $itemDefaultEtalases[$it->id] = $this->resolveDefaultEtalaseForItem($it, (int) $currentPharmacyId, $etalases);
+                }
+            }
+        }
 
-        return view('kasir.transfers.partials.items_table', compact('transfer', 'statusMap', 'etalases'));
+        return view('kasir.transfers.partials.items_table', compact('transfer', 'statusMap', 'etalases', 'itemDefaultEtalases'));
     }
 
     public function acceptItem(Request $request, MedicineTransferItems $item)
@@ -1442,8 +1569,13 @@ class TransfersController extends Controller
             return redirect(url()->previous() . '#accepted')->with('message', 'PIN pribadi salah atau belum diisi. Penerimaan item dibatalkan.');
         }
 
-        $chosenEtalaseId = $this->resolveDestinationEtalaseId($request->input('etalases_id'), (int) $currentPharmacyId)
-            ?: $this->resolveDestinationEtalaseId($item->etalases_id, (int) $currentPharmacyId);
+        $rawChoice = $request->input('etalases_id');
+        if ($rawChoice === 'default') {
+            $chosenEtalaseId = $this->resolveDefaultEtalaseForItem($item, (int) $currentPharmacyId)['id'];
+        } else {
+            $chosenEtalaseId = $this->resolveDestinationEtalaseId($rawChoice, (int) $currentPharmacyId)
+                ?: $this->resolveDestinationEtalaseId($item->etalases_id, (int) $currentPharmacyId);
+        }
 
         if (!isWarehousePharmacy($currentPharmacyId) && !$chosenEtalaseId) {
             return redirect(url()->previous() . '#accepted')->with('message', 'Pilih etalase tujuan terlebih dahulu sebelum menerima obat.');

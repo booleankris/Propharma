@@ -19,6 +19,7 @@ use App\Support\ReceivingInvoiceTotals;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Inertia\Inertia;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
@@ -980,6 +981,11 @@ class PurchaseReturnController extends Controller
 
     /**
      * Sesuaikan stok etalase (MedicineTransferItems) untuk farmasi outlet non-gudang.
+     * Prioritas pemotongan (delta < 0):
+     * 1. Potong dari MedicineTransferItems aktif milik batch yang persis cocok (qty > 0).
+     * 2. Fallback ke MedicineTransferItems aktif milik obat & cabang yang sama (OPN-* / ED sama / FIFO, qty > 0).
+     * 3. Jika stok etalase masih kurang atau belum ada baris etalase, kurangi/buat baris minus pada batch retur
+     *    (sama seperti Gudang) agar total STOK ETALASE selalu turun sesuai qty retur dan SALDO AWAL Kartu Stok tidak bergeser.
      */
     protected function adjustOutletTransferStock(?Batches $batch, int $pharmacyId, float $delta): void
     {
@@ -991,19 +997,231 @@ class PurchaseReturnController extends Controller
             return;
         }
 
-        $transferItem = MedicineTransferItems::where('batches_id', $batch->id)->first();
-        if (!$transferItem) {
+        if (!Schema::hasTable('medicine_transfer_items')) {
             return;
         }
 
-        if ($delta < 0) {
-            $deduct = abs($delta);
-            if ((float) $transferItem->qty >= $deduct) {
-                $transferItem->decrement('qty', $deduct);
+        $hasStatusCol = Schema::hasColumn('medicine_transfer_items', 'status');
+        $hasSourceTypeCol = Schema::hasColumn('medicine_transfer_items', 'source_type');
+
+        $applyActiveScope = function ($query) use ($hasStatusCol, $hasSourceTypeCol) {
+            if ($hasStatusCol) {
+                $query->where('medicine_transfer_items.status', 1);
             }
-        } else {
-            $transferItem->increment('qty', $delta);
+            if ($hasSourceTypeCol) {
+                $query->where(function ($q) {
+                    $q->whereNull('medicine_transfer_items.source_type')
+                      ->orWhere('medicine_transfer_items.source_type', '!=', 'retur_gudang');
+                });
+            }
+            return $query;
+        };
+
+        $exactItems = $applyActiveScope(MedicineTransferItems::where('batches_id', $batch->id))
+            ->orderByDesc('qty')
+            ->orderBy('id', 'asc')
+            ->get();
+
+        $siblingQuery = MedicineTransferItems::join('batches', 'medicine_transfer_items.batches_id', '=', 'batches.id')
+            ->where('batches.medicine_id', $batch->medicine_id)
+            ->where('batches.pharmacy_id', $pharmacyId)
+            ->where('medicine_transfer_items.batches_id', '!=', $batch->id)
+            ->select('medicine_transfer_items.*');
+        $applyActiveScope($siblingQuery);
+
+        if (!empty($batch->expired_date)) {
+            $siblingQuery->orderByRaw('CASE WHEN batches.expired_date = ? THEN 0 ELSE 1 END ASC', [$batch->expired_date]);
         }
+        $siblingItems = $siblingQuery
+            ->orderBy('batches.expired_date', 'asc')
+            ->orderBy('medicine_transfer_items.id', 'asc')
+            ->get();
+
+        if ($delta < 0) {
+            $remaining = abs($delta);
+
+            // 1. Potong dari batch yang persis cocok (yang masih punya qty > 0)
+            foreach ($exactItems as $item) {
+                if ($remaining <= 0.0001) {
+                    break;
+                }
+                if ((float) $item->qty <= 0) {
+                    continue;
+                }
+                $take = min((float) $item->qty, $remaining);
+                $item->decrement('qty', $take);
+                $remaining -= $take;
+            }
+
+            // 2. Fallback: potong dari batch aktif lain milik obat & cabang yang sama (misal OPN-* / FIFO)
+            if ($remaining > 0.0001) {
+                foreach ($siblingItems as $sib) {
+                    if ($remaining <= 0.0001) {
+                        break;
+                    }
+                    if ((float) $sib->qty <= 0) {
+                        continue;
+                    }
+                    $take = min((float) $sib->qty, $remaining);
+                    $sib->decrement('qty', $take);
+                    $remaining -= $take;
+                }
+            }
+
+            // 3. Jika masih ada sisa (stok etalase kurang / 0 / belum ada), buat minus di etalase
+            if ($remaining > 0.0001) {
+                $targetMinusItem = $exactItems->first();
+                if ($targetMinusItem) {
+                    $targetMinusItem->decrement('qty', $remaining);
+                } else {
+                    $created = $this->createOutletTransferItem($batch, $pharmacyId, -$remaining);
+                    if (!$created && $siblingItems->isNotEmpty()) {
+                        $siblingItems->last()->decrement('qty', $remaining);
+                    }
+                }
+            }
+
+            return;
+        }
+
+        // Restorasi stok (delta > 0)
+        $remainingRestore = $delta;
+
+        // 1. Pulihkan terlebih dahulu baris yang minus (mulai dari batch persis, lalu saudara) hingga kembali ke 0
+        foreach ($exactItems->concat($siblingItems) as $item) {
+            if ($remainingRestore <= 0.0001) {
+                break;
+            }
+            if ((float) $item->qty < 0) {
+                $heal = min(abs((float) $item->qty), $remainingRestore);
+                $item->increment('qty', $heal);
+                $remainingRestore -= $heal;
+            }
+        }
+
+        if ($remainingRestore <= 0.0001) {
+            return;
+        }
+
+        // 2. Pulihkan baris yang sebelumnya terpotong di bawah original_qty (> 0)
+        if (Schema::hasColumn('medicine_transfer_items', 'original_qty')) {
+            foreach ($exactItems->concat($siblingItems) as $item) {
+                if ($remainingRestore <= 0.0001) {
+                    break;
+                }
+                $orig = (float) ($item->original_qty ?? 0);
+                $curr = (float) $item->qty;
+                if ($orig > 0 && $curr < $orig) {
+                    $restoreAmt = min($orig - $curr, $remainingRestore);
+                    $item->increment('qty', $restoreAmt);
+                    $remainingRestore -= $restoreAmt;
+                }
+            }
+        }
+
+        if ($remainingRestore <= 0.0001) {
+            return;
+        }
+
+        // 3. Tambahkan sisa pemulihan ke batch persis jika ada, atau fallback ke batch etalase saudara (OPN-*), atau buat baru
+        if ($exactItems->isNotEmpty()) {
+            $exactItems->first()->increment('qty', $remainingRestore);
+        } elseif ($siblingItems->isNotEmpty()) {
+            $siblingItems->first()->increment('qty', $remainingRestore);
+        } else {
+            $this->createOutletTransferItem($batch, $pharmacyId, $remainingRestore);
+        }
+    }
+
+    /**
+     * Buat baris MedicineTransferItems aktif untuk batch di cabang non-gudang.
+     */
+    protected function createOutletTransferItem(Batches $batch, int $pharmacyId, float $qty): ?MedicineTransferItems
+    {
+        $data = [
+            'batches_id' => $batch->id,
+            'qty' => $qty,
+        ];
+
+        if (Schema::hasColumn('medicine_transfer_items', 'medicine_transfer_id')) {
+            $headerId = null;
+            if (Schema::hasTable('medicine_transfers')) {
+                $initCode = 'TRF-INIT-RET-' . $pharmacyId;
+                $headerId = DB::table('medicine_transfers')
+                    ->where('code', $initCode)
+                    ->value('id');
+
+                if (!$headerId) {
+                    $headerData = [
+                        'code' => $initCode,
+                        'status' => 1,
+                        'user_id' => auth()->id() ?: 1,
+                        'created_at' => now(),
+                        'updated_at' => now(),
+                    ];
+                    if (Schema::hasColumn('medicine_transfers', 'source_pharmacy_id')) {
+                        $headerData['source_pharmacy_id'] = $pharmacyId;
+                    }
+                    if (Schema::hasColumn('medicine_transfers', 'destination_pharmacy_id')) {
+                        $headerData['destination_pharmacy_id'] = $pharmacyId;
+                    }
+                    $headerId = DB::table('medicine_transfers')->insertGetId($headerData);
+                }
+            }
+
+            if (!$headerId) {
+                $headerId = MedicineTransferItems::whereHas('batches', function ($q) use ($pharmacyId) {
+                        $q->where('pharmacy_id', $pharmacyId);
+                    })
+                    ->whereNotNull('medicine_transfer_id')
+                    ->orderByDesc('id')
+                    ->value('medicine_transfer_id');
+            }
+
+            if ($headerId) {
+                $data['medicine_transfer_id'] = $headerId;
+            }
+        }
+
+        if (Schema::hasColumn('medicine_transfer_items', 'source_batches_id')) {
+            $data['source_batches_id'] = $batch->id;
+        }
+
+        if (Schema::hasColumn('medicine_transfer_items', 'source_type')) {
+            $data['source_type'] = 'pelayanan';
+        }
+
+        if (Schema::hasColumn('medicine_transfer_items', 'status')) {
+            $data['status'] = 1;
+        }
+
+        if (Schema::hasColumn('medicine_transfer_items', 'original_qty')) {
+            $data['original_qty'] = $qty > 0 ? $qty : 0;
+        }
+
+        if (Schema::hasColumn('medicine_transfer_items', 'etalases_id')) {
+            $etalaseId = MedicineTransferItems::whereHas('batches', function ($q) use ($batch, $pharmacyId) {
+                    $q->where('pharmacy_id', $pharmacyId)
+                      ->where('medicine_id', $batch->medicine_id);
+                })
+                ->whereNotNull('etalases_id')
+                ->value('etalases_id');
+
+            if (!$etalaseId && Schema::hasTable('etalases')) {
+                $etalaseId = DB::table('etalases')
+                    ->where('pharmacy_id', $pharmacyId)
+                    ->orderByDesc('status')
+                    ->orderBy('id')
+                    ->value('id')
+                    ?? DB::table('etalases')->orderBy('id')->value('id');
+            }
+
+            if ($etalaseId) {
+                $data['etalases_id'] = $etalaseId;
+            }
+        }
+
+        return MedicineTransferItems::create($data);
     }
 
     /**

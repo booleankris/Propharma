@@ -39,13 +39,24 @@
                                 $auditTime = $item->etalase_updated_at?->format('d M Y H:i');
                             @endphp
                             @if ($isDestinationPharmacy && (int) $item->status !== 2)
+                                @php
+                                    $itemDefault = $itemDefaultEtalases[$item->id] ?? null;
+                                    $defaultEtId = $itemDefault['id'] ?? '';
+                                    $defaultEtName = $itemDefault['name'] ?? '';
+                                    $defaultEtSource = $itemDefault['source'] ?? '';
+                                @endphp
                                 <div class="inline-flex flex-wrap items-center gap-1.5">
                                     <select class="item-etalase-select text-xs bg-white border border-slate-200 rounded-lg px-2 py-1 text-slate-700 outline-none focus:border-emerald-500 max-w-[180px] transition"
                                         data-transfer-id="{{ $transfer->id }}"
                                         data-item-id="{{ $item->id }}"
                                         data-item-status="{{ $item->status }}"
-                                        data-current-etalase-id="{{ $item->etalases_id ?? '' }}">
+                                        data-current-etalase-id="{{ $item->etalases_id ?? '' }}"
+                                        data-default-etalase-id="{{ $defaultEtId }}"
+                                        data-default-etalase-source="{{ $defaultEtSource }}">
                                         <option value="">— Tanpa / Pilih Etalase —</option>
+                                        @if (!empty($defaultEtId))
+                                            <option value="default">Default ({{ $defaultEtSource === 'previous' ? 'Sebelumnya' : 'Acak' }}: {{ $defaultEtName }})</option>
+                                        @endif
                                         @foreach ($etalases ?? [] as $et)
                                             <option value="{{ $et->id }}" @selected($item->etalases_id == $et->id)>{{ $et->name }}</option>
                                         @endforeach

@@ -337,7 +337,9 @@
                                 if (bulkSelect && bulkSelect.value) {
                                     container.querySelectorAll('.item-etalase-select').forEach((sel) => {
                                         if (!sel.value && String(sel.dataset.itemStatus || '0') === '0') {
-                                            sel.value = bulkSelect.value;
+                                            sel.value = bulkSelect.value === 'default'
+                                                ? (sel.dataset.defaultEtalaseId || 'default')
+                                                : bulkSelect.value;
                                         }
                                     });
                                 }
@@ -667,6 +669,9 @@
                                     <select class="transfer-bulk-etalase-select text-xs bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 text-slate-700 outline-none focus:border-emerald-500 max-w-[170px] transition"
                                         data-transfer-id="{{ $transfer->id }}" title="Pilih etalase tujuan penerima">
                                         <option value="">— Pilih Etalase —</option>
+                                        @if (count($etalases ?? []) > 0)
+                                            <option value="default">Default (Riwayat / Acak)</option>
+                                        @endif
                                         @foreach ($etalases ?? [] as $et)
                                             <option value="{{ $et->id }}">{{ $et->name }}</option>
                                         @endforeach

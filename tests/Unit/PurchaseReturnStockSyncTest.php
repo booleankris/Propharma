@@ -6,6 +6,7 @@ use App\Http\Controllers\Finance\PurchaseReturnController;
 use App\Models\Batches;
 use App\Models\ItemsLog;
 use App\Models\Medicines;
+use App\Models\MedicineTransferItems;
 use App\Models\PurchaseReturn;
 use App\Models\PurchaseReturnItem;
 use Illuminate\Database\Schema\Blueprint;
@@ -48,8 +49,13 @@ class PurchaseReturnStockSyncTest extends TestCase
 
         Schema::create('medicine_transfer_items', function (Blueprint $table) {
             $table->id();
+            $table->unsignedBigInteger('medicine_transfer_id')->nullable();
             $table->unsignedBigInteger('batches_id');
+            $table->unsignedBigInteger('source_batches_id')->nullable();
+            $table->string('source_type')->nullable();
             $table->double('qty')->default(0);
+            $table->double('original_qty')->nullable();
+            $table->integer('status')->default(1);
             $table->timestamps();
         });
 
@@ -510,5 +516,424 @@ class PurchaseReturnStockSyncTest extends TestCase
         $this->assertSame(0, Batches::count());
         $this->assertSame(0, ItemsLog::count());
         $this->assertEquals(6.0, (float) $med->fresh()->stock);
+    }
+
+    public function test_outlet_return_with_new_invoice_batch_falls_back_to_opname_transfer_stock(): void
+    {
+        $med = Medicines::create([
+            'code' => 'ATEVIR01',
+            'name' => 'ATEVIR TAB 0.5 MG @30',
+            'unit' => 'TAB',
+            'packaging' => 'BOX',
+            'content' => 30,
+            'stock' => 30,
+        ]);
+
+        // Batch hasil Stock Opname di Cabang Mulawarman (pharmacy_id = 3)
+        $opnameBatch = Batches::create([
+            'medicine_id' => $med->id,
+            'pharmacy_id' => 3,
+            'name' => 'OPN-20270201',
+            'expired_date' => '2027-02-01',
+            'stock' => 0,
+            'status' => 1,
+        ]);
+
+        $opnameTransfer = MedicineTransferItems::create([
+            'batches_id' => $opnameBatch->id,
+            'source_batches_id' => $opnameBatch->id,
+            'source_type' => 'pelayanan',
+            'qty' => 30,
+            'original_qty' => 30,
+            'status' => 1,
+        ]);
+
+        $pr = PurchaseReturn::create([
+            'return_no' => 'RET-2611/0035',
+            'invoice_number' => '0012112',
+            'creditor_code' => 'MSA',
+            'pharmacy_id' => 3,
+            'total_amount' => 33333,
+            'status' => 'sudah_diambil',
+            'status_date' => '2026-11-13',
+            'confirmed_date' => '2026-11-13',
+            'is_manual' => true,
+        ]);
+
+        $item = PurchaseReturnItem::create([
+            'purchase_return_id' => $pr->id,
+            'medicine_id' => $med->id,
+            'batch_id' => null,
+            'medicine_name' => $med->name,
+            'unit' => 'BOX',
+            'retur_type' => 'packaging',
+            'stock_unit_factor' => 30,
+            'batch_number' => '56C0440',
+            'expired_date' => '2027-02-01',
+            'qty' => 1,
+            'unit_price' => 33333,
+            'subtotal' => 33333,
+            'status' => 'sudah_diambil',
+            'stock_deducted' => false,
+        ]);
+
+        $controller = new class extends PurchaseReturnController {
+            public function __construct() {}
+            public function deductForTest(PurchaseReturnItem $item, string $date): void
+            {
+                $this->deductStockForItem($item, $date);
+                $item->save();
+            }
+        };
+
+        $controller->deductForTest($item, '2026-11-14');
+
+        $opnameTransfer->refresh();
+        $this->assertEquals(0.0, (float) $opnameTransfer->qty);
+
+        // Total stok etalase cabang turun dari 30 -> 0, sehingga SALDO AWAL = 0 - (-30) = 30 (tidak berubah jadi 60)
+        $counterStock = (float) MedicineTransferItems::whereHas('batches', function ($q) use ($med) {
+            $q->where('medicine_id', $med->id)->where('pharmacy_id', 3);
+        })->where('status', 1)->sum('qty');
+        $this->assertEquals(0.0, $counterStock);
+        $this->assertEquals(30.0, $counterStock - (-30.0));
+    }
+
+    public function test_outlet_return_allows_negative_transfer_stock_when_active_stock_insufficient_and_restores_cleanly(): void
+    {
+        $med = Medicines::create([
+            'code' => 'EVOFION01',
+            'name' => 'EVOFION TAB 500 MG @30',
+            'unit' => 'TAB',
+            'packaging' => 'BOX',
+            'content' => 30,
+            'stock' => 10,
+        ]);
+
+        $opnameBatch = Batches::create([
+            'medicine_id' => $med->id,
+            'pharmacy_id' => 3,
+            'name' => 'OPN-20270201',
+            'expired_date' => '2027-02-01',
+            'stock' => 0,
+            'status' => 1,
+        ]);
+
+        $opnameTransfer = MedicineTransferItems::create([
+            'batches_id' => $opnameBatch->id,
+            'source_batches_id' => $opnameBatch->id,
+            'source_type' => 'pelayanan',
+            'qty' => 10,
+            'original_qty' => 10,
+            'status' => 1,
+        ]);
+
+        $pr = PurchaseReturn::create([
+            'return_no' => 'RET-2611/0037',
+            'invoice_number' => '009988',
+            'creditor_code' => 'UDC',
+            'pharmacy_id' => 3,
+            'total_amount' => 50000,
+            'status' => 'dikonfirmasi',
+            'status_date' => '2026-11-14',
+            'confirmed_date' => '2026-11-14',
+            'is_manual' => true,
+        ]);
+
+        $item = PurchaseReturnItem::create([
+            'purchase_return_id' => $pr->id,
+            'medicine_id' => $med->id,
+            'batch_id' => null,
+            'medicine_name' => $med->name,
+            'unit' => 'BOX',
+            'retur_type' => 'packaging',
+            'stock_unit_factor' => 30,
+            'batch_number' => '01952',
+            'expired_date' => '2027-02-01',
+            'qty' => 1,
+            'unit_price' => 50000,
+            'subtotal' => 50000,
+            'status' => 'dikonfirmasi',
+            'stock_deducted' => false,
+        ]);
+
+        $controller = new class extends PurchaseReturnController {
+            public function __construct() {}
+            public function deductForTest(PurchaseReturnItem $item, string $date): void
+            {
+                $this->deductStockForItem($item, $date);
+                $item->save();
+            }
+            public function restoreForTest(PurchaseReturnItem $item, string $date): void
+            {
+                $this->restoreStockForItem($item, $date);
+                $item->save();
+            }
+        };
+
+        $controller->deductForTest($item, '2026-11-14');
+
+        $opnameTransfer->refresh();
+        $this->assertEquals(0.0, (float) $opnameTransfer->qty);
+
+        $returnBatch = Batches::where('medicine_id', $med->id)->where('name', '01952')->first();
+        $this->assertNotNull($returnBatch);
+
+        $returnTransfer = MedicineTransferItems::where('batches_id', $returnBatch->id)->first();
+        $this->assertNotNull($returnTransfer);
+        $this->assertEquals(-20.0, (float) $returnTransfer->qty);
+
+        // Total stok etalase cabang turun penuh sebesar -30 (dari 10 menjadi -20), SALDO AWAL tetap 10
+        $counterStockAfterDeduct = (float) MedicineTransferItems::whereHas('batches', function ($q) use ($med) {
+            $q->where('medicine_id', $med->id)->where('pharmacy_id', 3);
+        })->where('status', 1)->sum('qty');
+        $this->assertEquals(-20.0, $counterStockAfterDeduct);
+        $this->assertEquals(10.0, $counterStockAfterDeduct - (-30.0));
+
+        // Saat retur dibatalkan / barang kembali, baris minus kembali ke 0 dan OPN kembali ke 10
+        $controller->restoreForTest($item, '2026-11-15');
+
+        $opnameTransfer->refresh();
+        $returnTransfer->refresh();
+        $this->assertEquals(0.0, (float) $returnTransfer->qty);
+        $this->assertEquals(10.0, (float) $opnameTransfer->qty);
+    }
+
+    public function test_sync_command_deducts_unapplied_outlet_transfer_stock_for_already_synced_return(): void
+    {
+        $med = Medicines::create([
+            'code' => 'ATEVIR01',
+            'name' => 'ATEVIR TAB 0.5 MG @30',
+            'unit' => 'TAB',
+            'packaging' => 'BOX',
+            'content' => 30,
+            'stock' => 0,
+        ]);
+
+        $opnameBatch = Batches::create([
+            'medicine_id' => $med->id,
+            'pharmacy_id' => 3,
+            'name' => 'OPN-20270201',
+            'expired_date' => '2027-02-01',
+            'stock' => 0,
+            'status' => 1,
+        ]);
+
+        $returnBatch = Batches::create([
+            'medicine_id' => $med->id,
+            'pharmacy_id' => 3,
+            'name' => '56C0440',
+            'expired_date' => '2027-02-01',
+            'stock' => -30,
+            'status' => 1,
+        ]);
+
+        $opnameTransfer = MedicineTransferItems::create([
+            'batches_id' => $opnameBatch->id,
+            'source_batches_id' => $opnameBatch->id,
+            'source_type' => 'pelayanan',
+            'qty' => 30,
+            'original_qty' => 30,
+            'status' => 1,
+        ]);
+
+        ItemsLog::create([
+            'transaction_code' => 'SO-26100364',
+            'code' => '2610LOG-0001',
+            'type' => 'SO-SALDO-AWAL',
+            'medicine_id' => $med->id,
+            'qty' => 0,
+            'qty_before' => 30,
+            'qty_after' => 30,
+            'total' => 0,
+            'date' => '2026-09-26 23:59:59',
+            'status' => 5,
+            'batches_id' => $opnameBatch->id,
+        ]);
+
+        ItemsLog::create([
+            'transaction_code' => 'RET-2611/0035',
+            'code' => '2611LOG-0035',
+            'type' => 'RT',
+            'medicine_id' => $med->id,
+            'qty' => 30,
+            'qty_before' => 30,
+            'qty_after' => 0,
+            'total' => 33333,
+            'date' => '2026-11-14 21:04:23',
+            'status' => 4,
+            'batches_id' => $returnBatch->id,
+        ]);
+
+        $pr = PurchaseReturn::create([
+            'return_no' => 'RET-2611/0035',
+            'invoice_number' => '0012112',
+            'creditor_code' => 'MSA',
+            'pharmacy_id' => 3,
+            'total_amount' => 33333,
+            'status' => 'sudah_diambil',
+            'status_date' => '2026-11-13',
+            'confirmed_date' => '2026-11-13',
+            'is_manual' => true,
+        ]);
+
+        PurchaseReturnItem::create([
+            'purchase_return_id' => $pr->id,
+            'medicine_id' => $med->id,
+            'batch_id' => $returnBatch->id,
+            'medicine_name' => $med->name,
+            'unit' => 'BOX',
+            'retur_type' => 'packaging',
+            'stock_unit_factor' => 30,
+            'batch_number' => '56C0440',
+            'expired_date' => '2027-02-01',
+            'qty' => 1,
+            'unit_price' => 33333,
+            'subtotal' => 33333,
+            'status' => 'sudah_diambil',
+            'stock_deducted' => true,
+        ]);
+
+        $exitCode = Artisan::call('retur:sync-manual-stock', [
+            '--return-no' => 'RET-2611/0035',
+        ]);
+
+        $this->assertSame(0, $exitCode);
+        $opnameTransfer->refresh();
+        $this->assertEquals(0.0, (float) $opnameTransfer->qty);
+    }
+
+    public function test_sync_command_is_safe_when_medicine_already_has_sales_or_other_transactions(): void
+    {
+        $med = Medicines::create([
+            'code' => 'ATEVIR02',
+            'name' => 'ATEVIR TAB 0.5 MG @30',
+            'unit' => 'TAB',
+            'packaging' => 'BOX',
+            'content' => 30,
+            'stock' => -10,
+        ]);
+
+        $opnameBatch = Batches::create([
+            'medicine_id' => $med->id,
+            'pharmacy_id' => 3,
+            'name' => 'OPN-20270201',
+            'expired_date' => '2027-02-01',
+            'stock' => 0,
+            'status' => 1,
+        ]);
+
+        $returnBatch = Batches::create([
+            'medicine_id' => $med->id,
+            'pharmacy_id' => 3,
+            'name' => '56C0440',
+            'expired_date' => '2027-02-01',
+            'stock' => -30,
+            'status' => 1,
+        ]);
+
+        // Awalnya 30, lalu sudah terjual 10 di kasir sehingga sisa di OPN tinggal 20
+        $opnameTransfer = MedicineTransferItems::create([
+            'batches_id' => $opnameBatch->id,
+            'source_batches_id' => $opnameBatch->id,
+            'source_type' => 'pelayanan',
+            'qty' => 20,
+            'original_qty' => 30,
+            'status' => 1,
+        ]);
+
+        ItemsLog::create([
+            'transaction_code' => 'SO-26100364',
+            'code' => '2610LOG-0001',
+            'type' => 'SO-SALDO-AWAL',
+            'medicine_id' => $med->id,
+            'qty' => 0,
+            'qty_before' => 30,
+            'qty_after' => 30,
+            'total' => 0,
+            'date' => '2026-09-26 23:59:59',
+            'status' => 5,
+            'batches_id' => $opnameBatch->id,
+        ]);
+
+        // Transaksi penjualan 10 tablet
+        ItemsLog::create([
+            'transaction_code' => 'INV-26110001',
+            'code' => '2611LOG-0010',
+            'type' => 'UMUM',
+            'medicine_id' => $med->id,
+            'qty' => 10,
+            'qty_before' => 30,
+            'qty_after' => 20,
+            'total' => 15000,
+            'date' => '2026-11-10 10:00:00',
+            'status' => 1,
+            'batches_id' => $opnameBatch->id,
+        ]);
+
+        // Retur 30 tablet yang log-nya sudah tercatat tapi etalase belum terpotong
+        ItemsLog::create([
+            'transaction_code' => 'RET-2611/0035',
+            'code' => '2611LOG-0035',
+            'type' => 'RT',
+            'medicine_id' => $med->id,
+            'qty' => 30,
+            'qty_before' => 20,
+            'qty_after' => -10,
+            'total' => 33333,
+            'date' => '2026-11-14 21:04:23',
+            'status' => 4,
+            'batches_id' => $returnBatch->id,
+        ]);
+
+        $pr = PurchaseReturn::create([
+            'return_no' => 'RET-2611/0035',
+            'invoice_number' => '0012112',
+            'creditor_code' => 'MSA',
+            'pharmacy_id' => 3,
+            'total_amount' => 33333,
+            'status' => 'sudah_diambil',
+            'status_date' => '2026-11-13',
+            'confirmed_date' => '2026-11-13',
+            'is_manual' => true,
+        ]);
+
+        PurchaseReturnItem::create([
+            'purchase_return_id' => $pr->id,
+            'medicine_id' => $med->id,
+            'batch_id' => $returnBatch->id,
+            'medicine_name' => $med->name,
+            'unit' => 'BOX',
+            'retur_type' => 'packaging',
+            'stock_unit_factor' => 30,
+            'batch_number' => '56C0440',
+            'expired_date' => '2027-02-01',
+            'qty' => 1,
+            'unit_price' => 33333,
+            'subtotal' => 33333,
+            'status' => 'sudah_diambil',
+            'stock_deducted' => true,
+        ]);
+
+        $exitCode = Artisan::call('retur:sync-manual-stock', [
+            '--return-no' => 'RET-2611/0035',
+        ]);
+
+        $this->assertSame(0, $exitCode);
+
+        // OPN (sisa 20) habis dipotong 20 -> 0, dan sisanya (-10) masuk ke batch retur 56C0440
+        $opnameTransfer->refresh();
+        $this->assertEquals(0.0, (float) $opnameTransfer->qty);
+
+        $returnTransfer = MedicineTransferItems::where('batches_id', $returnBatch->id)->first();
+        $this->assertNotNull($returnTransfer);
+        $this->assertEquals(-10.0, (float) $returnTransfer->qty);
+
+        // Total stok etalase = -10, Total mutasi = -10 (jual) - 30 (retur) = -40 -> SALDO AWAL = -10 - (-40) = 30 (tetap akurat!)
+        $counterStock = (float) MedicineTransferItems::whereHas('batches', function ($q) use ($med) {
+            $q->where('medicine_id', $med->id)->where('pharmacy_id', 3);
+        })->where('status', 1)->sum('qty');
+        $this->assertEquals(-10.0, $counterStock);
+        $this->assertEquals(30.0, $counterStock - (-40.0));
     }
 }
