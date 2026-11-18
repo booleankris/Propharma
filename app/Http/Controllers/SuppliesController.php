@@ -93,6 +93,119 @@ class SuppliesController extends Controller
         return (int) $log->qty_after - (int) $log->qty_before;
     }
 
+    /**
+     * Hitung running balance sekuensial dengan memprioritaskan patokan tetap
+     * dari baris SO-SALDO-AWAL (forward replay) agar SALDO AWAL konsisten
+     * dan tidak ikut berubah-ubah jika ada selisih di tabel stok batch/etalase.
+     *
+     * Jika tidak ada baris SO-SALDO-AWAL sama sekali, fallback ke hitung mundur
+     * dari $fallbackRealtimeStock.
+     *
+     * @param \Illuminate\Support\Collection<int, ItemsLog> $orderedRows
+     * @param int $fallbackRealtimeStock
+     * @return array{runningMap: array<int, array{start: int, end: int, before: int, after: int}>, initialStart: int, finalEnd: int, hasOpeningAnchor: bool}
+     */
+    private function buildRunningLedger($orderedRows, int $fallbackRealtimeStock): array
+    {
+        $rows = $orderedRows->values();
+        if ($rows->isEmpty()) {
+            return [
+                'runningMap'       => [],
+                'initialStart'     => 0,
+                'finalEnd'         => $fallbackRealtimeStock,
+                'hasOpeningAnchor' => false,
+            ];
+        }
+
+        $anchorIdx = null;
+        foreach ($rows as $idx => $row) {
+            if (($row->type ?? null) === 'SO-SALDO-AWAL') {
+                $anchorIdx = $idx;
+            }
+        }
+
+        $runningMap = [];
+
+        if ($anchorIdx !== null) {
+            $anchorQty = (int) $rows[$anchorIdx]->qty_before;
+
+            // 1. Jika ada baris sebelum SO-SALDO-AWAL, hitung mundur secara kontinu dari SO-SALDO-AWAL ke baris ke-0
+            $backRunning = $anchorQty;
+            for ($i = $anchorIdx - 1; $i >= 0; $i--) {
+                $r = $rows[$i];
+                $delta = $this->stockLogDelta($r);
+                $rowEnd = $backRunning;
+                $rowStart = $rowEnd - $delta;
+                $backRunning = $rowStart;
+
+                $runningMap[$r->id] = [
+                    'start'  => $rowStart,
+                    'end'    => $rowEnd,
+                    'before' => $rowStart,
+                    'after'  => $rowEnd,
+                ];
+            }
+
+            $initialStart = $backRunning;
+
+            // 2. Pada baris SO-SALDO-AWAL dan seluruh baris setelahnya, hitung MAJU (forward) secara konsisten
+            $currRunning = $anchorQty;
+            $count = $rows->count();
+            for ($i = $anchorIdx; $i < $count; $i++) {
+                $r = $rows[$i];
+                if ($i === $anchorIdx) {
+                    $rowStart = $currRunning;
+                    $rowEnd = $currRunning;
+                } else {
+                    $rowStart = $currRunning;
+                    $delta = $this->stockLogDelta($r);
+                    $rowEnd = $rowStart + $delta;
+                    $currRunning = $rowEnd;
+                }
+
+                $runningMap[$r->id] = [
+                    'start'  => $rowStart,
+                    'end'    => $rowEnd,
+                    'before' => $rowStart,
+                    'after'  => $rowEnd,
+                ];
+            }
+
+            return [
+                'runningMap'       => $runningMap,
+                'initialStart'     => $initialStart,
+                'finalEnd'         => $currRunning,
+                'hasOpeningAnchor' => true,
+            ];
+        }
+
+        // Fallback (jika belum pernah ada SO-SALDO-AWAL): hitung mundur dari stok real-time
+        $totalMovement = $rows->sum(fn($log) => $this->stockLogDelta($log));
+        $currRunning = $fallbackRealtimeStock - $totalMovement;
+        $initialStart = $currRunning;
+
+        foreach ($rows as $r) {
+            $rowStart = $currRunning;
+            $delta = $this->stockLogDelta($r);
+            $rowEnd = $rowStart + $delta;
+            $currRunning = $rowEnd;
+
+            $runningMap[$r->id] = [
+                'start'  => $rowStart,
+                'end'    => $rowEnd,
+                'before' => $rowStart,
+                'after'  => $rowEnd,
+            ];
+        }
+
+        return [
+            'runningMap'       => $runningMap,
+            'initialStart'     => $initialStart,
+            'finalEnd'         => $currRunning,
+            'hasOpeningAnchor' => false,
+        ];
+    }
+
     private function calculateRealtimeStock($medicineId, $pharmacyId, $type = 'total')
     {
         if (!$medicineId) return 0;
@@ -275,6 +388,8 @@ class SuppliesController extends Controller
                 }
             }
 
+            $unfilteredMedicineQuery = $med ? (clone $baseQuery) : null;
+
             if ($request->filled('start_date')) {
                 $baseQuery->whereDate('date', '>=', $request->start_date);
             }
@@ -330,42 +445,50 @@ class SuppliesController extends Controller
             }
 
             // Hitung running balance sekuensial HANYA jika ada filter spesifik 1 obat.
-            // Uses the same stockLogDelta() + anchor-to-realtime approach as
-            // medicineStockLog() so that Stock Opname / Adjustment rows are
-            // properly accounted for even though they are hidden from the
-            // table (itemsQuery excludes status 5, 6).
+            // Dipatok maju (forward) dari SO-SALDO-AWAL agar SALDO AWAL selalu konsisten
+            // dan tidak pernah berubah-ubah.
             $runningMap = [];
             $initialStartBalance = 0;
+            $finalLedgerBalance = $balance;
 
-            if ($med) {
-                // Load ALL rows (including SO/Adjustment) for correct running balance
-                // Order by transaction date (not updated_at): SO-REBASE / SO-SALDO-AWAL
-                // rows are inserted later but carry the original movement date, so
-                // they must sit next to the logs they cancel.
-                $allRowsForBalance = (clone $baseQuery)->with(['medicines', 'batches'])
+            if ($med && $unfilteredMedicineQuery) {
+                $allRowsForBalance = (clone $unfilteredMedicineQuery)->with(['medicines', 'batches'])
                     ->orderByRaw($effectiveDateSql . ' ASC')
                     ->orderBy('id', 'asc')
                     ->get();
 
                 if ($allRowsForBalance->isNotEmpty()) {
-                    // Anchor to real-time stock of active location and replay backwards to find opening
-                    $currentStock = $balance;
-                    $totalMovement = $allRowsForBalance->sum(fn($log) => $this->stockLogDelta($log));
-                    $currRunning = $currentStock - $totalMovement;
-                    $initialStartBalance = $currRunning;
+                    $ledger = $this->buildRunningLedger($allRowsForBalance, $balance);
+                    $runningMap = $ledger['runningMap'];
+                    $initialStartBalance = $ledger['initialStart'];
+                    $finalLedgerBalance = $ledger['hasOpeningAnchor'] ? $ledger['finalEnd'] : $balance;
 
-                    foreach ($allRowsForBalance as $r) {
-                        $rowStart = $currRunning;
-                        $delta = $this->stockLogDelta($r);
-                        $rowEnd = $rowStart + $delta;
-                        $currRunning = $rowEnd;
+                    if ($request->filled('start_date') || $request->filled('end_date')) {
+                        $filteredIds = (clone $baseQuery)
+                            ->orderByRaw($effectiveDateSql . ' ASC')
+                            ->orderBy('id', 'asc')
+                            ->pluck('id');
 
-                        // Store for all rows; the display will only use entries
-                        // matching displayed row IDs (status != 5, 6)
-                        $runningMap[$r->id] = [
-                            'start' => $rowStart,
-                            'end'   => $rowEnd,
-                        ];
+                        if ($filteredIds->isNotEmpty()) {
+                            $firstFilteredId = $filteredIds->first();
+                            $lastFilteredId = $filteredIds->last();
+                            $initialStartBalance = $runningMap[$firstFilteredId]['start'] ?? $ledger['initialStart'];
+                            $finalLedgerBalance = $ledger['hasOpeningAnchor']
+                                ? ($runningMap[$lastFilteredId]['end'] ?? $balance)
+                                : $balance;
+                        } else {
+                            if ($request->filled('start_date')) {
+                                $lastPriorId = (clone $unfilteredMedicineQuery)
+                                    ->whereDate('date', '<', $request->start_date)
+                                    ->orderByRaw($effectiveDateSql . ' DESC')
+                                    ->orderBy('id', 'desc')
+                                    ->value('id');
+                                $initialStartBalance = ($lastPriorId && isset($runningMap[$lastPriorId]))
+                                    ? $runningMap[$lastPriorId]['end']
+                                    : $ledger['initialStart'];
+                            }
+                            $finalLedgerBalance = $ledger['hasOpeningAnchor'] ? $initialStartBalance : $balance;
+                        }
                     }
                 }
             }
@@ -550,7 +673,7 @@ class SuppliesController extends Controller
                         'stat_sold_rt' => $stats->qty_sold_rt ?? 0,
                         'stat_storage' => $storageStock,
                         'stat_counter' => $counterStock,
-                        'stat_balance' => $balance,
+                        'stat_balance' => $med ? $finalLedgerBalance : $balance,
                     ]
                 ])
                 ->make(true);
@@ -604,17 +727,10 @@ class SuppliesController extends Controller
                 $ledgerRows = $baseQuery()
                     ->orderByRaw($effectiveDateSql . ' ASC')
                     ->orderBy('id', 'asc')
-                    ->get(['id', 'medicine_id', 'qty', 'qty_before', 'qty_after', 'total', 'status', 'date', 'created_at']);
+                    ->get(['id', 'medicine_id', 'type', 'qty', 'qty_before', 'qty_after', 'total', 'status', 'date', 'created_at']);
 
-                $running = $totalStockGudang - $ledgerRows->sum(fn($log) => $this->stockLogDelta($log));
-                foreach ($ledgerRows as $log) {
-                    $before = $running;
-                    $running += $this->stockLogDelta($log);
-                    $runningMap[$log->id] = [
-                        'before' => $before,
-                        'after' => $running,
-                    ];
-                }
+                $ledger = $this->buildRunningLedger($ledgerRows, $totalStockGudang);
+                $runningMap = $ledger['runningMap'];
             }
 
             $items = $baseQuery()->with([
@@ -1419,7 +1535,7 @@ class SuppliesController extends Controller
                 ? $baseMedicineLogQuery()
                     ->orderByRaw($effectiveDateSql . ' ASC')
                     ->orderBy('id', 'asc')
-                    ->get(['id', 'medicine_id', 'qty', 'qty_before', 'qty_after', 'total', 'status', 'date', 'created_at'])
+                    ->get(['id', 'medicine_id', 'type', 'qty', 'qty_before', 'qty_after', 'total', 'status', 'date', 'created_at'])
                 : collect();
 
             $runningMap = [];
@@ -1431,17 +1547,11 @@ class SuppliesController extends Controller
                 }
 
                 $currentStock = $this->calculateRealtimeStock((int) $medicineId, $activePharmacyId, 'total');
-                $totalMovement = $medicineLogs->sum(fn($log) => $this->stockLogDelta($log));
-                $running = $currentStock - $totalMovement;
-                $openingByMedicine[$medicineId] = $running;
+                $ledger = $this->buildRunningLedger($medicineLogs, $currentStock);
+                $openingByMedicine[$medicineId] = $ledger['initialStart'];
 
-                foreach ($medicineLogs as $log) {
-                    $before = $running;
-                    $running += $this->stockLogDelta($log);
-                    $runningMap[$log->id] = [
-                        'before' => $before,
-                        'after' => $running,
-                    ];
+                foreach ($ledger['runningMap'] as $logId => $entry) {
+                    $runningMap[$logId] = $entry;
                 }
             }
 
