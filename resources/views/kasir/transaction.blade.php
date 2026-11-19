@@ -266,7 +266,9 @@
             gap: 10px;
         }
 
-        @container (inline-size < 380px) {
+        @container (inline-size < 380px)
+
+            {
             .svc-field-grid {
                 grid-template-columns: minmax(0, 1fr);
             }
@@ -428,6 +430,7 @@
         }
 
         @media (pointer: coarse) {
+
             .svc-search-input,
             .svc-input,
             .svc-currency-input {
@@ -441,7 +444,7 @@
             transition: all 0.15s ease-in-out;
         }
 
-        input[name="service_invoice_type"]:checked + .service-invoice-card {
+        input[name="service_invoice_type"]:checked+.service-invoice-card {
             border-color: #2563eb !important;
             background-color: #eff6ff !important;
             color: #1d4ed8 !important;
@@ -462,7 +465,7 @@
         }
 
         /* Wajib: pastikan class `hidden` tetap menang di atas display:grid
-           (dipakai untuk menyembunyikan ringkasan pada transaksi KREDIT). */
+                       (dipakai untuk menyembunyikan ringkasan pada transaksi KREDIT). */
         .pay-summary.hidden,
         .pay-summary--two.hidden {
             display: none !important;
@@ -472,7 +475,7 @@
             min-width: 0;
         }
 
-        .pay-summary-field > label {
+        .pay-summary-field>label {
             display: block;
             margin-bottom: 6px;
             font-size: 12px;
@@ -481,7 +484,7 @@
             letter-spacing: 0.01em;
         }
 
-        .pay-summary-field > input {
+        .pay-summary-field>input {
             width: 100%;
             height: 44px;
             border-radius: 12px;
@@ -495,7 +498,7 @@
             transition: border-color 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
         }
 
-        .pay-summary-field > input:focus {
+        .pay-summary-field>input:focus {
             outline: none;
             border-color: #93c5fd;
             background: #ffffff;
@@ -749,14 +752,15 @@
                 <div class="svc-header mb-3">
                     <div class="svc-title-group">
                         <span class="svc-icon-badge" aria-hidden="true">
-                            <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-                                stroke-linecap="round" stroke-linejoin="round">
+                            <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                 <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
                             </svg>
                         </span>
                         <div class="min-w-0">
                             <div class="flex items-center gap-2 flex-wrap">
-                                <h3 id="servicePanelHeading" class="text-[13px] font-poppins font-bold text-slate-800 leading-tight">
+                                <h3 id="servicePanelHeading"
+                                    class="text-[13px] font-poppins font-bold text-slate-800 leading-tight">
                                     Jasa &amp; Biaya
                                 </h3>
                                 <span id="serviceSelectedBadge"
@@ -770,10 +774,10 @@
                         </div>
                     </div>
 
-                    <button type="button" id="serviceOpenAddBtn" class="svc-add-toggle"
-                        aria-expanded="false" aria-controls="serviceCustomFormWrap">
-                        <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"
-                            stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <button type="button" id="serviceOpenAddBtn" class="svc-add-toggle" aria-expanded="false"
+                        aria-controls="serviceCustomFormWrap">
+                        <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                             <path d="M12 5v14M5 12h14" />
                         </svg>
                         <span>Tambah Jasa</span>
@@ -791,14 +795,15 @@
                                 <path d="m21 21-4.3-4.3" />
                             </svg>
                             <input id="serviceSearch" type="search" name="service_search"
-                                placeholder="Cari jasa tersimpan atau ketik nama jasa baru…"
-                                autocomplete="off" autocorrect="off" autocapitalize="none" spellcheck="false"
-                                enterkeyhint="search" aria-autocomplete="list" aria-controls="serviceList"
-                                aria-expanded="false" class="svc-search-input font-poppins">
+                                placeholder="Cari jasa tersimpan atau ketik nama jasa baru…" autocomplete="off"
+                                autocorrect="off" autocapitalize="none" spellcheck="false" enterkeyhint="search"
+                                aria-autocomplete="list" aria-controls="serviceList" aria-expanded="false"
+                                class="svc-search-input font-poppins">
                             <button type="button" id="serviceSearchClear" class="svc-search-clear hidden"
                                 aria-label="Bersihkan pencarian jasa">
                                 <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                                    stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                    stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"
+                                    aria-hidden="true">
                                     <path d="M18 6 6 18M6 6l12 12" />
                                 </svg>
                             </button>
@@ -806,14 +811,17 @@
                     </search>
 
                     <div id="serviceResults" class="svc-dropdown hidden">
-                        <ul id="serviceList" role="listbox" aria-label="Daftar jasa tersimpan" class="svc-dropdown-list"></ul>
+                        <ul id="serviceList" role="listbox" aria-label="Daftar jasa tersimpan"
+                            class="svc-dropdown-list"></ul>
                         <button type="button" id="serviceQuickAddBtn" class="svc-quick-add">
                             <span class="flex items-center gap-1.5 min-w-0">
-                                <svg class="w-3.5 h-3.5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                                    stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                <svg class="w-3.5 h-3.5 shrink-0" viewBox="0 0 24 24" fill="none"
+                                    stroke="currentColor" stroke-width="2.4" stroke-linecap="round"
+                                    stroke-linejoin="round" aria-hidden="true">
                                     <path d="M12 5v14M5 12h14" />
                                 </svg>
-                                <span id="serviceQuickAddLabel" class="truncate">Tambah jasa baru &amp; atur biaya</span>
+                                <span id="serviceQuickAddLabel" class="truncate">Tambah jasa baru &amp; atur
+                                    biaya</span>
                             </span>
                             <span class="text-[10px] font-medium text-emerald-600/90 shrink-0">Enter ↵</span>
                         </button>
@@ -835,9 +843,10 @@
 
                         <div class="svc-field-grid">
                             <div class="svc-field">
-                                <label for="serviceCustomName">Nama Jasa <span class="text-rose-500" aria-hidden="true">*</span></label>
-                                <input id="serviceCustomName" name="service_name" type="text" required maxlength="150"
-                                    placeholder="cth. Konsultasi, Cek Gula Darah" autocomplete="off"
+                                <label for="serviceCustomName">Nama Jasa <span class="text-rose-500"
+                                        aria-hidden="true">*</span></label>
+                                <input id="serviceCustomName" name="service_name" type="text" required
+                                    maxlength="150" placeholder="cth. Konsultasi, Cek Gula Darah" autocomplete="off"
                                     enterkeyhint="next" aria-describedby="serviceCustomError" class="svc-input">
                             </div>
 
@@ -855,9 +864,11 @@
                         <p id="serviceCustomError" role="alert" aria-live="polite"
                             class="hidden text-[11px] font-medium text-rose-600 mt-2"></p>
 
-                        <div class="mt-3 pt-2.5 border-t border-slate-200/80 flex flex-wrap items-center justify-between gap-2.5">
+                        <div
+                            class="mt-3 pt-2.5 border-t border-slate-200/80 flex flex-wrap items-center justify-between gap-2.5">
                             <label for="serviceCustomSaveMaster" class="svc-check-label">
-                                <input id="serviceCustomSaveMaster" name="save_to_master" type="checkbox" value="1" checked>
+                                <input id="serviceCustomSaveMaster" name="save_to_master" type="checkbox"
+                                    value="1" checked>
                                 <span>Simpan ke daftar jasa (bisa dipilih lagi)</span>
                             </label>
 
@@ -872,10 +883,12 @@
                 <div id="serviceSelectedWrap" class="hidden mt-1">
                     <form id="serviceEditForm" method="POST" action="{{ route('transaction.service.save') }}"
                         aria-labelledby="serviceSelectedHeading" class="svc-selected-card" novalidate>
-                        <div class="flex items-start justify-between gap-2 pb-2.5 mb-2.5 border-b border-emerald-200/70">
+                        <div
+                            class="flex items-start justify-between gap-2 pb-2.5 mb-2.5 border-b border-emerald-200/70">
                             <div class="min-w-0">
                                 <div class="flex items-center gap-2 flex-wrap">
-                                    <span id="serviceSelectedHeading" class="text-[12.5px] font-bold text-slate-900 truncate"></span>
+                                    <span id="serviceSelectedHeading"
+                                        class="text-[12.5px] font-bold text-slate-900 truncate"></span>
                                     <span id="serviceSelectedPrice"
                                         class="text-[11.5px] font-bold text-emerald-700 bg-emerald-100/80 border border-emerald-200 px-2 py-0.5 rounded-md tabular-nums"></span>
                                 </div>
@@ -886,17 +899,20 @@
                             </div>
 
                             <div class="flex items-center gap-1.5 shrink-0">
-                                <button type="button" id="serviceChangeBtn" class="svc-btn svc-btn-ghost">Ganti</button>
-                                <button type="button" id="serviceClearBtn" class="svc-btn svc-btn-danger-ghost">Hapus</button>
+                                <button type="button" id="serviceChangeBtn"
+                                    class="svc-btn svc-btn-ghost">Ganti</button>
+                                <button type="button" id="serviceClearBtn"
+                                    class="svc-btn svc-btn-danger-ghost">Hapus</button>
                             </div>
                         </div>
 
                         <div class="svc-field-grid">
                             <div class="svc-field">
-                                <label for="serviceEditName">Nama Jasa <span class="text-rose-500" aria-hidden="true">*</span></label>
-                                <input id="serviceEditName" name="service_name" type="text" required maxlength="150"
-                                    autocomplete="off" enterkeyhint="next" aria-describedby="serviceEditError"
-                                    class="svc-input">
+                                <label for="serviceEditName">Nama Jasa <span class="text-rose-500"
+                                        aria-hidden="true">*</span></label>
+                                <input id="serviceEditName" name="service_name" type="text" required
+                                    maxlength="150" autocomplete="off" enterkeyhint="next"
+                                    aria-describedby="serviceEditError" class="svc-input">
                             </div>
 
                             <div class="svc-field">
@@ -913,18 +929,21 @@
                         <p id="serviceEditError" role="alert" aria-live="polite"
                             class="hidden text-[11px] font-medium text-rose-600 mt-2"></p>
 
-                        <div class="mt-3 pt-2.5 border-t border-slate-200/70 flex flex-wrap items-center justify-between gap-2">
+                        <div
+                            class="mt-3 pt-2.5 border-t border-slate-200/70 flex flex-wrap items-center justify-between gap-2">
                             <label for="serviceEditSaveMaster" class="svc-check-label">
-                                <input id="serviceEditSaveMaster" name="save_to_master" type="checkbox" value="1">
+                                <input id="serviceEditSaveMaster" name="save_to_master" type="checkbox"
+                                    value="1">
                                 <span>Perbarui juga di daftar jasa</span>
                             </label>
 
                             <div class="flex items-center gap-1.5">
-                                <button type="button" id="serviceEditResetBtn" class="svc-btn svc-btn-subtle hidden">
+                                <button type="button" id="serviceEditResetBtn"
+                                    class="svc-btn svc-btn-subtle hidden">
                                     Reset
                                 </button>
                                 <button type="submit" id="serviceEditSaveBtn" class="svc-btn svc-btn-primary">
-                                    Simpan Perubahan
+                                    Terapkan
                                 </button>
                             </div>
                         </div>
@@ -1981,13 +2000,14 @@
                     <div class="flex gap-2" id="paymentTypeGroup">
                         {{-- Cash --}}
                         <label class="payment-option flex-1 cursor-pointer">
-                            <input type="radio" id="payment_type" name="payment_type" onclick="getPaymentType()"
-                                value="CASH" class="sr-only">
+                            <input type="radio" id="payment_type" name="payment_type"
+                                onclick="getPaymentType()" value="CASH" class="sr-only">
                             <div
                                 class="payment-card cash-card flex flex-col items-center gap-2 py-3 px-2 rounded-xl border text-center">
                                 <div class="payment-icon w-9 h-9 rounded-lg flex items-center justify-center">
-                                    <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                                        stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                                    <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none"
+                                        stroke="currentColor" stroke-width="1.8" stroke-linecap="round"
+                                        stroke-linejoin="round">
                                         <rect x="2" y="6" width="20" height="12" rx="2" />
                                         <circle cx="12" cy="12" r="3" />
                                         <path d="M6 12h.01M18 12h.01" />
@@ -2023,8 +2043,9 @@
                             <div
                                 class="payment-card debit-card flex flex-col items-center gap-2 py-3 px-2 rounded-xl border text-center">
                                 <div class="payment-icon w-9 h-9 rounded-lg flex items-center justify-center">
-                                    <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                                        stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                                    <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none"
+                                        stroke="currentColor" stroke-width="1.8" stroke-linecap="round"
+                                        stroke-linejoin="round">
                                         <rect x="1" y="4" width="22" height="16" rx="2" />
                                         <path d="M1 10h22" />
                                         <path d="M4 15h3M10 15h2" />
@@ -2036,8 +2057,8 @@
 
                         {{-- Transfer --}}
                         <label class="payment-option flex-1 cursor-pointer">
-                            <input type="radio" name="payment_type" onclick="getPaymentType()" value="TRANSFER"
-                                class="sr-only">
+                            <input type="radio" name="payment_type" onclick="getPaymentType()"
+                                value="TRANSFER" class="sr-only">
                             <div
                                 class="payment-card transfer-card flex flex-col items-center gap-2 py-3 px-2 rounded-xl border text-center">
                                 <div class="payment-icon w-9 h-9 rounded-lg flex items-center justify-center">
@@ -2067,9 +2088,12 @@
                         </div>
 
                         @php
-                            $branchBankOptions = !empty($availableBanks) && count($availableBanks) > 0
-                                ? collect($availableBanks)
-                                : collect(['Mandiri', 'BNI', 'BCA', 'BRI', 'BTN'])->map(fn($b) => ['bank_name' => $b, 'name' => 'Bank ' . $b, 'account_number' => null]);
+                            $branchBankOptions =
+                                !empty($availableBanks) && count($availableBanks) > 0
+                                    ? collect($availableBanks)
+                                    : collect(['Mandiri', 'BNI', 'BCA', 'BRI', 'BTN'])->map(
+                                        fn($b) => ['bank_name' => $b, 'name' => 'Bank ' . $b, 'account_number' => null],
+                                    );
                         @endphp
 
                         {{-- Quick-pick Bank Chips --}}
@@ -2078,7 +2102,8 @@
                                 @php $bankItem = $bankOpt['bank_name'] ?? ''; @endphp
                                 <button type="button"
                                     class="bank-chip-btn py-2 px-2 rounded-xl border border-slate-200 bg-white text-xs font-semibold text-slate-700 hover:border-blue-400 hover:bg-blue-50/50 active:scale-95 transition-all text-center flex items-center justify-center gap-1 focus:outline-none focus:ring-2 focus:ring-blue-400"
-                                    data-bank="{{ $bankItem }}" onclick="selectBankChip('{{ $bankItem }}')">
+                                    data-bank="{{ $bankItem }}"
+                                    onclick="selectBankChip('{{ $bankItem }}')">
                                     <span>{{ $bankItem }}</span>
                                 </button>
                             @endforeach
@@ -2092,7 +2117,9 @@
                                 <option value="">-- Pilih Bank --</option>
                                 @foreach ($branchBankOptions as $bankOpt)
                                     <option value="{{ $bankOpt['bank_name'] }}">
-                                        {{ $bankOpt['name'] }}@if (!empty($bankOpt['account_number'])) ({{ $bankOpt['account_number'] }})@endif
+                                        {{ $bankOpt['name'] }}@if (!empty($bankOpt['account_number']))
+                                            ({{ $bankOpt['account_number'] }})
+                                        @endif
                                     </option>
                                 @endforeach
                             </select>
@@ -2153,15 +2180,17 @@
                     <div>
                         <label for="doctor_shipping_fee_input"
                             class="block text-[11px] font-bold text-slate-700 mb-1">Nominal Ongkir (Rp)</label>
-                        <input type="text" id="doctor_shipping_fee_input" oninput="formatDoctorShippingFee(this)"
-                            onfocus="this.select()" placeholder="Rp 0" inputmode="numeric" autocomplete="off"
+                        <input type="text" id="doctor_shipping_fee_input"
+                            oninput="formatDoctorShippingFee(this)" onfocus="this.select()" placeholder="Rp 0"
+                            inputmode="numeric" autocomplete="off"
                             class="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm font-semibold text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-sm transition" />
                     </div>
 
                     <div>
                         <div class="flex items-center justify-between mb-1.5">
                             <label class="text-[11px] font-bold text-slate-700">Dibayar Ke</label>
-                            <button type="button" id="btnSyncShippingPayment" onclick="resetShippingPaymentSync()"
+                            <button type="button" id="btnSyncShippingPayment"
+                                onclick="resetShippingPaymentSync()"
                                 class="text-[10px] font-medium text-blue-600 hover:text-blue-700 hover:underline flex items-center gap-1">
                                 <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -2191,7 +2220,8 @@
                     </div>
 
                     {{-- Bank / Merchant tujuan ongkir --}}
-                    <div id="shippingBankWrapper" class="p-2 bg-white border border-slate-200 rounded-xl transition-all">
+                    <div id="shippingBankWrapper"
+                        class="p-2 bg-white border border-slate-200 rounded-xl transition-all">
                         <div class="flex items-center justify-between mb-1">
                             <label class="text-[10px] font-semibold text-slate-700 flex items-center gap-1">
                                 <span id="shippingBankBadge"
@@ -2200,9 +2230,12 @@
                             </label>
                         </div>
                         @php
-                            $shippingBankOptions = !empty($availableBanks) && count($availableBanks) > 0
-                                ? collect($availableBanks)
-                                : collect(['Mandiri', 'BNI', 'BCA', 'BRI', 'BTN'])->map(fn($b) => ['bank_name' => $b, 'name' => 'Bank ' . $b, 'account_number' => null]);
+                            $shippingBankOptions =
+                                !empty($availableBanks) && count($availableBanks) > 0
+                                    ? collect($availableBanks)
+                                    : collect(['Mandiri', 'BNI', 'BCA', 'BRI', 'BTN'])->map(
+                                        fn($b) => ['bank_name' => $b, 'name' => 'Bank ' . $b, 'account_number' => null],
+                                    );
                         @endphp
                         <div class="grid grid-cols-5 gap-1 mb-1.5">
                             @foreach ($shippingBankOptions as $bankOpt)
@@ -2220,7 +2253,9 @@
                             <option value="">-- Pilih Bank --</option>
                             @foreach ($shippingBankOptions as $bankOpt)
                                 <option value="{{ $bankOpt['bank_name'] }}">
-                                    {{ $bankOpt['name'] }}@if (!empty($bankOpt['account_number'])) ({{ $bankOpt['account_number'] }})@endif
+                                    {{ $bankOpt['name'] }}@if (!empty($bankOpt['account_number']))
+                                        ({{ $bankOpt['account_number'] }})
+                                    @endif
                                 </option>
                             @endforeach
                         </select>
@@ -2230,18 +2265,17 @@
                     <div class="mt-1 pt-3 border-t border-blue-200/70 space-y-1.5">
                         <div class="flex items-center justify-between gap-3 text-[11px]">
                             <span class="text-slate-600">Total transaksi (setelah diskon)</span>
-                            <span id="shippingBaseTotal"
-                                class="font-semibold text-slate-800 tabular-nums">Rp 0</span>
+                            <span id="shippingBaseTotal" class="font-semibold text-slate-800 tabular-nums">Rp
+                                0</span>
                         </div>
                         <div class="flex items-center justify-between gap-3 text-[11px]">
                             <span class="text-slate-600">Ongkir</span>
-                            <span id="shippingFeeDisplay"
-                                class="font-semibold text-slate-800 tabular-nums">Rp 0</span>
+                            <span id="shippingFeeDisplay" class="font-semibold text-slate-800 tabular-nums">Rp
+                                0</span>
                         </div>
                         <div class="flex items-center justify-between gap-3 text-[11px]">
                             <span class="text-slate-600">Masuk ke rekening</span>
-                            <span id="shippingBankDestination"
-                                class="font-semibold text-slate-800">-</span>
+                            <span id="shippingBankDestination" class="font-semibold text-slate-800">-</span>
                         </div>
                         <div
                             class="flex items-center justify-between gap-3 rounded-xl bg-white border border-blue-300 px-3 py-2">
@@ -2864,7 +2898,7 @@
 
     // ── Jasa (hanya untuk transaksi tipe JASA) ────────────────────────────
     // serviceAmount bernilai 0 untuk tipe lain sehingga rumus lama tidak berubah.
-    var isServiceTransaction = {{ ($isServiceTransaction ?? false) ? 'true' : 'false' }};
+    var isServiceTransaction = {{ $isServiceTransaction ?? false ? 'true' : 'false' }};
     var serviceAmount = {{ (float) ($serviceAmount ?? 0) }};
     var serviceInvoiceType = "{{ $serviceInvoiceType ?? 'UPDS' }}";
     @php
@@ -3241,7 +3275,8 @@
             modal.classList.remove('hidden');
             modal.classList.add('flex');
 
-            const isResep = (transactionType === 'RESEP TUNAI' || transactionType === 'KREDIT' || transactionType === 'RESEP KREDIT');
+            const isResep = (transactionType === 'RESEP TUNAI' || transactionType === 'KREDIT' ||
+                transactionType === 'RESEP KREDIT');
             if (isResep) {
                 btnGroupResep.classList.remove('hidden');
                 btnGroupResep.classList.add('flex');
@@ -4128,16 +4163,21 @@
             if (!baseEl && !feeEl && !grandEl) return;
 
             const digits = (value) => String(value || '').replace(/\D/g, '');
-            const fmt = (value) => 'Rp ' + Number(Math.max(0, Math.round(Number(value) || 0))).toLocaleString('id-ID');
+            const fmt = (value) => 'Rp ' + Number(Math.max(0, Math.round(Number(value) || 0))).toLocaleString(
+                'id-ID');
 
             const render = () => {
                 try {
                     const totalField = document.getElementById('carttotal');
                     const totalDigits = digits(totalField?.value);
-                    const globalTotal = typeof window.totaltransaction !== 'undefined' ? Number(window.totaltransaction) : 0;
-                    const globalDiscount = typeof window.subtotal_discount !== 'undefined' ? Number(window.subtotal_discount) : 0;
-                    const payable = totalDigits !== '' ? Number(totalDigits) : Math.max(0, globalTotal - globalDiscount);
-                    const fee = Number(digits(document.getElementById('doctor_shipping_fee_input')?.value)) || 0;
+                    const globalTotal = typeof window.totaltransaction !== 'undefined' ? Number(window
+                        .totaltransaction) : 0;
+                    const globalDiscount = typeof window.subtotal_discount !== 'undefined' ? Number(window
+                        .subtotal_discount) : 0;
+                    const payable = totalDigits !== '' ? Number(totalDigits) : Math.max(0, globalTotal -
+                        globalDiscount);
+                    const fee = Number(digits(document.getElementById('doctor_shipping_fee_input')?.value)) ||
+                        0;
 
                     if (baseEl) baseEl.textContent = fmt(payable);
                     if (feeEl) feeEl.textContent = fmt(fee);
@@ -4288,7 +4328,9 @@
 
             const focusEl = (el) => {
                 if (!el) return;
-                el.focus({ preventScroll: true });
+                el.focus({
+                    preventScroll: true
+                });
                 if (el.tagName === 'INPUT' && typeof el.select === 'function') {
                     try {
                         el.select();
@@ -4344,9 +4386,12 @@
                     if (['ArrowRight', 'ArrowDown', 'ArrowLeft', 'ArrowUp'].includes(e.key)) {
                         e.preventDefault();
                         const dir = (e.key === 'ArrowRight' || e.key === 'ArrowDown') ? 1 : -1;
-                        const nextRadio = methodRadios[(index + dir + methodRadios.length) % methodRadios.length];
+                        const nextRadio = methodRadios[(index + dir + methodRadios.length) %
+                            methodRadios.length];
                         nextRadio.checked = true;
-                        nextRadio.focus({ preventScroll: true });
+                        nextRadio.focus({
+                            preventScroll: true
+                        });
                         onShippingPaymentTypeChange(nextRadio.value, true);
                         return;
                     }
@@ -4397,7 +4442,7 @@
                 const activeType = activeEl?.type;
                 const isTyping = activeTag === 'TEXTAREA' ||
                     (activeTag === 'INPUT' && !['radio', 'checkbox', 'button', 'submit'].includes(
-                    activeType)) ||
+                        activeType)) ||
                     activeTag === 'SELECT';
 
                 if (!isTyping) {
@@ -5147,7 +5192,7 @@
                     if (error.response?.status === 409) {
                         alert(error.response.data?.message ||
                             'Racikan sudah selesai di sesi lain. Aktifkan ulang mode racikan untuk memulai yang baru.'
-                            );
+                        );
                     }
                 }).finally(releaseSubmitLock);
             }
@@ -5644,7 +5689,7 @@
         const toggleDoctorShipping = document.getElementById('toggleDoctorShipping');
         const isShippingActive = toggleDoctorShipping && toggleDoctorShipping.checked;
         const rawShippingFee = document.getElementById('doctor_shipping_fee_input')?.value.replace(/\D/g, "") ||
-        "0";
+            "0";
         const doctor_shipping_fee = isShippingActive ? parseInt(rawShippingFee, 10) : 0;
         const selectedShipRadio = document.querySelector('input[name="shipping_payment_type"]:checked');
         const activeShipMethod = selectedShipRadio ? selectedShipRadio.value : (typeof shippingPaymentType !==
@@ -5658,7 +5703,7 @@
             null;
 
         if (isShippingActive && doctor_shipping_fee > 0 && ['QRIS', 'DEBIT', 'TRANSFER'].includes(
-            activeShipMethod) && !doctor_shipping_bank_name) {
+                activeShipMethod) && !doctor_shipping_bank_name) {
             iziToast.warning({
                 title: 'Peringatan',
                 message: 'Silahkan Pilih Bank / Merchant Terlebih Dahulu untuk Ongkir ' +
@@ -6856,10 +6901,12 @@
 
                     // 2. ASK TO PRINT FULL RECEIPT (Dokumen 2: Salinan Resep / Full Receipt)
                     const isRecipe = Boolean(
-                        res.data.is_recipe ||
-                        ['RESEP TUNAI', 'KREDIT', 'RESEP KREDIT'].includes(String(res.data.transaction_type || '').toUpperCase().trim()) ||
-                        ['RESEP TUNAI', 'KREDIT', 'RESEP KREDIT'].includes(String(currenttransaction || '').toUpperCase().trim()) ||
-                        ['RESEP TUNAI', 'KREDIT', 'RESEP KREDIT'].includes(String(transaction_type || '').toUpperCase().trim())
+                        res.data.is_recipe || ['RESEP TUNAI', 'KREDIT', 'RESEP KREDIT'].includes(String(res.data
+                            .transaction_type || '').toUpperCase().trim()) || ['RESEP TUNAI', 'KREDIT',
+                            'RESEP KREDIT'
+                        ].includes(String(currenttransaction || '').toUpperCase().trim()) || ['RESEP TUNAI',
+                            'KREDIT', 'RESEP KREDIT'
+                        ].includes(String(transaction_type || '').toUpperCase().trim())
                     );
                     const trxId = res.data.transaction_id || checkoutPayload.transaction_id;
                     const fullReceiptUrl = res.data.print_resep_url || `/print/fullreceipt/${trxId}`;
@@ -6899,7 +6946,8 @@
                             });
                         } else {
                             setTimeout(() => {
-                                const printAgain = confirm("Transaksi berhasil! Apakah Anda ingin mencetak Full Receipt?");
+                                const printAgain = confirm(
+                                    "Transaksi berhasil! Apakah Anda ingin mencetak Full Receipt?");
                                 if (printAgain) {
                                     window.open(fullReceiptUrl, '_blank');
                                 }
@@ -7420,7 +7468,8 @@
         };
 
         function redirectToFreshTransaction(title, message, targetUrl, delayMs) {
-            if (isRedirecting || isCheckoutFinished || window.__kasirIsCheckoutFinished || (typeof checkoutProcessing !== 'undefined' && checkoutProcessing)) return;
+            if (isRedirecting || isCheckoutFinished || window.__kasirIsCheckoutFinished || (
+                    typeof checkoutProcessing !== 'undefined' && checkoutProcessing)) return;
             isRedirecting = true;
 
             const searchInput = document.getElementById('productSearch');
@@ -7547,8 +7596,9 @@
         let lastSharedWarnAt = 0;
 
         function runHeartbeat(force) {
-            if (isRedirecting || heartbeatBusy || isCheckoutFinished || window.__kasirIsCheckoutFinished || (typeof checkoutProcessing !== 'undefined' &&
-                checkoutProcessing)) {
+            if (isRedirecting || heartbeatBusy || isCheckoutFinished || window.__kasirIsCheckoutFinished || (
+                    typeof checkoutProcessing !== 'undefined' &&
+                    checkoutProcessing)) {
                 return;
             }
             const now = Date.now();
@@ -7563,7 +7613,8 @@
                 client_tab_id: myTabId,
                 cart_signature: typeof currentCartSignature !== 'undefined' ? currentCartSignature : ''
             }).then(res => {
-                if (isRedirecting || isCheckoutFinished || window.__kasirIsCheckoutFinished || (typeof checkoutProcessing !== 'undefined' && checkoutProcessing)) {
+                if (isRedirecting || isCheckoutFinished || window.__kasirIsCheckoutFinished || (
+                        typeof checkoutProcessing !== 'undefined' && checkoutProcessing)) {
                     return;
                 }
                 const payload = res.data || {};
@@ -7848,7 +7899,8 @@
             const editPriceEl = document.getElementById('serviceEditPrice');
             const editMasterEl = document.getElementById('serviceEditSaveMaster');
             const servicePrice = Math.round(Number(serviceData.price ?? serviceAmount ?? 0));
-            const nextKey = `${serviceData.id || ''}:${serviceData.doctor_service_id || ''}:${serviceData.name || ''}:${servicePrice}`;
+            const nextKey =
+                `${serviceData.id || ''}:${serviceData.doctor_service_id || ''}:${serviceData.name || ''}:${servicePrice}`;
 
             if (headingEl) headingEl.textContent = serviceData.name || '';
             if (priceEl) priceEl.textContent = serviceRupiah(servicePrice);
@@ -7893,9 +7945,9 @@
 
         if (!customWrap) return;
 
-        const initialName = typeof prefillName === 'string'
-            ? prefillName.trim()
-            : (searchInput ? searchInput.value.trim() : '');
+        const initialName = typeof prefillName === 'string' ?
+            prefillName.trim() :
+            (searchInput ? searchInput.value.trim() : '');
 
         if (results) results.classList.add('hidden');
         if (searchInput) searchInput.setAttribute('aria-expanded', 'false');
@@ -7973,7 +8025,9 @@
         actionables.forEach(function(el, idx) {
             el.classList.toggle('is-active', idx === serviceDropdownIndex);
         });
-        actionables[serviceDropdownIndex].scrollIntoView({ block: 'nearest' });
+        actionables[serviceDropdownIndex].scrollIntoView({
+            block: 'nearest'
+        });
     }
 
     function renderServiceList(items) {
@@ -7985,9 +8039,9 @@
 
         const keyword = searchInput ? searchInput.value.trim() : '';
         if (quickAddLabel) {
-            quickAddLabel.textContent = keyword
-                ? 'Tambah "' + keyword + '" & atur biaya'
-                : 'Tambah jasa baru & atur biaya';
+            quickAddLabel.textContent = keyword ?
+                'Tambah "' + keyword + '" & atur biaya' :
+                'Tambah jasa baru & atur biaya';
         }
 
         list.replaceChildren();
@@ -7996,9 +8050,9 @@
         if (!items || items.length === 0) {
             const emptyLi = document.createElement('li');
             emptyLi.className = 'px-3 py-2.5 text-[11px] text-slate-400 text-center';
-            emptyLi.textContent = keyword
-                ? 'Jasa "' + keyword + '" belum tersimpan.'
-                : 'Belum ada jasa tersimpan. Tambahkan jasa baru di bawah.';
+            emptyLi.textContent = keyword ?
+                'Jasa "' + keyword + '" belum tersimpan.' :
+                'Belum ada jasa tersimpan. Tambahkan jasa baru di bawah.';
             list.appendChild(emptyLi);
         } else {
             items.forEach(function(item) {
@@ -8028,8 +8082,12 @@
         if (!isServiceTransaction) return;
 
         try {
-            const { data } = await axios.get("{{ route('transaction.service.search') }}", {
-                params: { q: keyword || '' }
+            const {
+                data
+            } = await axios.get("{{ route('transaction.service.search') }}", {
+                params: {
+                    q: keyword || ''
+                }
             });
             renderServiceList(data);
         } catch (e) {
@@ -8061,7 +8119,9 @@
 
     async function chooseService(serviceId) {
         try {
-            const { data } = await axios.post("{{ route('transaction.service.save') }}", {
+            const {
+                data
+            } = await axios.post("{{ route('transaction.service.save') }}", {
                 transaction_id: transaction_id,
                 doctor_service_id: serviceId,
             });
@@ -8108,7 +8168,9 @@
         }
 
         try {
-            const { data } = await axios.post("{{ route('transaction.service.save') }}", {
+            const {
+                data
+            } = await axios.post("{{ route('transaction.service.save') }}", {
                 transaction_id: transaction_id,
                 service_name: nameVal,
                 price: priceVal,
@@ -8165,7 +8227,9 @@
         }
 
         try {
-            const { data } = await axios.post("{{ route('transaction.service.save') }}", {
+            const {
+                data
+            } = await axios.post("{{ route('transaction.service.save') }}", {
                 transaction_id: transaction_id,
                 doctor_service_id: serviceData.doctor_service_id || null,
                 service_name: nameVal,
@@ -8174,7 +8238,7 @@
             });
 
             applyServiceServerResponse(data);
-
+            document.getElementById('productSearch').focus();
             iziToast.success({
                 title: 'Berhasil',
                 message: data.message || 'Perubahan jasa disimpan.',
@@ -8191,7 +8255,7 @@
         } finally {
             if (submitBtn) {
                 submitBtn.disabled = false;
-                submitBtn.textContent = 'Simpan Perubahan';
+                submitBtn.textContent = 'Terapkan';
             }
         }
     }
@@ -8201,8 +8265,12 @@
         if (!confirm('Hapus jasa dari transaksi ini?')) return;
 
         try {
-            const { data } = await axios.delete("{{ route('transaction.service.delete') }}", {
-                data: { transaction_id: transaction_id }
+            const {
+                data
+            } = await axios.delete("{{ route('transaction.service.delete') }}", {
+                data: {
+                    transaction_id: transaction_id
+                }
             });
 
             applyServiceServerResponse(data);
@@ -8234,14 +8302,17 @@
                 '? Keranjang obat akan dikosongkan karena harga obat berbeda per jenis.');
 
             if (!proceed) {
-                const radioPrev = document.querySelector('input[name="service_invoice_type"][value="' + previousType + '"]');
+                const radioPrev = document.querySelector('input[name="service_invoice_type"][value="' +
+                    previousType + '"]');
                 if (radioPrev) radioPrev.checked = true;
                 return;
             }
         }
 
         try {
-            const { data } = await axios.post("{{ route('transaction.service.invoiceType') }}", {
+            const {
+                data
+            } = await axios.post("{{ route('transaction.service.invoiceType') }}", {
                 transaction_id: transaction_id,
                 invoice_type: type,
             });
@@ -8257,7 +8328,8 @@
             // Harga obat & perilaku UI mengikuti parameter jenis faktur → muat ulang.
             window.location.reload();
         } catch (e) {
-            const radioPrev = document.querySelector('input[name="service_invoice_type"][value="' + previousType + '"]');
+            const radioPrev = document.querySelector('input[name="service_invoice_type"][value="' + previousType +
+                '"]');
             if (radioPrev) radioPrev.checked = true;
 
             iziToast.error({
@@ -8320,7 +8392,8 @@
                         chooseService(activeEl.dataset.serviceId);
                     } else if (activeEl === quickAddBtn || actionables.length <= 1) {
                         openCustomServiceForm(this.value.trim());
-                    } else if (actionables[0] && actionables[0].dataset && actionables[0].dataset.serviceId) {
+                    } else if (actionables[0] && actionables[0].dataset && actionables[0].dataset
+                        .serviceId) {
                         chooseService(actionables[0].dataset.serviceId);
                     }
                 } else if (e.key === 'Escape') {
