@@ -1918,14 +1918,16 @@ class SalesController extends Controller
                 $query->where('name', 'like', '%' . $q . '%');
             })
             ->orderBy('name')
-            ->limit(20)
+            ->limit(30)
             ->get()
             ->map(function (DoctorService $service) {
+                $price = (float) $service->price;
+
                 return [
                     'id' => $service->id,
                     'name' => $service->name,
-                    'price' => (float) $service->price,
-                    'price_label' => 'Rp ' . number_format((float) $service->price, 0, ',', '.'),
+                    'price' => $price,
+                    'price_label' => 'Rp ' . number_format($price, 0, ',', '.'),
                 ];
             })
             ->values();
@@ -1934,14 +1936,20 @@ class SalesController extends Controller
     }
 
     /**
-     * Pilih / ganti jasa pada transaksi tipe JASA.
-     * Harga diambil dari master (qty selalu 1) dan disimpan sebagai snapshot.
+     * Pilih, tambah, atau ubah jasa pada transaksi tipe JASA.
+     * Mendukung:
+     * 1. Memilih jasa dari Master Jasa (doctor_service_id),
+     * 2. Menambah jasa baru beserta biayanya langsung dari kasir (opsional simpan ke Master Jasa),
+     * 3. Mengubah nama & biaya jasa yang sedang terpilih (untuk transaksi ini saja atau sekalian perbarui Master Jasa).
      */
     public function saveService(Request $request)
     {
         $validated = $request->validate([
             'transaction_id' => 'required|integer',
-            'doctor_service_id' => 'required|integer|exists:doctor_services,id',
+            'doctor_service_id' => 'nullable|integer|required_without:service_name',
+            'service_name' => 'nullable|string|max:150|required_without:doctor_service_id',
+            'price' => 'nullable|numeric|min:0|max:9999999999999',
+            'save_to_master' => 'nullable|boolean',
             'invoice_type' => 'nullable|string|in:' . implode(',', self::SERVICE_INVOICE_TYPES),
         ]);
 
@@ -1950,9 +1958,74 @@ class SalesController extends Controller
             return $transaction;
         }
 
-        $service = DoctorService::findOrFail($validated['doctor_service_id']);
+        $hasCustomName = array_key_exists('service_name', $validated) && $validated['service_name'] !== null;
+        $hasCustomPrice = array_key_exists('price', $validated) && $validated['price'] !== null;
 
-        DB::transaction(function () use ($transaction, $service, $validated) {
+        $masterService = ! empty($validated['doctor_service_id'])
+            ? DoctorService::find((int) $validated['doctor_service_id'])
+            : null;
+
+        if (! $hasCustomName && ! $masterService) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Jasa tidak ditemukan di Master Jasa.',
+                'errors' => ['doctor_service_id' => ['Jasa tidak ditemukan di Master Jasa.']],
+            ], 422);
+        }
+        $saveToMaster = $request->boolean('save_to_master', false);
+
+        $resolvedName = $hasCustomName
+            ? trim((string) $validated['service_name'])
+            : (string) ($masterService->name ?? '');
+
+        if ($resolvedName === '') {
+            return response()->json([
+                'success' => false,
+                'message' => 'Nama jasa wajib diisi.',
+                'errors' => ['service_name' => ['Nama jasa wajib diisi.']],
+            ], 422);
+        }
+
+        $resolvedPrice = $hasCustomPrice
+            ? round((float) $validated['price'], 2)
+            : round((float) ($masterService->price ?? 0), 2);
+
+        $isEditAction = $hasCustomName || $hasCustomPrice;
+        $savedToMaster = false;
+
+        DB::transaction(function () use (
+            $transaction,
+            &$masterService,
+            $resolvedName,
+            $resolvedPrice,
+            $saveToMaster,
+            &$savedToMaster,
+            $validated
+        ) {
+            if ($saveToMaster) {
+                if ($masterService) {
+                    $masterService->update([
+                        'name' => $resolvedName,
+                        'price' => $resolvedPrice,
+                    ]);
+                } else {
+                    $existingMaster = DoctorService::whereRaw('LOWER(name) = ?', [mb_strtolower($resolvedName)])->first();
+                    if ($existingMaster) {
+                        $existingMaster->update([
+                            'name' => $resolvedName,
+                            'price' => $resolvedPrice,
+                        ]);
+                        $masterService = $existingMaster;
+                    } else {
+                        $masterService = DoctorService::create([
+                            'name' => $resolvedName,
+                            'price' => $resolvedPrice,
+                        ]);
+                    }
+                }
+                $savedToMaster = true;
+            }
+
             $invoiceType = $this->normalizeServiceInvoiceType(
                 $validated['invoice_type'] ?? $transaction->service_invoice_type
             );
@@ -1964,9 +2037,9 @@ class SalesController extends Controller
             TransactionService::updateOrCreate(
                 ['medicine_transaction_id' => $transaction->id],
                 [
-                    'doctor_service_id' => $service->id,
-                    'service_name' => $service->name,
-                    'price' => round((float) $service->price, 2),
+                    'doctor_service_id' => $masterService?->id,
+                    'service_name' => $resolvedName,
+                    'price' => $resolvedPrice,
                 ]
             );
 
@@ -1979,9 +2052,14 @@ class SalesController extends Controller
             }
         }, 3);
 
+        $message = $savedToMaster
+            ? 'Jasa berhasil disimpan & diterapkan.'
+            : ($isEditAction ? 'Perubahan jasa berhasil diterapkan.' : 'Jasa berhasil dipilih.');
+
         return response()->json(array_merge([
             'success' => true,
-            'message' => 'Jasa berhasil dipilih.',
+            'message' => $message,
+            'saved_to_master' => $savedToMaster,
         ], $this->buildCartSyncPayload((int) $transaction->id)));
     }
 

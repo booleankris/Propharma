@@ -331,7 +331,7 @@
         align-items: center;
         position: sticky;
         top: 0;
-        z-index: 50;
+        z-index: 990;
     }
 
     .topbar-date {
@@ -389,38 +389,145 @@
         z-index: 99;
     }
 
+    /* ── Topbar Notification Trigger (Clean & Clear Alert State) ── */
+    .notif-trigger-btn {
+        position: relative;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 40px;
+        height: 38px;
+        border-radius: 10px;
+        border: 1px solid #e2e8f0;
+        background: #ffffff;
+        color: #64748b;
+        cursor: pointer;
+        overflow: visible;
+        transition: background 150ms ease, border-color 150ms ease, color 150ms ease;
+    }
+
+    .notif-bell-svg {
+        width: 17px;
+        height: 17px;
+        flex-shrink: 0;
+    }
+
+    .notif-trigger-btn.has-alert-critical .notif-bell-svg,
+    .notif-trigger-btn.has-alert-warning .notif-bell-svg {
+        transform: translate(-1px, 2px);
+    }
+
+    .notif-trigger-btn:hover {
+        background: #f8fafc;
+        border-color: #cbd5e1;
+        color: #0f172a;
+    }
+
+    .notif-trigger-btn:focus-visible,
+    .notif-tab:focus-visible,
+    .notif-cat-tab:focus-visible,
+    .notif-icon-btn:focus-visible,
+    .notif-close:focus-visible {
+        outline: 2px solid #2563eb;
+        outline-offset: 2px;
+    }
+
+    .notif-trigger-btn.has-alert-critical {
+        background: #fef2f2;
+        border-color: #fecaca;
+        color: #dc2626;
+    }
+
+    .notif-trigger-btn.has-alert-critical:hover {
+        background: #fee2e2;
+        border-color: #fca5a5;
+    }
+
+    .notif-trigger-btn.has-alert-warning {
+        background: #fffbeb;
+        border-color: #fde68a;
+        color: #d97706;
+    }
+
+    .notif-trigger-btn.has-alert-warning:hover {
+        background: #fef3c7;
+        border-color: #fcd34d;
+    }
+
+    .notif-bell-count {
+        position: absolute;
+        top: -6px;
+        right: -7px;
+        min-width: 17px;
+        height: 16px;
+        padding: 0 4px;
+        border-radius: 9999px;
+        background: #dc2626;
+        color: #ffffff;
+        font-size: 9.5px;
+        font-weight: 700;
+        line-height: 13px;
+        text-align: center;
+        border: 1.5px solid #ffffff;
+        font-variant-numeric: tabular-nums;
+        pointer-events: none;
+    }
+
+    .notif-trigger-btn.has-alert-warning .notif-bell-count {
+        background: #d97706;
+    }
+
+    @media (prefers-reduced-motion: no-preference) {
+        .notif-overlay:not(.hidden) {
+            animation: notif-pop-in 140ms ease-out both;
+        }
+    }
+
+    @keyframes notif-pop-in {
+        from {
+            opacity: 0;
+            transform: translateY(-4px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
     /* ── Notification panel ── */
     .notif-overlay {
-        position: absolute;
-        top: 68px;
+        position: fixed;
+        top: 66px;
         right: 16px;
-        width: 410px;
-        max-width: calc(100vw - 32px);
-        z-index: 999;
-        background: white;
-        border-radius: 18px;
+        width: 416px;
+        max-width: calc(100vw - 24px);
+        z-index: 9995;
+        background: #ffffff;
+        border-radius: 14px;
         border: 1px solid #e2e8f0;
-        box-shadow: 0 10px 30px -5px rgba(0, 0, 0, 0.15);
+        box-shadow: 0 14px 32px -8px rgba(15, 23, 42, 0.16);
         overflow: hidden;
+        transform-origin: top right;
     }
 
     .notif-header {
-        padding: 14px 16px 12px;
+        padding: 12px 14px;
         border-bottom: 1px solid #f1f5f9;
         display: flex;
         align-items: center;
         justify-content: space-between;
         gap: 8px;
+        background: #ffffff;
     }
 
     .notif-title {
-        font-size: 14px;
+        font-size: 13.5px;
         font-weight: 700;
-        color: #0f2744;
+        color: #0f172a;
     }
 
     .notif-active-badge {
-        font-size: 10.5px;
+        font-size: 10px;
         font-weight: 600;
         padding: 2px 8px;
         border-radius: 9999px;
@@ -442,11 +549,11 @@
         cursor: pointer;
         color: #64748b;
         padding: 5px;
-        border-radius: 8px;
+        border-radius: 7px;
         display: inline-flex;
         align-items: center;
         justify-content: center;
-        transition: all 0.15s ease;
+        transition: background 150ms ease, color 150ms ease;
     }
 
     .notif-icon-btn:hover {
@@ -459,11 +566,11 @@
         border: none;
         cursor: pointer;
         color: #94a3b8;
-        font-size: 20px;
+        font-size: 19px;
         line-height: 1;
         padding: 2px 6px;
-        border-radius: 6px;
-        transition: all 0.15s ease;
+        border-radius: 7px;
+        transition: background 150ms ease, color 150ms ease;
     }
 
     .notif-close:hover {
@@ -471,14 +578,74 @@
         color: #0f172a;
     }
 
+    /* Accessible Category Tabs (non-color underline indicator) */
+    .notif-cat-tablist {
+        display: flex;
+        align-items: stretch;
+        gap: 4px;
+        padding: 0 12px;
+        background: #ffffff;
+        border-bottom: 1px solid #e2e8f0;
+    }
+
+    .notif-cat-tab {
+        position: relative;
+        flex: 1 1 0;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 5px;
+        padding: 9px 4px;
+        border: 0;
+        background: transparent;
+        color: #64748b;
+        font-size: 11.5px;
+        font-weight: 600;
+        cursor: pointer;
+        white-space: nowrap;
+        transition: color 150ms ease;
+    }
+
+    .notif-cat-tab:hover {
+        color: #0f172a;
+    }
+
+    .notif-cat-tab[aria-selected="true"] {
+        color: #0f172a;
+    }
+
+    .notif-cat-tab[aria-selected="true"]::after {
+        content: "";
+        position: absolute;
+        inset: auto 8px 0;
+        border-block-end: 2px solid #dc2626;
+    }
+
+    .notif-cat-count {
+        font-size: 10px;
+        font-weight: 700;
+        padding: 1px 6px;
+        border-radius: 9999px;
+        background: #f1f5f9;
+        color: #475569;
+        font-variant-numeric: tabular-nums;
+    }
+
+    .notif-cat-tab[aria-selected="true"] .notif-cat-count {
+        background: #fee2e2;
+        color: #b91c1c;
+    }
+
+    /* Branch filter tabs */
     .notif-tabs-bar {
         display: flex;
         align-items: center;
         gap: 6px;
-        padding: 8px 14px;
+        padding: 7px 12px;
         background: #f8fafc;
         border-bottom: 1px solid #f1f5f9;
         overflow-x: auto;
+        scroll-snap-type: x proximity;
         scrollbar-width: none;
         -webkit-overflow-scrolling: touch;
     }
@@ -488,16 +655,18 @@
     }
 
     .notif-tab {
+        flex: none;
+        scroll-snap-align: start;
         white-space: nowrap;
         font-size: 11px;
         font-weight: 600;
-        padding: 4px 10px;
+        padding: 3.5px 9px;
         border-radius: 9999px;
         border: 1px solid #e2e8f0;
         background: #ffffff;
         color: #64748b;
         cursor: pointer;
-        transition: all 0.15s ease;
+        transition: background 150ms ease, color 150ms ease, border-color 150ms ease;
         user-select: none;
     }
 
@@ -508,72 +677,36 @@
     }
 
     .notif-tab.active {
-        background: #4f46e5;
+        background: #1e293b;
         color: #ffffff;
-        border-color: #4f46e5;
-        box-shadow: 0 2px 6px rgba(79, 70, 229, 0.25);
+        border-color: #1e293b;
     }
 
     .notif-branch-pill {
         display: inline-flex;
         align-items: center;
         font-size: 9.5px;
-        font-weight: 700;
+        font-weight: 600;
         padding: 1.5px 6px;
-        border-radius: 6px;
+        border-radius: 5px;
         text-transform: uppercase;
-        letter-spacing: 0.03em;
+        letter-spacing: 0.02em;
         line-height: 1.2;
     }
 
-    .notif-footer-meta {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        font-size: 11px;
-        color: #94a3b8;
-        margin-top: 4px;
-        gap: 6px;
-    }
-
-    .notif-time {
-        font-size: 11px;
-        color: #94a3b8;
-        white-space: nowrap;
-    }
-
-    .notif-trx-code {
-        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-        font-size: 10px;
-        color: #64748b;
-        background: #f1f5f9;
-        padding: 1px 5px;
-        border-radius: 4px;
-        border: 1px solid #e2e8f0;
-    }
-
-    .notif-sisa {
-        font-size: 10.5px;
-        color: #334155;
-        background: #f8fafc;
-        border: 1px solid #e2e8f0;
-        padding: 1px 6px;
-        border-radius: 4px;
-        white-space: nowrap;
-    }
-
     .notif-list {
-        max-height: 420px;
+        max-height: 380px;
         overflow-y: auto;
+        overscroll-behavior: contain;
     }
 
     .notif-item {
         display: flex;
         align-items: flex-start;
-        gap: 12px;
-        padding: 12px 18px;
-        border-bottom: 1px solid #f8fafc;
-        transition: background 0.15s;
+        gap: 10px;
+        padding: 10px 14px;
+        border-bottom: 1px solid #f1f5f9;
+        transition: background 150ms ease;
     }
 
     .notif-item:hover {
@@ -585,126 +718,164 @@
     }
 
     .notif-dot {
-        width: 36px;
-        height: 36px;
-        border-radius: 10px;
+        width: 30px;
+        height: 30px;
+        border-radius: 8px;
         display: flex;
         align-items: center;
         justify-content: center;
-        font-size: 15px;
         flex-shrink: 0;
+        margin-top: 1px;
     }
 
-    .dot-1 {
+    .notif-dot.dot-critical {
         background: #fef2f2;
         color: #dc2626;
     }
 
-    .dot-2 {
-        background: #ecfdf5;
-        color: #16a34a;
-    }
-
-    .dot-3 {
-        background: #eff6ff;
-        color: #2563eb;
-    }
-
-    .dot-4 {
-        background: #fff7ed;
-        color: #ea580c;
-    }
-
-    .dot-5 {
-        background: #f5f3ff;
-        color: #7c3aed;
-    }
-
-    .dot-6 {
-        background: #f5f3ff;
-        color: #7c3aed;
+    .notif-dot.dot-warning {
+        background: #fffbeb;
+        color: #d97706;
     }
 
     .notif-name {
-        font-size: 13px;
+        font-size: 12.5px;
         font-weight: 600;
-        color: #1e293b;
-        margin-bottom: 4px;
-    }
-
-    .notif-meta {
-        font-size: 11px;
-        color: #94a3b8;
-        margin-top: 3px;
-    }
-
-    .notif-empty {
-        padding: 32px;
-        text-align: center;
-        color: #94a3b8;
-        font-size: 13px;
+        color: #0f172a;
+        line-height: 1.3;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        display: -webkit-box;
+        -webkit-line-clamp: 2;
+        -webkit-box-orient: vertical;
     }
 
     .notif-badge {
         display: inline-flex;
         align-items: center;
-        gap: 4px;
-        font-size: 10px;
+        font-size: 9.5px;
         font-weight: 700;
-        padding: 2px 8px;
-        border-radius: 20px;
+        padding: 1.5px 6px;
+        border-radius: 5px;
         text-transform: uppercase;
-        letter-spacing: 0.04em;
+        letter-spacing: 0.03em;
     }
 
-    .badge-1 {
+    .notif-badge.badge-critical {
         background: #fef2f2;
-        color: #dc2626;
+        color: #b91c1c;
     }
 
-    .badge-2 {
-        background: #ecfdf5;
-        color: #16a34a;
+    .notif-badge.badge-warning {
+        background: #fffbeb;
+        color: #b45309;
     }
 
-    .badge-3 {
-        background: #eff6ff;
-        color: #2563eb;
-    }
-
-    .badge-4 {
-        background: #fff7ed;
-        color: #ea580c;
-    }
-
-    .badge-5 {
-        background: #f5f3ff;
-        color: #7c3aed;
-    }
-
-    .badge-6 {
-        background: #f5f3ff;
-        color: #7c3aed;
-    }
-
-    .notif-qty {
-        font-size: 13px;
-        font-weight: 700;
-        margin-left: auto;
+    .notif-metric-box {
+        text-align: right;
         flex-shrink: 0;
-        padding-top: 2px;
+        font-variant-numeric: tabular-nums;
     }
 
-    .qty-out {
+    .notif-metric-main {
+        font-size: 12px;
+        font-weight: 700;
+        line-height: 1.25;
+        white-space: nowrap;
+    }
+
+    .notif-metric-main.is-critical {
         color: #dc2626;
     }
 
-    .qty-in {
-        color: #16a34a;
+    .notif-metric-main.is-warning {
+        color: #d97706;
     }
 
-    .qty-neutral {
-        color: #7c3aed;
+    .notif-metric-sub {
+        font-size: 10px;
+        color: #64748b;
+        margin-top: 2px;
+        white-space: nowrap;
+    }
+
+    .notif-footer-meta {
+        display: flex;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 5px;
+        margin-top: 4px;
+        font-size: 10.5px;
+        color: #64748b;
+    }
+
+    .notif-code-chip {
+        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+        font-size: 10px;
+        color: #475569;
+        background: #f1f5f9;
+        padding: 1px 5px;
+        border-radius: 4px;
+    }
+
+    .notif-panel-footer {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+        padding: 9px 14px;
+        background: #f8fafc;
+        border-top: 1px solid #f1f5f9;
+        font-size: 11px;
+    }
+
+    .notif-footer-link {
+        font-weight: 600;
+        color: #2563eb;
+        text-decoration: none;
+    }
+
+    .notif-footer-link:hover {
+        text-decoration: underline;
+    }
+
+    .notif-export-btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        padding: 4px 9px;
+        border-radius: 7px;
+        border: 1px solid #a7f3d0;
+        background: #ecfdf5;
+        color: #047857;
+        font-size: 11px;
+        font-weight: 700;
+        cursor: pointer;
+        white-space: nowrap;
+        transition: background 150ms ease, border-color 150ms ease, color 150ms ease, opacity 150ms ease;
+    }
+
+    .notif-export-btn:hover {
+        background: #d1fae5;
+        border-color: #6ee7b7;
+        color: #065f46;
+    }
+
+    .notif-export-btn:focus-visible {
+        outline: 2px solid #059669;
+        outline-offset: 2px;
+    }
+
+    .notif-export-btn:disabled {
+        opacity: 0.65;
+        cursor: wait;
+    }
+
+    .notif-empty {
+        padding: 28px 18px;
+        text-align: center;
+        color: #64748b;
+        font-size: 12.5px;
     }
 
     /* ── Mobile ── */
@@ -780,7 +951,11 @@
     }
 
     .select2-container {
-        z-index: 999 !important;
+        z-index: 20 !important;
+    }
+
+    .select2-container.select2-container--open {
+        z-index: 9999999 !important;
     }
 
     .select2-container .select2-selection--single .select2-selection__rendered {
@@ -1208,26 +1383,19 @@
             <!-- Garis Pemisah (Opsional, agar terlihat lebih rapi) -->
             <div class="hidden sm:block h-5 w-px bg-gray-200"></div>
 
-            <!-- Grup Tombol Notifikasi -->
-            <div class="flex items-center gap-1.5">
-                <button
-                    class="topbar-btn rounded-lg p-2 text-gray-500 hover:bg-gray-100 hover:text-gray-700 transition-all focus:outline-none"
-                    onclick="toggleModal('notif-modal'); loadStockNotifications();" aria-label="Notifikasi stok">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                        stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <!-- Tombol Notifikasi Stok & ED -->
+            <div class="flex items-center">
+                <button id="notif-bell-btn" type="button" class="notif-trigger-btn"
+                    onclick="toggleModal('notif-modal'); loadStockNotifications();"
+                    title="Notifikasi Stok Rendah & Dekat ED" aria-label="Notifikasi stok rendah dan dekat kedaluwarsa"
+                    aria-haspopup="dialog" aria-controls="notif-modal">
+                    <svg class="notif-bell-svg" width="18" height="18" viewBox="0 0 24 24" fill="none"
+                        stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"
+                        aria-hidden="true">
                         <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
                         <path d="M13.73 21a2 2 0 0 1-3.46 0" />
                     </svg>
-                </button>
-
-                <button
-                    class="topbar-btn rounded-lg p-2 text-gray-500 hover:bg-gray-100 hover:text-gray-700 transition-all focus:outline-none"
-                    onclick="toggleModal('expiry-modal')" aria-label="Obat kedaluwarsa">
-                    <svg width="18" height="18" xmlns="http://www.w3.org/2000/svg" fill="none"
-                        viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M3 12a9 9 0 1 0 3-6.708M3 4v5h5" />
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 7v5l3 3" />
-                    </svg>
+                    <span id="notif-bell-count" class="notif-bell-count hidden" aria-live="polite"></span>
                 </button>
             </div>
 
@@ -2680,18 +2848,30 @@
     </div>
 </div>
 
-{{-- Notif Modal --}}
-<div id="notif-modal" class="notif-overlay hidden">
+{{-- Notif Modal: Peringatan Stok Rendah & Dekat ED --}}
+<div id="notif-modal" class="notif-overlay hidden" role="dialog" aria-labelledby="notif-panel-title">
     <div class="notif-header">
         <div class="flex items-center gap-2 overflow-hidden">
-            <span class="notif-title">Notifikasi Stok</span>
+            <span id="notif-panel-title" class="notif-title truncate">Notifikasi Stok &amp; ED</span>
             <span id="notif-active-branch-badge" class="notif-active-badge">Memuat...</span>
         </div>
-        <div class="flex items-center gap-1">
+        <div class="flex items-center gap-1 shrink-0">
+            <button id="notif-export-btn" type="button" class="notif-export-btn"
+                onclick="exportStockNotifications()" title="Export seluruh notifikasi ke Excel (.xlsx)"
+                aria-label="Export notifikasi stok ke Excel">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                    stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                    <polyline points="7 10 12 15 17 10" />
+                    <line x1="12" y1="15" x2="12" y2="3" />
+                </svg>
+                <span id="notif-export-label">Excel</span>
+            </button>
             <button id="notif-refresh-btn" type="button" class="notif-icon-btn"
-                onclick="loadStockNotifications(true)" title="Segarkan Notifikasi" aria-label="Segarkan">
+                onclick="loadStockNotifications(true)" title="Segarkan" aria-label="Segarkan">
                 <svg id="notif-refresh-icon" width="15" height="15" viewBox="0 0 24 24" fill="none"
-                    stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                    aria-hidden="true">
                     <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67" />
                 </svg>
             </button>
@@ -2701,15 +2881,42 @@
         </div>
     </div>
 
+    {{-- Tab Kategori --}}
+    <div id="notif-cat-tablist" class="notif-cat-tablist" role="tablist" aria-label="Kategori notifikasi stok">
+        <button type="button" role="tab" id="notif-tab-all" class="notif-cat-tab" aria-selected="true"
+            data-alert-tab="all" onclick="switchStockAlertTab('all')">
+            <span>Semua</span>
+            <span id="notif-tab-count-all" class="notif-cat-count">0</span>
+        </button>
+        <button type="button" role="tab" id="notif-tab-low" class="notif-cat-tab" aria-selected="false"
+            data-alert-tab="low_stock" onclick="switchStockAlertTab('low_stock')">
+            <span>Stok Rendah</span>
+            <span id="notif-tab-count-low" class="notif-cat-count">0</span>
+        </button>
+        <button type="button" role="tab" id="notif-tab-ed" class="notif-cat-tab" aria-selected="false"
+            data-alert-tab="near_expiry" onclick="switchStockAlertTab('near_expiry')">
+            <span>Dekat ED</span>
+            <span id="notif-tab-count-ed" class="notif-cat-count">0</span>
+        </button>
+    </div>
+
     <!-- Branch Filter Container (Dynamically rendered for GM/Admin/HO) -->
     <div id="notif-branch-tabs" class="notif-tabs-bar hidden"></div>
 
-    <div class="notif-list" id="notif-list-container">
+    <div class="notif-list" id="notif-list-container" role="tabpanel" aria-labelledby="notif-tab-all">
         <div class="notif-empty" id="notif-loading">
             <div
-                class="animate-spin inline-block w-5 h-5 border-[2px] border-current border-t-transparent text-indigo-600 rounded-full mb-2">
+                class="animate-spin inline-block w-5 h-5 border-[2px] border-current border-t-transparent text-slate-400 rounded-full mb-2">
             </div>
-            <div>Memuat aktivitas stok...</div>
+            <div>Memuat notifikasi...</div>
+        </div>
+    </div>
+
+    <div class="notif-panel-footer">
+        <span id="notif-updated-label" class="text-slate-400">Memuat...</span>
+        <div class="flex items-center gap-3">
+            <a href="{{ route('supplies.stockData') }}" class="notif-footer-link">Data Stok</a>
+            <a href="{{ route('kasir.nearExpiry') }}" class="notif-footer-link">Daftar ED</a>
         </div>
     </div>
 </div>
@@ -2717,43 +2924,199 @@
 <script>
     let stockNotifsLoaded = false;
     let currentStockBranchFilter = 'all';
+    let currentStockAlertTab = 'all';
     let isFetchingStockNotifs = false;
+    let stockNotifPayload = null;
+
+    function escapeNotifHtml(str) {
+        return String(str ?? '')
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
+    }
 
     function getBranchBadgeStyle(pharmacyId) {
         const id = parseInt(pharmacyId);
         switch (id) {
             case 1:
-                return {
-                    bg: '#eff6ff', color: '#1d4ed8', border: '#bfdbfe'
-                }; // PMI - Blue
+                return { bg: '#eff6ff', color: '#1d4ed8', border: '#bfdbfe' };
             case 2:
-                return {
-                    bg: '#fffbeb', color: '#b45309', border: '#fde68a'
-                }; // Mulawarman - Amber
+                return { bg: '#fffbeb', color: '#b45309', border: '#fde68a' };
             case 3:
-                return {
-                    bg: '#ecfdf5', color: '#047857', border: '#a7f3d0'
-                }; // MIM - Emerald
+                return { bg: '#ecfdf5', color: '#047857', border: '#a7f3d0' };
             case 4:
-                return {
-                    bg: '#eef2ff', color: '#4338ca', border: '#c7d2fe'
-                }; // Sutomo - Indigo
+                return { bg: '#eef2ff', color: '#4338ca', border: '#c7d2fe' };
             case 5:
-                return {
-                    bg: '#fff1f2', color: '#be123c', border: '#fecdd3'
-                }; // Antasari - Rose
+                return { bg: '#fff1f2', color: '#be123c', border: '#fecdd3' };
             case 9:
-                return {
-                    bg: '#f5f3ff', color: '#6d28d9', border: '#ddd6fe'
-                }; // Gudang PMI - Purple
+                return { bg: '#f5f3ff', color: '#6d28d9', border: '#ddd6fe' };
             default:
-                return {
-                    bg: '#f8fafc', color: '#475569', border: '#e2e8f0'
-                };
+                return { bg: '#f8fafc', color: '#475569', border: '#e2e8f0' };
         }
     }
 
-    function loadStockNotifications(forceRefresh = false, branchId = null) {
+    function updateNotifBellBadge(summary) {
+        const bellBtn = document.getElementById('notif-bell-btn');
+        const bellCount = document.getElementById('notif-bell-count');
+
+        const total = Number(summary?.total_count || 0);
+        const critical = Number(summary?.critical_count || 0);
+
+        if (bellBtn) {
+            bellBtn.classList.remove('has-alert-critical', 'has-alert-warning');
+            if (total > 0) {
+                bellBtn.classList.add(critical > 0 ? 'has-alert-critical' : 'has-alert-warning');
+                bellBtn.title = `${total} notifikasi stok rendah & dekat ED`;
+            } else {
+                bellBtn.title = 'Notifikasi Stok & ED';
+            }
+        }
+
+        if (bellCount) {
+            if (total > 0) {
+                bellCount.textContent = total > 99 ? '99+' : String(total);
+                bellCount.classList.remove('hidden');
+            } else {
+                bellCount.classList.add('hidden');
+            }
+        }
+    }
+
+    function switchStockAlertTab(tab) {
+        currentStockAlertTab = tab || 'all';
+        const tabs = document.querySelectorAll('#notif-cat-tablist [role="tab"]');
+        const listContainer = document.getElementById('notif-list-container');
+        let activeTabId = 'notif-tab-all';
+
+        tabs.forEach(btn => {
+            const isActive = btn.dataset.alertTab === currentStockAlertTab;
+            btn.setAttribute('aria-selected', isActive ? 'true' : 'false');
+            if (isActive) activeTabId = btn.id;
+        });
+
+        if (listContainer) {
+            listContainer.setAttribute('aria-labelledby', activeTabId);
+        }
+
+        if (stockNotifPayload) {
+            renderStockAlertItems(stockNotifPayload);
+        }
+    }
+
+    function renderStockAlertItems(response) {
+        const container = document.getElementById('notif-list-container');
+        if (!container) return;
+
+        const summary = response.summary || {};
+        const lowCount = Number(summary.low_stock_count || 0);
+        const edCount = Number(summary.near_expiry_count || 0);
+        const totalCount = Number(summary.total_count || 0);
+
+        const tabAllCount = document.getElementById('notif-tab-count-all');
+        const tabLowCount = document.getElementById('notif-tab-count-low');
+        const tabEdCount = document.getElementById('notif-tab-count-ed');
+        if (tabAllCount) tabAllCount.textContent = String(totalCount);
+        if (tabLowCount) tabLowCount.textContent = String(lowCount);
+        if (tabEdCount) tabEdCount.textContent = String(edCount);
+
+        let items = [];
+        if (currentStockAlertTab === 'low_stock') {
+            items = response.low_stock || [];
+        } else if (currentStockAlertTab === 'near_expiry') {
+            items = response.near_expiry || [];
+        } else {
+            items = response.notifications || [];
+        }
+
+        if (!items.length) {
+            const emptyMsg = currentStockAlertTab === 'low_stock'
+                ? 'Semua stok berada di atas batas minimal'
+                : (currentStockAlertTab === 'near_expiry'
+                    ? 'Tidak ada batch dekat ED dalam 90 hari'
+                    : 'Stok aman dan tidak ada obat dekat ED');
+
+            container.innerHTML = `
+                <div class="notif-empty">
+                    <div class="font-semibold text-slate-700">${emptyMsg}</div>
+                    <div class="text-[11px] text-slate-400 mt-1">Tidak ada peringatan untuk cabang ini</div>
+                </div>`;
+            return;
+        }
+
+        let html = '';
+        items.forEach(item => {
+            const isCritical = item.severity === 'critical';
+            const dotClass = isCritical ? 'dot-critical' : 'dot-warning';
+            const badgeClass = isCritical ? 'badge-critical' : 'badge-warning';
+            const metricClass = isCritical ? 'is-critical' : 'is-warning';
+            const branchStyle = getBranchBadgeStyle(item.pharmacy_id);
+            const safeName = escapeNotifHtml(item.name);
+            const safeLabel = escapeNotifHtml(item.label);
+            const safeBranch = escapeNotifHtml(item.pharmacy_short || item.pharmacy_name || 'Cabang');
+
+            if (item.type === 'low_stock') {
+                const safeCode = item.code ? `<span class="notif-code-chip">${escapeNotifHtml(item.code)}</span>` : '';
+                const safeUnit = item.unit ? ` ${escapeNotifHtml(item.unit)}` : '';
+
+                html += `
+                <div class="notif-item">
+                    <div class="notif-dot ${dotClass}" aria-hidden="true">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z" />
+                            <path d="m3.3 7 8.7 5 8.7-5" /><path d="M12 22V12" />
+                        </svg>
+                    </div>
+                    <div style="flex:1; min-width:0;">
+                        <div class="flex items-start justify-between gap-2">
+                            <div class="notif-name" title="${safeName}">${safeName}</div>
+                            <div class="notif-metric-box">
+                                <div class="notif-metric-main ${metricClass}">${escapeNotifHtml(item.current_stock)} / ${escapeNotifHtml(item.minimal_stock)}</div>
+                                <div class="notif-metric-sub">Stok / Min${safeUnit}</div>
+                            </div>
+                        </div>
+                        <div class="notif-footer-meta">
+                            <span class="notif-badge ${badgeClass}">${safeLabel}</span>
+                            <span class="notif-branch-pill" style="background:${branchStyle.bg}; color:${branchStyle.color}; border:1px solid ${branchStyle.border};">${safeBranch}</span>
+                            ${safeCode}
+                        </div>
+                    </div>
+                </div>`;
+            } else {
+                const safeBatch = item.batch_name ? `<span class="notif-code-chip">${escapeNotifHtml(item.batch_name)}</span>` : '';
+                const safeUnit = item.unit ? ` ${escapeNotifHtml(item.unit)}` : '';
+
+                html += `
+                <div class="notif-item">
+                    <div class="notif-dot ${dotClass}" aria-hidden="true">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <circle cx="12" cy="12" r="10" />
+                            <polyline points="12 6 12 12 16 14" />
+                        </svg>
+                    </div>
+                    <div style="flex:1; min-width:0;">
+                        <div class="flex items-start justify-between gap-2">
+                            <div class="notif-name" title="${safeName}">${safeName}</div>
+                            <div class="notif-metric-box">
+                                <div class="notif-metric-main ${metricClass}">${escapeNotifHtml(item.countdown)}</div>
+                                <div class="notif-metric-sub">${escapeNotifHtml(item.expired_date)} · Stok ${escapeNotifHtml(item.current_stock)}${safeUnit}</div>
+                            </div>
+                        </div>
+                        <div class="notif-footer-meta">
+                            <span class="notif-badge ${badgeClass}">${safeLabel}</span>
+                            <span class="notif-branch-pill" style="background:${branchStyle.bg}; color:${branchStyle.color}; border:1px solid ${branchStyle.border};">${safeBranch}</span>
+                            ${safeBatch}
+                        </div>
+                    </div>
+                </div>`;
+            }
+        });
+
+        container.innerHTML = html;
+    }
+
+    function loadStockNotifications(forceRefresh = false, branchId = null, silent = false) {
         if (isFetchingStockNotifs) return;
         if (stockNotifsLoaded && !forceRefresh && branchId === null) return;
 
@@ -2765,17 +3128,18 @@
         const refreshIcon = document.getElementById('notif-refresh-icon');
         const activeBadgeEl = document.getElementById('notif-active-branch-badge');
         const tabsContainer = document.getElementById('notif-branch-tabs');
-
-        if (!container) return;
+        const updatedLabel = document.getElementById('notif-updated-label');
 
         isFetchingStockNotifs = true;
-        if (refreshIcon) refreshIcon.classList.add('animate-spin');
+        if (refreshIcon && !silent) refreshIcon.classList.add('animate-spin');
 
-        container.innerHTML = `
-            <div class="notif-empty">
-                <div class="animate-spin inline-block w-5 h-5 border-[2px] border-current border-t-transparent text-indigo-600 rounded-full mb-2"></div>
-                <div>Memuat aktivitas stok...</div>
-            </div>`;
+        if (container && !silent) {
+            container.innerHTML = `
+                <div class="notif-empty">
+                    <div class="animate-spin inline-block w-5 h-5 border-[2px] border-current border-t-transparent text-rose-600 rounded-full mb-2"></div>
+                    <div>Memeriksa stok rendah &amp; dekat ED...</div>
+                </div>`;
+        }
 
         let url = '{{ route('kasir.stockNotifications') }}';
         const params = new URLSearchParams();
@@ -2783,6 +3147,9 @@
             params.append('pharmacy_id', currentStockBranchFilter);
         } else if (currentStockBranchFilter === 'all') {
             params.append('pharmacy_id', 'all');
+        }
+        if (forceRefresh) {
+            params.append('refresh', '1');
         }
         if (params.toString()) {
             url += '?' + params.toString();
@@ -2801,44 +3168,43 @@
             .then(response => {
                 stockNotifsLoaded = true;
                 isFetchingStockNotifs = false;
+                stockNotifPayload = response;
                 if (refreshIcon) refreshIcon.classList.remove('animate-spin');
 
-                const items = Array.isArray(response) ? response : (response.notifications || []);
                 const meta = response.meta || {};
+                const summary = response.summary || {};
 
-                // Update active branch badge in header
+                updateNotifBellBadge(summary);
+
+                if (updatedLabel) {
+                    updatedLabel.textContent = meta.updated_at ? `Diperbarui ${meta.updated_at}` : 'Tersinkron';
+                }
+
                 if (activeBadgeEl) {
                     if (meta.can_filter_branch) {
                         if (currentStockBranchFilter === 'all') {
                             activeBadgeEl.textContent = 'Semua Cabang';
                             activeBadgeEl.className = 'notif-active-badge badge-all';
                         } else {
-                            const matched = meta.branches ? meta.branches.find(b => String(b.id) === String(
-                                currentStockBranchFilter)) : null;
-                            const label = matched ? (matched.short_name || matched.name) : 'Cabang ' +
-                                currentStockBranchFilter;
-                            activeBadgeEl.textContent = label;
+                            const matched = meta.branches ? meta.branches.find(b => String(b.id) === String(currentStockBranchFilter)) : null;
+                            activeBadgeEl.textContent = matched ? (matched.short_name || matched.name) : ('Cabang ' + currentStockBranchFilter);
                             activeBadgeEl.className = 'notif-active-badge';
                         }
                     } else {
-                        activeBadgeEl.textContent = meta.active_pharmacy_name ? (meta.active_pharmacy_name.replace(
-                            /SAHABAT /i, '')) : 'Cabang';
+                        activeBadgeEl.textContent = meta.active_pharmacy_name
+                            ? meta.active_pharmacy_name.replace(/SAHABAT /i, '')
+                            : 'Cabang';
                         activeBadgeEl.className = 'notif-active-badge';
                     }
                 }
 
-                // Render branch filter tabs if allowed
                 if (tabsContainer) {
                     if (meta.can_filter_branch && meta.branches && meta.branches.length > 0) {
                         tabsContainer.classList.remove('hidden');
-                        let tabsHtml = `
-                        <button type="button" class="notif-tab ${currentStockBranchFilter === 'all' ? 'active' : ''}" 
-                            onclick="loadStockNotifications(true, 'all')">Semua</button>`;
+                        let tabsHtml = `<button type="button" class="notif-tab ${currentStockBranchFilter === 'all' ? 'active' : ''}" onclick="loadStockNotifications(true, 'all')">Semua</button>`;
                         meta.branches.forEach(b => {
                             const isActive = String(currentStockBranchFilter) === String(b.id);
-                            tabsHtml += `
-                            <button type="button" class="notif-tab ${isActive ? 'active' : ''}" 
-                                onclick="loadStockNotifications(true, ${b.id})">${b.short_name || b.name}</button>`;
+                            tabsHtml += `<button type="button" class="notif-tab ${isActive ? 'active' : ''}" onclick="loadStockNotifications(true, ${b.id})">${escapeNotifHtml(b.short_name || b.name)}</button>`;
                         });
                         tabsContainer.innerHTML = tabsHtml;
                     } else {
@@ -2846,78 +3212,76 @@
                     }
                 }
 
-                if (!items || items.length === 0) {
-                    container.innerHTML = `
-                    <div class="notif-empty">
-                        <svg class="w-8 h-8 text-gray-300 mx-auto mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"/>
-                        </svg>
-                        <div>Belum ada aktivitas stok untuk cabang ini</div>
-                    </div>`;
-                    return;
-                }
-
-                let html = '';
-                items.forEach(item => {
-                    const badgeStyle = getBranchBadgeStyle(item.pharmacy_id);
-                    const sisaHtml = (item.qty_after !== null && item.qty_after !== undefined) ?
-                        `<span class="notif-sisa">Sisa: <b>${item.qty_after}</b></span>` :
-                        '';
-                    const codeHtml = item.transaction_code ?
-                        `<span class="notif-trx-code">${item.transaction_code}</span>` :
-                        '';
-
-                    html += `
-                <div class="notif-item">
-                    <div class="notif-dot dot-${item.color}">${item.icon}</div>
-                    <div style="flex:1; min-width:0;">
-                        <div class="flex items-start justify-between gap-1">
-                            <div class="notif-name" title="${item.name}">${item.name}</div>
-                            <div class="notif-qty ${item.class}">${item.sign} ${item.qty}</div>
-                        </div>
-                        <div class="flex items-center flex-wrap gap-1.5 my-1">
-                            <span class="notif-badge badge-${item.color}">${item.label}</span>
-                            <span class="notif-branch-pill" style="background:${badgeStyle.bg}; color:${badgeStyle.color}; border:1px solid ${badgeStyle.border};">
-                                ${item.pharmacy_short || item.pharmacy_name || 'Cabang'}
-                            </span>
-                        </div>
-                        <div class="notif-footer-meta">
-                            <span class="notif-time">${item.time}</span>
-                            <div class="flex items-center gap-1.5 ml-auto text-right">
-                                ${codeHtml}
-                                ${sisaHtml}
-                            </div>
-                        </div>
-                    </div>
-                </div>`;
-                });
-                container.innerHTML = html;
+                renderStockAlertItems(response);
             })
-            .catch(err => {
+            .catch(() => {
                 isFetchingStockNotifs = false;
                 if (refreshIcon) refreshIcon.classList.remove('animate-spin');
-                container.innerHTML = `
-                <div class="notif-empty text-red-500">
-                    <p class="font-semibold mb-1">Gagal memuat notifikasi stok</p>
-                    <button type="button" onclick="loadStockNotifications(true)" class="text-xs text-indigo-600 hover:underline">Coba lagi</button>
-                </div>`;
+                if (container && !silent) {
+                    container.innerHTML = `
+                    <div class="notif-empty text-rose-600">
+                        <p class="font-semibold mb-1">Gagal memuat peringatan stok</p>
+                        <button type="button" onclick="loadStockNotifications(true)" class="text-xs text-blue-600 hover:underline">Coba lagi</button>
+                    </div>`;
+                }
             });
     }
+
+    function exportStockNotifications() {
+        const btn = document.getElementById('notif-export-btn');
+        const label = document.getElementById('notif-export-label');
+        const url = new URL('{{ route('kasir.stockNotifications.export') }}', window.location.origin);
+
+        if (currentStockBranchFilter && currentStockBranchFilter !== 'all') {
+            url.searchParams.set('pharmacy_id', String(currentStockBranchFilter));
+        } else {
+            url.searchParams.set('pharmacy_id', 'all');
+        }
+        url.searchParams.set('tab', currentStockAlertTab || 'all');
+
+        if (btn) btn.disabled = true;
+        if (label) label.textContent = 'Mengunduh…';
+
+        window.location.href = url.toString();
+
+        setTimeout(function() {
+            if (btn) btn.disabled = false;
+            if (label) label.textContent = 'Excel';
+        }, 2500);
+    }
+
+    document.addEventListener('DOMContentLoaded', function() {
+        // Muat otomatis secara senyap agar tombol lonceng langsung menyala mencolok bila ada peringatan
+        loadStockNotifications(false, null, true);
+
+        const tablist = document.getElementById('notif-cat-tablist');
+        if (tablist) {
+            tablist.addEventListener('keydown', function(e) {
+                if (e.key !== 'ArrowRight' && e.key !== 'ArrowLeft') return;
+                const tabs = [...tablist.querySelectorAll('[role="tab"]')];
+                const idx = tabs.indexOf(document.activeElement);
+                if (idx === -1) return;
+                e.preventDefault();
+                const next = e.key === 'ArrowRight'
+                    ? tabs[(idx + 1) % tabs.length]
+                    : tabs[(idx - 1 + tabs.length) % tabs.length];
+                next.focus();
+                switchStockAlertTab(next.dataset.alertTab);
+            });
+        }
+
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') {
+                const modal = document.getElementById('notif-modal');
+                if (modal && !modal.classList.contains('hidden')) {
+                    modal.classList.add('hidden');
+                    document.getElementById('notif-bell-btn')?.focus();
+                }
+            }
+        });
+    });
 </script>
 
-{{-- Expiry Modal --}}
-<div id="expiry-modal" class="notif-overlay hidden">
-    <div class="notif-header">
-        <span class="notif-title">Obat Kedaluwarsa</span>
-        <button class="notif-close"
-            onclick="document.getElementById('expiry-modal').classList.add('hidden')">×</button>
-    </div>
-    <div class="notif-list">
-
-        <div class="notif-empty">Tidak ada obat kedaluwarsa / mendekati</div>
-
-    </div>
-</div>
 {{-- Export Center Modal --}}
 <div id="exportCenterModal"
     class="modal-hide modal-transition fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2

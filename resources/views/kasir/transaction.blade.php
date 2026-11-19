@@ -56,6 +56,386 @@
             box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.2) !important;
         }
 
+        /* Jasa: panel pilih, tambah, dan ubah jasa & biaya */
+        .svc-panel {
+            border-radius: 14px;
+            border: 1px solid #e2e8f0;
+            box-shadow: 0 2px 10px -2px rgba(15, 23, 42, 0.05);
+            container-type: inline-size;
+        }
+
+        .svc-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .svc-title-group {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            min-width: 0;
+        }
+
+        .svc-icon-badge {
+            width: 34px;
+            height: 34px;
+            border-radius: 10px;
+            background: #ecfdf5;
+            border: 1px solid #a7f3d0;
+            color: #059669;
+            display: grid;
+            place-items: center;
+            flex-shrink: 0;
+        }
+
+        .svc-add-toggle {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            padding: 6px 11px;
+            border-radius: 9px;
+            border: 1px solid #a7f3d0;
+            background: #ecfdf5;
+            color: #047857;
+            font-size: 11px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+        }
+
+        .svc-add-toggle:hover {
+            background: #d1fae5;
+            border-color: #6ee7b7;
+        }
+
+        .svc-add-toggle:focus-visible,
+        .svc-btn:focus-visible,
+        .svc-input:focus-visible,
+        .svc-search-input:focus-visible {
+            outline: 2px solid #059669;
+            outline-offset: 1px;
+        }
+
+        .svc-search-box {
+            position: relative;
+            display: flex;
+            align-items: center;
+        }
+
+        .svc-search-icon {
+            position: absolute;
+            inset-inline-start: 11px;
+            width: 15px;
+            height: 15px;
+            color: #94a3b8;
+            pointer-events: none;
+        }
+
+        .svc-search-input {
+            width: 100%;
+            border-radius: 10px;
+            border: 1px solid #cbd5e1;
+            background: #f8fafc;
+            padding: 9px 34px 9px 34px;
+            font-size: 12px;
+            color: #0f172a;
+            transition: border-color 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
+        }
+
+        .svc-search-input:hover {
+            border-color: #94a3b8;
+        }
+
+        .svc-search-input:focus {
+            background: #ffffff;
+            border-color: #10b981;
+            box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.14);
+        }
+
+        .svc-search-clear {
+            position: absolute;
+            inset-inline-end: 8px;
+            width: 22px;
+            height: 22px;
+            border-radius: 999px;
+            display: grid;
+            place-items: center;
+            color: #64748b;
+            background: transparent;
+            border: 0;
+            cursor: pointer;
+        }
+
+        .svc-search-clear:hover {
+            background: #e2e8f0;
+            color: #0f172a;
+        }
+
+        .svc-dropdown {
+            position: absolute;
+            inset-inline: 0;
+            top: calc(100% + 6px);
+            z-index: 60;
+            border-radius: 12px;
+            border: 1px solid #e2e8f0;
+            background: #ffffff;
+            box-shadow: 0 14px 32px -8px rgba(15, 23, 42, 0.16), 0 4px 10px -4px rgba(15, 23, 42, 0.08);
+            overflow: hidden;
+        }
+
+        .svc-dropdown-list {
+            max-height: 230px;
+            overflow-y: auto;
+            padding: 4px;
+            margin: 0;
+            list-style: none;
+        }
+
+        .svc-dropdown-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+            padding: 8px 10px;
+            border-radius: 8px;
+            font-size: 12px;
+            cursor: pointer;
+            transition: background 0.12s ease;
+        }
+
+        .svc-dropdown-item:hover,
+        .svc-dropdown-item.is-active {
+            background: #f0fdf4;
+        }
+
+        .svc-dropdown-price {
+            font-variant-numeric: tabular-nums;
+            font-weight: 700;
+            font-size: 11px;
+            color: #047857;
+            background: #ecfdf5;
+            border: 1px solid #d1fae5;
+            padding: 2px 8px;
+            border-radius: 999px;
+            white-space: nowrap;
+        }
+
+        .svc-quick-add {
+            width: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+            padding: 9px 12px;
+            border: 0;
+            border-top: 1px solid #e2e8f0;
+            background: #f8fafc;
+            color: #047857;
+            font-size: 11.5px;
+            font-weight: 600;
+            text-align: left;
+            cursor: pointer;
+            transition: background 0.15s ease;
+        }
+
+        .svc-quick-add:hover,
+        .svc-quick-add.is-active {
+            background: #ecfdf5;
+        }
+
+        .svc-form-card {
+            border-radius: 12px;
+            border: 1px solid #cbd5e1;
+            background: #f8fafc;
+            padding: 12px 14px;
+        }
+
+        .svc-selected-card {
+            border-radius: 12px;
+            border: 1px solid #a7f3d0;
+            background: linear-gradient(180deg, #f0fdf4 0%, #ffffff 42%);
+            padding: 12px 14px;
+        }
+
+        .svc-field-grid {
+            display: grid;
+            grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr);
+            gap: 10px;
+        }
+
+        @container (inline-size < 380px) {
+            .svc-field-grid {
+                grid-template-columns: minmax(0, 1fr);
+            }
+        }
+
+        .svc-field label {
+            display: block;
+            font-size: 11px;
+            font-weight: 600;
+            color: #475569;
+            margin-bottom: 4px;
+        }
+
+        .svc-input {
+            width: 100%;
+            border-radius: 9px;
+            border: 1px solid #cbd5e1;
+            background: #ffffff;
+            padding: 7px 10px;
+            font-size: 12px;
+            color: #0f172a;
+            transition: border-color 0.15s ease, box-shadow 0.15s ease;
+        }
+
+        .svc-input:focus {
+            border-color: #10b981;
+            box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.14);
+        }
+
+        .svc-input[aria-invalid="true"] {
+            border-color: #e11d48;
+            box-shadow: 0 0 0 3px rgba(225, 29, 72, 0.12);
+        }
+
+        .svc-currency-wrap {
+            display: flex;
+            align-items: stretch;
+            border-radius: 9px;
+            border: 1px solid #cbd5e1;
+            background: #ffffff;
+            overflow: hidden;
+            transition: border-color 0.15s ease, box-shadow 0.15s ease;
+        }
+
+        .svc-currency-wrap:focus-within {
+            border-color: #10b981;
+            box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.14);
+        }
+
+        .svc-currency-wrap.is-invalid {
+            border-color: #e11d48;
+            box-shadow: 0 0 0 3px rgba(225, 29, 72, 0.12);
+        }
+
+        .svc-currency-prefix {
+            display: inline-flex;
+            align-items: center;
+            padding: 0 9px;
+            background: #f1f5f9;
+            border-inline-end: 1px solid #e2e8f0;
+            color: #475569;
+            font-size: 11px;
+            font-weight: 700;
+            user-select: none;
+        }
+
+        .svc-currency-input {
+            width: 100%;
+            min-width: 0;
+            border: 0;
+            background: transparent;
+            padding: 7px 10px;
+            font-size: 12px;
+            font-weight: 600;
+            font-variant-numeric: tabular-nums;
+            color: #0f172a;
+            outline: none;
+        }
+
+        .svc-check-label {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 11px;
+            color: #475569;
+            cursor: pointer;
+            user-select: none;
+        }
+
+        .svc-check-label input[type="checkbox"] {
+            width: 14px;
+            height: 14px;
+            accent-color: #059669;
+            cursor: pointer;
+        }
+
+        .svc-btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 5px;
+            padding: 7px 12px;
+            border-radius: 9px;
+            font-size: 11.5px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease, opacity 0.15s ease;
+        }
+
+        .svc-btn-primary {
+            border: 1px solid #059669;
+            background: #059669;
+            color: #ffffff;
+        }
+
+        .svc-btn-primary:hover {
+            background: #047857;
+            border-color: #047857;
+        }
+
+        .svc-btn-subtle {
+            border: 1px solid #cbd5e1;
+            background: #ffffff;
+            color: #334155;
+        }
+
+        .svc-btn-subtle:hover {
+            background: #f1f5f9;
+        }
+
+        .svc-btn-danger-ghost {
+            border: 1px solid #fecdd3;
+            background: #fff1f2;
+            color: #be123c;
+            padding: 4px 9px;
+            font-size: 11px;
+        }
+
+        .svc-btn-danger-ghost:hover {
+            background: #ffe4e6;
+        }
+
+        .svc-btn-ghost {
+            border: 1px solid #cbd5e1;
+            background: #ffffff;
+            color: #334155;
+            padding: 4px 9px;
+            font-size: 11px;
+        }
+
+        .svc-btn-ghost:hover {
+            background: #f8fafc;
+            border-color: #94a3b8;
+        }
+
+        .svc-btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        @media (pointer: coarse) {
+            .svc-search-input,
+            .svc-input,
+            .svc-currency-input {
+                font-size: 16px;
+                min-height: 44px;
+            }
+        }
+
         /* Jasa: pemilih jenis faktur obat */
         .service-invoice-card {
             transition: all 0.15s ease-in-out;
@@ -365,45 +745,195 @@
 
         @if (($isServiceTransaction ?? false) && $check_transaction != 0)
             {{-- Panel Jasa (khusus transaksi tipe JASA) --}}
-            <div class="card p-4 mb-3 bg-white dashboard-panel" id="servicePanel">
-                <div class="flex items-center justify-between gap-2 mb-2">
-                    <div class="flex items-center gap-2">
-                        <span class="text-[13px] font-poppins font-semibold text-gray-800">Jasa</span>
-                        <span class="text-[10px] text-gray-400">Harga otomatis dari Master Jasa</span>
+            <div class="card p-4 mb-3 bg-white dashboard-panel svc-panel" id="servicePanel">
+                <div class="svc-header mb-3">
+                    <div class="svc-title-group">
+                        <span class="svc-icon-badge" aria-hidden="true">
+                            <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                                stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
+                            </svg>
+                        </span>
+                        <div class="min-w-0">
+                            <div class="flex items-center gap-2 flex-wrap">
+                                <h3 id="servicePanelHeading" class="text-[13px] font-poppins font-bold text-slate-800 leading-tight">
+                                    Jasa &amp; Biaya
+                                </h3>
+                                <span id="serviceSelectedBadge"
+                                    class="hidden inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 border border-emerald-200/80">
+                                    Terpilih
+                                </span>
+                            </div>
+                            <p class="text-[11px] text-slate-500 mt-0.5 leading-snug">
+                                Pilih jasa tersimpan atau tambahkan jasa &amp; biaya sendiri
+                            </p>
+                        </div>
                     </div>
-                    <span id="serviceSelectedBadge"
-                        class="hidden text-[10px] font-semibold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 uppercase">Terpilih</span>
+
+                    <button type="button" id="serviceOpenAddBtn" class="svc-add-toggle"
+                        aria-expanded="false" aria-controls="serviceCustomFormWrap">
+                        <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"
+                            stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                            <path d="M12 5v14M5 12h14" />
+                        </svg>
+                        <span>Tambah Jasa</span>
+                    </button>
                 </div>
 
-                {{-- Pencarian jasa --}}
+                {{-- Pencarian & pilih jasa tersimpan --}}
                 <div id="servicePickerWrap" class="relative">
-                    <input id="serviceSearch" type="text" placeholder="Ketik nama jasa…" autocomplete="off"
-                        class="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-[11px] font-poppins focus:outline-none focus:ring-2 focus:ring-gray-300">
-                    <div id="serviceResults"
-                        class="absolute z-50 mt-1 w-full rounded-xl border border-gray-200 bg-white shadow-lg hidden">
-                        <ul id="serviceList" role="listbox" class="max-h-64 overflow-auto py-1"></ul>
+                    <search>
+                        <label for="serviceSearch" class="sr-only">Cari atau ketik nama jasa</label>
+                        <div class="svc-search-box">
+                            <svg class="svc-search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                <circle cx="11" cy="11" r="8" />
+                                <path d="m21 21-4.3-4.3" />
+                            </svg>
+                            <input id="serviceSearch" type="search" name="service_search"
+                                placeholder="Cari jasa tersimpan atau ketik nama jasa baru…"
+                                autocomplete="off" autocorrect="off" autocapitalize="none" spellcheck="false"
+                                enterkeyhint="search" aria-autocomplete="list" aria-controls="serviceList"
+                                aria-expanded="false" class="svc-search-input font-poppins">
+                            <button type="button" id="serviceSearchClear" class="svc-search-clear hidden"
+                                aria-label="Bersihkan pencarian jasa">
+                                <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                    stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                    <path d="M18 6 6 18M6 6l12 12" />
+                                </svg>
+                            </button>
+                        </div>
+                    </search>
+
+                    <div id="serviceResults" class="svc-dropdown hidden">
+                        <ul id="serviceList" role="listbox" aria-label="Daftar jasa tersimpan" class="svc-dropdown-list"></ul>
+                        <button type="button" id="serviceQuickAddBtn" class="svc-quick-add">
+                            <span class="flex items-center gap-1.5 min-w-0">
+                                <svg class="w-3.5 h-3.5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                    stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                    <path d="M12 5v14M5 12h14" />
+                                </svg>
+                                <span id="serviceQuickAddLabel" class="truncate">Tambah jasa baru &amp; atur biaya</span>
+                            </span>
+                            <span class="text-[10px] font-medium text-emerald-600/90 shrink-0">Enter ↵</span>
+                        </button>
                     </div>
                 </div>
 
-                {{-- Jasa terpilih --}}
-                <div id="serviceSelectedWrap"
-                    class="hidden mt-2 flex items-center justify-between gap-2 rounded-xl border border-emerald-200 bg-emerald-50/60 px-3 py-2">
-                    <div>
-                        <div id="serviceSelectedName" class="text-[12px] font-semibold text-gray-800"></div>
-                        <div id="serviceSelectedPrice" class="text-[11px] text-gray-600"></div>
-                    </div>
-                    <div class="flex items-center gap-2">
-                        <button type="button" id="serviceChangeBtn"
-                            class="text-[11px] font-medium text-blue-600 hover:underline">Ganti</button>
-                        <span class="text-gray-300">|</span>
-                        <button type="button" id="serviceClearBtn"
-                            class="text-[11px] font-medium text-red-500 hover:underline">Hapus</button>
-                    </div>
+                {{-- Form tambah jasa baru beserta biayanya --}}
+                <div id="serviceCustomFormWrap" class="hidden mt-2.5">
+                    <form id="serviceCustomForm" method="POST" action="{{ route('transaction.service.save') }}"
+                        aria-labelledby="serviceCustomFormTitle" class="svc-form-card" novalidate>
+                        <div class="flex items-center justify-between gap-2 mb-2.5">
+                            <span id="serviceCustomFormTitle" class="text-[12px] font-bold text-slate-800">
+                                Tambah Jasa Baru
+                            </span>
+                            <button type="button" id="serviceCustomCancelBtn" class="svc-btn svc-btn-ghost">
+                                Batal
+                            </button>
+                        </div>
+
+                        <div class="svc-field-grid">
+                            <div class="svc-field">
+                                <label for="serviceCustomName">Nama Jasa <span class="text-rose-500" aria-hidden="true">*</span></label>
+                                <input id="serviceCustomName" name="service_name" type="text" required maxlength="150"
+                                    placeholder="cth. Konsultasi, Cek Gula Darah" autocomplete="off"
+                                    enterkeyhint="next" aria-describedby="serviceCustomError" class="svc-input">
+                            </div>
+
+                            <div class="svc-field">
+                                <label for="serviceCustomPrice">Biaya Jasa</label>
+                                <div id="serviceCustomPriceWrap" class="svc-currency-wrap">
+                                    <span class="svc-currency-prefix">Rp</span>
+                                    <input id="serviceCustomPrice" name="price" type="text" inputmode="numeric"
+                                        placeholder="0" autocomplete="off" enterkeyhint="done"
+                                        aria-describedby="serviceCustomError" class="svc-currency-input">
+                                </div>
+                            </div>
+                        </div>
+
+                        <p id="serviceCustomError" role="alert" aria-live="polite"
+                            class="hidden text-[11px] font-medium text-rose-600 mt-2"></p>
+
+                        <div class="mt-3 pt-2.5 border-t border-slate-200/80 flex flex-wrap items-center justify-between gap-2.5">
+                            <label for="serviceCustomSaveMaster" class="svc-check-label">
+                                <input id="serviceCustomSaveMaster" name="save_to_master" type="checkbox" value="1" checked>
+                                <span>Simpan ke daftar jasa (bisa dipilih lagi)</span>
+                            </label>
+
+                            <button type="submit" id="serviceCustomSubmitBtn" class="svc-btn svc-btn-primary">
+                                Simpan &amp; Pakai
+                            </button>
+                        </div>
+                    </form>
+                </div>
+
+                {{-- Jasa terpilih — tampilkan nama & biaya dan izinkan ubah langsung --}}
+                <div id="serviceSelectedWrap" class="hidden mt-1">
+                    <form id="serviceEditForm" method="POST" action="{{ route('transaction.service.save') }}"
+                        aria-labelledby="serviceSelectedHeading" class="svc-selected-card" novalidate>
+                        <div class="flex items-start justify-between gap-2 pb-2.5 mb-2.5 border-b border-emerald-200/70">
+                            <div class="min-w-0">
+                                <div class="flex items-center gap-2 flex-wrap">
+                                    <span id="serviceSelectedHeading" class="text-[12.5px] font-bold text-slate-900 truncate"></span>
+                                    <span id="serviceSelectedPrice"
+                                        class="text-[11.5px] font-bold text-emerald-700 bg-emerald-100/80 border border-emerald-200 px-2 py-0.5 rounded-md tabular-nums"></span>
+                                </div>
+                                <span id="serviceEditStatus" role="status" aria-live="polite"
+                                    class="inline-block text-[10.5px] text-emerald-700/90 font-medium mt-0.5">
+                                    Nama &amp; biaya dapat diubah langsung di bawah
+                                </span>
+                            </div>
+
+                            <div class="flex items-center gap-1.5 shrink-0">
+                                <button type="button" id="serviceChangeBtn" class="svc-btn svc-btn-ghost">Ganti</button>
+                                <button type="button" id="serviceClearBtn" class="svc-btn svc-btn-danger-ghost">Hapus</button>
+                            </div>
+                        </div>
+
+                        <div class="svc-field-grid">
+                            <div class="svc-field">
+                                <label for="serviceEditName">Nama Jasa <span class="text-rose-500" aria-hidden="true">*</span></label>
+                                <input id="serviceEditName" name="service_name" type="text" required maxlength="150"
+                                    autocomplete="off" enterkeyhint="next" aria-describedby="serviceEditError"
+                                    class="svc-input">
+                            </div>
+
+                            <div class="svc-field">
+                                <label for="serviceEditPrice">Biaya Jasa</label>
+                                <div id="serviceEditPriceWrap" class="svc-currency-wrap">
+                                    <span class="svc-currency-prefix">Rp</span>
+                                    <input id="serviceEditPrice" name="price" type="text" inputmode="numeric"
+                                        placeholder="0" autocomplete="off" enterkeyhint="done"
+                                        aria-describedby="serviceEditError" class="svc-currency-input">
+                                </div>
+                            </div>
+                        </div>
+
+                        <p id="serviceEditError" role="alert" aria-live="polite"
+                            class="hidden text-[11px] font-medium text-rose-600 mt-2"></p>
+
+                        <div class="mt-3 pt-2.5 border-t border-slate-200/70 flex flex-wrap items-center justify-between gap-2">
+                            <label for="serviceEditSaveMaster" class="svc-check-label">
+                                <input id="serviceEditSaveMaster" name="save_to_master" type="checkbox" value="1">
+                                <span>Perbarui juga di daftar jasa</span>
+                            </label>
+
+                            <div class="flex items-center gap-1.5">
+                                <button type="button" id="serviceEditResetBtn" class="svc-btn svc-btn-subtle hidden">
+                                    Reset
+                                </button>
+                                <button type="submit" id="serviceEditSaveBtn" class="svc-btn svc-btn-primary">
+                                    Simpan Perubahan
+                                </button>
+                            </div>
+                        </div>
+                    </form>
                 </div>
 
                 {{-- Jenis faktur obat --}}
-                <div class="mt-3">
-                    <label class="block text-[11px] font-semibold text-gray-600 mb-1">Jenis Faktur Obat</label>
+                <div class="mt-3.5 pt-3 border-t border-slate-100">
+                    <label class="block text-[11px] font-semibold text-slate-600 mb-1.5">Jenis Faktur Obat</label>
                     <div class="grid grid-cols-3 gap-1.5">
                         @foreach (['UPDS' => 'UPDS', 'HV/OTC' => 'HV', 'RESEP TUNAI' => 'Resep Tunai'] as $invValue => $invLabel)
                             <label class="cursor-pointer">
@@ -411,13 +941,13 @@
                                     class="sr-only" onchange="setServiceInvoiceType('{{ $invValue }}')"
                                     @checked(($serviceInvoiceType ?? 'UPDS') === $invValue)>
                                 <div
-                                    class="service-invoice-card flex items-center justify-center py-2 rounded-xl border border-gray-200 bg-white text-[11px] font-medium text-gray-600 text-center">
+                                    class="service-invoice-card flex items-center justify-center py-2 rounded-xl border border-slate-200 bg-white text-[11px] font-medium text-slate-600 text-center">
                                     {{ $invLabel }}
                                 </div>
                             </label>
                         @endforeach
                     </div>
-                    <p class="text-[10px] text-gray-400 mt-1">
+                    <p class="text-[10.5px] text-slate-400 mt-1.5">
                         Mengubah jenis faktur obat akan mengosongkan keranjang obat (harga obat berbeda per jenis).
                     </p>
                 </div>
@@ -2341,6 +2871,7 @@
         $serviceDataForJs = $transactionService
             ? [
                 'id' => $transactionService->id,
+                'doctor_service_id' => $transactionService->doctor_service_id,
                 'name' => $transactionService->service_name,
                 'price' => (float) $transactionService->price,
             ]
@@ -4355,6 +4886,7 @@
             serviceAmount = parseFloat(data.service_amount) || 0;
             serviceData = data.service ? {
                 id: data.service.id,
+                doctor_service_id: data.service.doctor_service_id ?? null,
                 name: data.service.name,
                 price: parseFloat(data.service.price) || 0
             } : null;
@@ -7202,74 +7734,294 @@
     });
 
     // =====================================================
-    // Jasa (transaksi tipe JASA) — UI pemilihan jasa
+    // Jasa (transaksi tipe JASA) — Pilih, Tambah & Ubah Jasa
     // Blok ini hanya aktif bila halaman bertipe JASA.
     // =====================================================
     let serviceSearchTimer = null;
+    let serviceDropdownIndex = -1;
+    let serviceEditDirty = false;
+    let lastSyncedServiceKey = '';
 
     function serviceRupiah(value) {
-        return 'Rp ' + Number(value || 0).toLocaleString('id-ID');
+        return 'Rp ' + Math.round(Number(value || 0)).toLocaleString('id-ID');
     }
 
-    function renderServiceSelection() {
+    function formatServiceNumber(value) {
+        const num = Math.max(0, Math.round(Number(value || 0)));
+        return num.toLocaleString('id-ID');
+    }
+
+    function parseServicePrice(raw) {
+        const digits = String(raw ?? '').replace(/[^\d]/g, '');
+        return digits === '' ? 0 : Number(digits);
+    }
+
+    function bindServiceCurrencyInput(inputEl, wrapEl, onValueChange) {
+        if (!inputEl) return;
+        inputEl.addEventListener('input', function() {
+            const digits = this.value.replace(/[^\d]/g, '');
+            this.value = digits === '' ? '' : Number(digits).toLocaleString('id-ID');
+            this.removeAttribute('aria-invalid');
+            if (wrapEl) wrapEl.classList.remove('is-invalid');
+            if (typeof onValueChange === 'function') onValueChange();
+        });
+        inputEl.addEventListener('blur', function() {
+            const val = parseServicePrice(this.value);
+            this.value = val > 0 ? formatServiceNumber(val) : (this.value.trim() === '' ? '' : '0');
+        });
+    }
+
+    function setServiceFieldError(errorEl, inputEl, message, wrapEl) {
+        if (errorEl) {
+            errorEl.textContent = message || '';
+            errorEl.classList.toggle('hidden', !message);
+        }
+        if (inputEl) {
+            if (message) {
+                inputEl.setAttribute('aria-invalid', 'true');
+            } else {
+                inputEl.removeAttribute('aria-invalid');
+            }
+        }
+        if (wrapEl) {
+            wrapEl.classList.toggle('is-invalid', Boolean(message));
+        }
+    }
+
+    function syncServiceEditDirtyState() {
+        const nameInput = document.getElementById('serviceEditName');
+        const priceInput = document.getElementById('serviceEditPrice');
+        const saveMasterCb = document.getElementById('serviceEditSaveMaster');
+        const resetBtn = document.getElementById('serviceEditResetBtn');
+        const statusEl = document.getElementById('serviceEditStatus');
+
+        if (!serviceData || !nameInput || !priceInput) {
+            serviceEditDirty = false;
+            return;
+        }
+
+        const currentName = nameInput.value.trim();
+        const currentPrice = parseServicePrice(priceInput.value);
+        const savedName = String(serviceData.name || '').trim();
+        const savedPrice = Math.round(Number(serviceData.price ?? serviceAmount ?? 0));
+        const masterToggled = Boolean(saveMasterCb && saveMasterCb.checked);
+
+        serviceEditDirty = (currentName !== savedName) || (currentPrice !== savedPrice) || masterToggled;
+
+        if (resetBtn) {
+            resetBtn.classList.toggle('hidden', !serviceEditDirty);
+        }
+        if (statusEl) {
+            if (serviceEditDirty) {
+                statusEl.textContent = 'Ada perubahan belum disimpan — klik Simpan Perubahan';
+                statusEl.className = 'inline-block text-[10.5px] text-amber-700 font-semibold mt-0.5';
+            } else {
+                statusEl.textContent = 'Nama & biaya dapat diubah langsung di bawah';
+                statusEl.className = 'inline-block text-[10.5px] text-emerald-700/90 font-medium mt-0.5';
+            }
+        }
+    }
+
+    function updateServiceAddButtonState(isOpen) {
+        const btn = document.getElementById('serviceOpenAddBtn');
+        if (!btn) return;
+        btn.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+        btn.classList.toggle('hidden', Boolean(isOpen));
+    }
+
+    function renderServiceSelection(forceResetInputs = false) {
         const wrap = document.getElementById('serviceSelectedWrap');
         const picker = document.getElementById('servicePickerWrap');
+        const customWrap = document.getElementById('serviceCustomFormWrap');
         const badge = document.getElementById('serviceSelectedBadge');
         const amountLabel = document.getElementById('serviceAmountLabel');
 
         if (amountLabel) amountLabel.textContent = serviceRupiah(serviceAmount);
-
         if (!wrap || !picker) return;
 
+        const isCustomOpen = customWrap && !customWrap.classList.contains('hidden');
+
         if (serviceData) {
-            const nameEl = document.getElementById('serviceSelectedName');
+            const headingEl = document.getElementById('serviceSelectedHeading');
             const priceEl = document.getElementById('serviceSelectedPrice');
-            if (nameEl) nameEl.textContent = serviceData.name || '';
-            if (priceEl) priceEl.textContent = serviceRupiah(serviceData.price ?? serviceAmount);
-            wrap.classList.remove('hidden');
-            picker.classList.add('hidden');
+            const editNameEl = document.getElementById('serviceEditName');
+            const editPriceEl = document.getElementById('serviceEditPrice');
+            const editMasterEl = document.getElementById('serviceEditSaveMaster');
+            const servicePrice = Math.round(Number(serviceData.price ?? serviceAmount ?? 0));
+            const nextKey = `${serviceData.id || ''}:${serviceData.doctor_service_id || ''}:${serviceData.name || ''}:${servicePrice}`;
+
+            if (headingEl) headingEl.textContent = serviceData.name || '';
+            if (priceEl) priceEl.textContent = serviceRupiah(servicePrice);
+
+            // Hindari menimpa ketikan kasir saat background heartbeat sync, kecuali data berubah atau dipaksa reset.
+            if (forceResetInputs || (!serviceEditDirty && nextKey !== lastSyncedServiceKey)) {
+                if (editNameEl) editNameEl.value = serviceData.name || '';
+                if (editPriceEl) editPriceEl.value = formatServiceNumber(servicePrice);
+                if (editMasterEl) editMasterEl.checked = false;
+                setServiceFieldError(document.getElementById('serviceEditError'), editNameEl, '');
+                lastSyncedServiceKey = nextKey;
+                serviceEditDirty = false;
+                syncServiceEditDirtyState();
+            }
+
+            if (!isCustomOpen) {
+                wrap.classList.remove('hidden');
+                picker.classList.add('hidden');
+            }
             if (badge) badge.classList.remove('hidden');
         } else {
+            lastSyncedServiceKey = '';
+            serviceEditDirty = false;
             wrap.classList.add('hidden');
-            picker.classList.remove('hidden');
+            if (!isCustomOpen) {
+                picker.classList.remove('hidden');
+            }
             if (badge) badge.classList.add('hidden');
         }
     }
 
-    function showServicePicker() {
+    function openCustomServiceForm(prefillName) {
+        const customWrap = document.getElementById('serviceCustomFormWrap');
         const picker = document.getElementById('servicePickerWrap');
-        if (picker) picker.classList.remove('hidden');
-        const input = document.getElementById('serviceSearch');
-        if (input) {
-            input.value = '';
-            input.focus();
+        const selectedWrap = document.getElementById('serviceSelectedWrap');
+        const results = document.getElementById('serviceResults');
+        const searchInput = document.getElementById('serviceSearch');
+        const nameInput = document.getElementById('serviceCustomName');
+        const priceInput = document.getElementById('serviceCustomPrice');
+        const saveMasterCb = document.getElementById('serviceCustomSaveMaster');
+        const errorEl = document.getElementById('serviceCustomError');
+
+        if (!customWrap) return;
+
+        const initialName = typeof prefillName === 'string'
+            ? prefillName.trim()
+            : (searchInput ? searchInput.value.trim() : '');
+
+        if (results) results.classList.add('hidden');
+        if (searchInput) searchInput.setAttribute('aria-expanded', 'false');
+        if (picker) picker.classList.add('hidden');
+        if (selectedWrap) selectedWrap.classList.add('hidden');
+
+        customWrap.classList.remove('hidden');
+        updateServiceAddButtonState(true);
+
+        if (nameInput) nameInput.value = initialName;
+        if (priceInput) priceInput.value = '';
+        if (saveMasterCb) saveMasterCb.checked = true;
+        setServiceFieldError(errorEl, nameInput, '', document.getElementById('serviceCustomPriceWrap'));
+
+        if (initialName && priceInput) {
+            priceInput.focus();
+        } else if (nameInput) {
+            nameInput.focus();
         }
+    }
+
+    function closeCustomServiceForm(returnFocusToSearch = false) {
+        const customWrap = document.getElementById('serviceCustomFormWrap');
+        const picker = document.getElementById('servicePickerWrap');
+        const selectedWrap = document.getElementById('serviceSelectedWrap');
+        const searchInput = document.getElementById('serviceSearch');
+
+        if (customWrap) customWrap.classList.add('hidden');
+        updateServiceAddButtonState(false);
+
+        if (serviceData) {
+            if (selectedWrap) selectedWrap.classList.remove('hidden');
+            if (picker) picker.classList.add('hidden');
+        } else {
+            if (picker) picker.classList.remove('hidden');
+            if (returnFocusToSearch && searchInput) searchInput.focus();
+        }
+    }
+
+    function showServicePicker() {
+        const customWrap = document.getElementById('serviceCustomFormWrap');
+        const picker = document.getElementById('servicePickerWrap');
+        const selectedWrap = document.getElementById('serviceSelectedWrap');
+        const searchInput = document.getElementById('serviceSearch');
+        const clearBtn = document.getElementById('serviceSearchClear');
+
+        if (customWrap) customWrap.classList.add('hidden');
+        updateServiceAddButtonState(false);
+        if (selectedWrap) selectedWrap.classList.add('hidden');
+        if (picker) picker.classList.remove('hidden');
+
+        if (searchInput) {
+            searchInput.value = '';
+            searchInput.focus();
+        }
+        if (clearBtn) clearBtn.classList.add('hidden');
         searchServices('');
+    }
+
+    function getServiceDropdownActionables() {
+        const list = document.getElementById('serviceList');
+        const quickAddBtn = document.getElementById('serviceQuickAddBtn');
+        const items = list ? [...list.querySelectorAll('li[data-service-id]')] : [];
+        if (quickAddBtn) items.push(quickAddBtn);
+        return items;
+    }
+
+    function highlightServiceDropdown(nextIdx) {
+        const actionables = getServiceDropdownActionables();
+        if (!actionables.length) {
+            serviceDropdownIndex = -1;
+            return;
+        }
+        serviceDropdownIndex = Math.max(0, Math.min(nextIdx, actionables.length - 1));
+        actionables.forEach(function(el, idx) {
+            el.classList.toggle('is-active', idx === serviceDropdownIndex);
+        });
+        actionables[serviceDropdownIndex].scrollIntoView({ block: 'nearest' });
     }
 
     function renderServiceList(items) {
         const list = document.getElementById('serviceList');
         const results = document.getElementById('serviceResults');
+        const searchInput = document.getElementById('serviceSearch');
+        const quickAddLabel = document.getElementById('serviceQuickAddLabel');
         if (!list || !results) return;
 
-        if (!items || items.length === 0) {
-            list.innerHTML = '<li class="px-3 py-2 text-[11px] text-gray-400">Jasa tidak ditemukan.</li>';
-            results.classList.remove('hidden');
-            return;
+        const keyword = searchInput ? searchInput.value.trim() : '';
+        if (quickAddLabel) {
+            quickAddLabel.textContent = keyword
+                ? 'Tambah "' + keyword + '" & atur biaya'
+                : 'Tambah jasa baru & atur biaya';
         }
 
-        list.innerHTML = items.map(function(item) {
-            const safeName = String(item.name || '').replace(/</g, '&lt;');
-            const priceLabel = item.price_label || serviceRupiah(item.price);
+        list.replaceChildren();
+        serviceDropdownIndex = -1;
 
-            return '<li class="px-3 py-2 text-[11px] cursor-pointer hover:bg-gray-50 flex items-center justify-between gap-2"' +
-                ' data-service-id="' + item.id + '">' +
-                '<span class="text-gray-700">' + safeName + '</span>' +
-                '<span class="font-semibold text-gray-800">' + priceLabel + '</span>' +
-                '</li>';
-        }).join('');
+        if (!items || items.length === 0) {
+            const emptyLi = document.createElement('li');
+            emptyLi.className = 'px-3 py-2.5 text-[11px] text-slate-400 text-center';
+            emptyLi.textContent = keyword
+                ? 'Jasa "' + keyword + '" belum tersimpan.'
+                : 'Belum ada jasa tersimpan. Tambahkan jasa baru di bawah.';
+            list.appendChild(emptyLi);
+        } else {
+            items.forEach(function(item) {
+                const li = document.createElement('li');
+                li.className = 'svc-dropdown-item';
+                li.setAttribute('role', 'option');
+                li.dataset.serviceId = String(item.id);
+
+                const nameSpan = document.createElement('span');
+                nameSpan.className = 'text-slate-800 font-medium truncate';
+                nameSpan.textContent = item.name || '';
+
+                const priceSpan = document.createElement('span');
+                priceSpan.className = 'svc-dropdown-price';
+                priceSpan.textContent = item.price_label || serviceRupiah(item.price);
+
+                li.append(nameSpan, priceSpan);
+                list.appendChild(li);
+            });
+        }
 
         results.classList.remove('hidden');
+        if (searchInput) searchInput.setAttribute('aria-expanded', 'true');
     }
 
     async function searchServices(keyword) {
@@ -7285,6 +8037,28 @@
         }
     }
 
+    function applyServiceServerResponse(data) {
+        serviceAmount = parseFloat(data.service_amount) || 0;
+        serviceData = data.service ? {
+            id: data.service.id,
+            doctor_service_id: data.service.doctor_service_id ?? null,
+            name: data.service.name,
+            price: parseFloat(data.service.price) || 0
+        } : null;
+
+        const results = document.getElementById('serviceResults');
+        const searchInput = document.getElementById('serviceSearch');
+        const customWrap = document.getElementById('serviceCustomFormWrap');
+
+        if (results) results.classList.add('hidden');
+        if (searchInput) searchInput.setAttribute('aria-expanded', 'false');
+        if (customWrap) customWrap.classList.add('hidden');
+        updateServiceAddButtonState(false);
+
+        renderServiceSelection(true);
+        syncCartFromServer(data);
+    }
+
     async function chooseService(serviceId) {
         try {
             const { data } = await axios.post("{{ route('transaction.service.save') }}", {
@@ -7292,30 +8066,133 @@
                 doctor_service_id: serviceId,
             });
 
-            serviceAmount = parseFloat(data.service_amount) || 0;
-            serviceData = data.service ? {
-                id: data.service.id,
-                name: data.service.name,
-                price: parseFloat(data.service.price) || 0
-            } : null;
-
-            renderServiceSelection();
-            syncCartFromServer(data);
+            applyServiceServerResponse(data);
 
             iziToast.success({
                 title: 'Berhasil',
                 message: data.message,
                 position: 'topRight'
             });
-
-            const productSearch = document.getElementById('productSearch');
-            if (productSearch) productSearch.focus();
         } catch (e) {
             iziToast.error({
                 title: 'Gagal',
                 message: e.response?.data?.message || 'Gagal memilih jasa.',
                 position: 'topRight'
             });
+        }
+    }
+
+    async function submitCustomServiceForm(e) {
+        e.preventDefault();
+
+        const nameInput = document.getElementById('serviceCustomName');
+        const priceInput = document.getElementById('serviceCustomPrice');
+        const saveMasterCb = document.getElementById('serviceCustomSaveMaster');
+        const submitBtn = document.getElementById('serviceCustomSubmitBtn');
+        const errorEl = document.getElementById('serviceCustomError');
+        const priceWrap = document.getElementById('serviceCustomPriceWrap');
+
+        const nameVal = (nameInput?.value || '').trim();
+        const priceVal = parseServicePrice(priceInput?.value || '0');
+
+        if (!nameVal) {
+            setServiceFieldError(errorEl, nameInput, 'Nama jasa wajib diisi.');
+            nameInput?.focus();
+            return;
+        }
+
+        setServiceFieldError(errorEl, nameInput, '', priceWrap);
+        if (submitBtn) {
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Menyimpan…';
+        }
+
+        try {
+            const { data } = await axios.post("{{ route('transaction.service.save') }}", {
+                transaction_id: transaction_id,
+                service_name: nameVal,
+                price: priceVal,
+                save_to_master: Boolean(saveMasterCb ? saveMasterCb.checked : true),
+            });
+
+            applyServiceServerResponse(data);
+
+            iziToast.success({
+                title: 'Berhasil',
+                message: data.message || 'Jasa berhasil disimpan.',
+                position: 'topRight'
+            });
+        } catch (err) {
+            const msg = err.response?.data?.message || 'Gagal menyimpan jasa.';
+            setServiceFieldError(errorEl, nameInput, msg);
+            iziToast.error({
+                title: 'Gagal',
+                message: msg,
+                position: 'topRight'
+            });
+        } finally {
+            if (submitBtn) {
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Simpan & Pakai';
+            }
+        }
+    }
+
+    async function submitEditedServiceForm(e) {
+        e.preventDefault();
+        if (!serviceData) return;
+
+        const nameInput = document.getElementById('serviceEditName');
+        const priceInput = document.getElementById('serviceEditPrice');
+        const saveMasterCb = document.getElementById('serviceEditSaveMaster');
+        const submitBtn = document.getElementById('serviceEditSaveBtn');
+        const errorEl = document.getElementById('serviceEditError');
+        const priceWrap = document.getElementById('serviceEditPriceWrap');
+
+        const nameVal = (nameInput?.value || '').trim();
+        const priceVal = parseServicePrice(priceInput?.value || '0');
+
+        if (!nameVal) {
+            setServiceFieldError(errorEl, nameInput, 'Nama jasa tidak boleh kosong.');
+            nameInput?.focus();
+            return;
+        }
+
+        setServiceFieldError(errorEl, nameInput, '', priceWrap);
+        if (submitBtn) {
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Menyimpan…';
+        }
+
+        try {
+            const { data } = await axios.post("{{ route('transaction.service.save') }}", {
+                transaction_id: transaction_id,
+                doctor_service_id: serviceData.doctor_service_id || null,
+                service_name: nameVal,
+                price: priceVal,
+                save_to_master: Boolean(saveMasterCb && saveMasterCb.checked),
+            });
+
+            applyServiceServerResponse(data);
+
+            iziToast.success({
+                title: 'Berhasil',
+                message: data.message || 'Perubahan jasa disimpan.',
+                position: 'topRight'
+            });
+        } catch (err) {
+            const msg = err.response?.data?.message || 'Gagal memperbarui jasa.';
+            setServiceFieldError(errorEl, nameInput, msg);
+            iziToast.error({
+                title: 'Gagal',
+                message: msg,
+                position: 'topRight'
+            });
+        } finally {
+            if (submitBtn) {
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Simpan Perubahan';
+            }
         }
     }
 
@@ -7328,10 +8205,7 @@
                 data: { transaction_id: transaction_id }
             });
 
-            serviceAmount = parseFloat(data.service_amount) || 0;
-            serviceData = null;
-            renderServiceSelection();
-            syncCartFromServer(data);
+            applyServiceServerResponse(data);
 
             iziToast.success({
                 title: 'Berhasil',
@@ -7398,31 +8272,133 @@
     (function initServicePanel() {
         if (!isServiceTransaction) return;
 
-        renderServiceSelection();
+        renderServiceSelection(true);
 
         const searchInput = document.getElementById('serviceSearch');
+        const clearSearchBtn = document.getElementById('serviceSearchClear');
+        const list = document.getElementById('serviceList');
+        const results = document.getElementById('serviceResults');
+        const quickAddBtn = document.getElementById('serviceQuickAddBtn');
+        const openAddBtn = document.getElementById('serviceOpenAddBtn');
+        const customForm = document.getElementById('serviceCustomForm');
+        const customCancelBtn = document.getElementById('serviceCustomCancelBtn');
+        const customNameInput = document.getElementById('serviceCustomName');
+        const customPriceInput = document.getElementById('serviceCustomPrice');
+        const editForm = document.getElementById('serviceEditForm');
+        const editNameInput = document.getElementById('serviceEditName');
+        const editPriceInput = document.getElementById('serviceEditPrice');
+        const editSaveMasterCb = document.getElementById('serviceEditSaveMaster');
+        const editResetBtn = document.getElementById('serviceEditResetBtn');
+
         if (searchInput) {
             searchInput.addEventListener('input', function() {
                 clearTimeout(serviceSearchTimer);
                 const keyword = this.value;
+                if (clearSearchBtn) clearSearchBtn.classList.toggle('hidden', keyword.trim() === '');
                 serviceSearchTimer = setTimeout(function() {
                     searchServices(keyword);
-                }, 250);
+                }, 200);
             });
 
             searchInput.addEventListener('focus', function() {
                 searchServices(this.value);
             });
+
+            searchInput.addEventListener('keydown', function(e) {
+                if (e.isComposing) return;
+                if (e.key === 'ArrowDown') {
+                    e.preventDefault();
+                    highlightServiceDropdown(serviceDropdownIndex + 1);
+                } else if (e.key === 'ArrowUp') {
+                    e.preventDefault();
+                    highlightServiceDropdown(serviceDropdownIndex <= 0 ? 0 : serviceDropdownIndex - 1);
+                } else if (e.key === 'Enter') {
+                    e.preventDefault();
+                    const actionables = getServiceDropdownActionables();
+                    const activeEl = serviceDropdownIndex >= 0 ? actionables[serviceDropdownIndex] : null;
+                    if (activeEl && activeEl.dataset && activeEl.dataset.serviceId) {
+                        chooseService(activeEl.dataset.serviceId);
+                    } else if (activeEl === quickAddBtn || actionables.length <= 1) {
+                        openCustomServiceForm(this.value.trim());
+                    } else if (actionables[0] && actionables[0].dataset && actionables[0].dataset.serviceId) {
+                        chooseService(actionables[0].dataset.serviceId);
+                    }
+                } else if (e.key === 'Escape') {
+                    if (results) results.classList.add('hidden');
+                    searchInput.setAttribute('aria-expanded', 'false');
+                    if (serviceData) renderServiceSelection();
+                }
+            });
         }
 
-        const list = document.getElementById('serviceList');
+        if (clearSearchBtn && searchInput) {
+            clearSearchBtn.addEventListener('click', function() {
+                searchInput.value = '';
+                clearSearchBtn.classList.add('hidden');
+                searchInput.focus();
+                searchServices('');
+            });
+        }
+
         if (list) {
             list.addEventListener('click', function(e) {
                 const li = e.target.closest('li[data-service-id]');
                 if (!li) return;
-                chooseService(li.getAttribute('data-service-id'));
+                chooseService(li.dataset.serviceId);
             });
         }
+
+        if (quickAddBtn) {
+            quickAddBtn.addEventListener('click', function() {
+                openCustomServiceForm(searchInput ? searchInput.value.trim() : '');
+            });
+        }
+
+        if (openAddBtn) {
+            openAddBtn.addEventListener('click', function() {
+                openCustomServiceForm(searchInput ? searchInput.value.trim() : '');
+            });
+        }
+
+        if (customCancelBtn) {
+            customCancelBtn.addEventListener('click', function() {
+                closeCustomServiceForm(true);
+            });
+        }
+
+        if (customNameInput) {
+            customNameInput.addEventListener('input', function() {
+                setServiceFieldError(document.getElementById('serviceCustomError'), customNameInput, '');
+            });
+        }
+
+        bindServiceCurrencyInput(customPriceInput, document.getElementById('serviceCustomPriceWrap'));
+        if (customForm) customForm.addEventListener('submit', submitCustomServiceForm);
+
+        if (editNameInput) {
+            editNameInput.addEventListener('input', function() {
+                setServiceFieldError(document.getElementById('serviceEditError'), editNameInput, '');
+                syncServiceEditDirtyState();
+            });
+        }
+
+        bindServiceCurrencyInput(
+            editPriceInput,
+            document.getElementById('serviceEditPriceWrap'),
+            syncServiceEditDirtyState
+        );
+
+        if (editSaveMasterCb) {
+            editSaveMasterCb.addEventListener('change', syncServiceEditDirtyState);
+        }
+
+        if (editResetBtn) {
+            editResetBtn.addEventListener('click', function() {
+                renderServiceSelection(true);
+            });
+        }
+
+        if (editForm) editForm.addEventListener('submit', submitEditedServiceForm);
 
         const changeBtn = document.getElementById('serviceChangeBtn');
         if (changeBtn) changeBtn.addEventListener('click', showServicePicker);
@@ -7431,10 +8407,12 @@
         if (clearBtn) clearBtn.addEventListener('click', removeService);
 
         document.addEventListener('click', function(e) {
-            const results = document.getElementById('serviceResults');
             const picker = document.getElementById('servicePickerWrap');
             if (!results || !picker) return;
-            if (!picker.contains(e.target)) results.classList.add('hidden');
+            if (!picker.contains(e.target)) {
+                results.classList.add('hidden');
+                if (searchInput) searchInput.setAttribute('aria-expanded', 'false');
+            }
         });
     })();
 </script>

@@ -453,9 +453,6 @@
         function toggleModal(id) {
             const target = document.getElementById(id);
             if (!target) return;
-            document.querySelectorAll('#notif-modal, #expiry-modal').forEach(m => {
-                if (m.id !== id) m.classList.add('hidden');
-            });
             target.classList.toggle('hidden');
             if (id === 'notif-modal' && !target.classList.contains('hidden')) {
                 if (typeof loadStockNotifications === 'function') {
@@ -465,13 +462,11 @@
         }
 
         document.addEventListener('click', function(e) {
-            ['notif-modal', 'expiry-modal'].forEach(id => {
-                const modal = document.getElementById(id);
-                if (!modal) return;
-                if (!e.target.closest(`#${id}`) && !e.target.closest(`[onclick*="${id}"]`)) {
-                    modal.classList.add('hidden');
-                }
-            });
+            const modal = document.getElementById('notif-modal');
+            if (!modal) return;
+            if (!e.target.closest('#notif-modal') && !e.target.closest('[onclick*="notif-modal"]')) {
+                modal.classList.add('hidden');
+            }
         });
 
         function applySalesFilters(reportLabel) {

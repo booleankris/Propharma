@@ -195,6 +195,7 @@ Route::middleware(['auth', 'role:General Manager|manager|Manager|administrator']
 Route::middleware(['auth', 'role:General Manager|Kasir|Gudang PMI|HO|administrator|manager|Manager|Koordinator|koordinator|Online|Online Grab|Online Shopee|Digital|UMKM|operator|Operator|Finance'])->group(function () {
     Route::get('/near-expiry', [HomeController::class, 'nearExpiry'])->name('kasir.nearExpiry');
     Route::get('/stock-notifications', [HomeController::class, 'stockNotifications'])->name('kasir.stockNotifications');
+    Route::get('/stock-notifications/export', [HomeController::class, 'exportStockNotifications'])->name('kasir.stockNotifications.export');
 
     // Global Feature
     Route::prefix('account')->name('account.')->group(function () {

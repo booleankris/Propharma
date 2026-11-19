@@ -220,4 +220,93 @@ class TransactionServiceEndpointTest extends TestCase
 
         $this->assertSame(0, TransactionService::where('medicine_transaction_id', $trx->id)->count());
     }
+
+    public function test_can_create_custom_service_and_save_to_master_for_reuse(): void
+    {
+        $trx = $this->makeTransaction('JASA');
+        $headers = ['X-Requested-With' => 'XMLHttpRequest'];
+
+        $response = $this->withHeaders($headers)
+            ->postJson('/transaction/service', [
+                'transaction_id' => $trx->id,
+                'service_name' => 'Cek Gula Darah',
+                'price' => 25000,
+                'save_to_master' => true,
+            ])
+            ->assertOk()
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('saved_to_master', true)
+            ->assertJsonPath('service_amount', 25000)
+            ->assertJsonPath('service.name', 'Cek Gula Darah')
+            ->assertJsonPath('total_transaction', 25000);
+
+        $masterId = $response->json('service.doctor_service_id');
+        $this->assertNotNull($masterId);
+
+        $this->assertDatabaseHas('doctor_services', [
+            'id' => $masterId,
+            'name' => 'Cek Gula Darah',
+            'price' => 25000,
+        ]);
+
+        // Saat dicari kembali, tampilkan nama dan biayanya
+        $this->withHeaders($headers)
+            ->getJson('/transaction/service/search?q=Gula')
+            ->assertOk()
+            ->assertJsonFragment([
+                'id' => $masterId,
+                'name' => 'Cek Gula Darah',
+                'price' => 25000,
+                'price_label' => 'Rp 25.000',
+            ]);
+    }
+
+    public function test_user_can_override_selected_service_name_and_price_with_or_without_updating_master(): void
+    {
+        $trx = $this->makeTransaction('JASA', 'UPDS');
+        $masterId = $this->makeService('Tindik Telinga', 40000);
+        $headers = ['X-Requested-With' => 'XMLHttpRequest'];
+
+        // 1. Pilih jasa dari master
+        $this->withHeaders($headers)->postJson('/transaction/service', [
+            'transaction_id' => $trx->id,
+            'doctor_service_id' => $masterId,
+        ])->assertOk()->assertJsonPath('service_amount', 40000);
+
+        // 2. Ubah nama & biaya untuk transaksi ini saja (tanpa ubah master)
+        $this->withHeaders($headers)->postJson('/transaction/service', [
+            'transaction_id' => $trx->id,
+            'doctor_service_id' => $masterId,
+            'service_name' => 'Tindik Telinga (Promo)',
+            'price' => 30000,
+            'save_to_master' => false,
+        ])->assertOk()
+            ->assertJsonPath('saved_to_master', false)
+            ->assertJsonPath('service.name', 'Tindik Telinga (Promo)')
+            ->assertJsonPath('service_amount', 30000);
+
+        $this->assertDatabaseHas('doctor_services', [
+            'id' => $masterId,
+            'name' => 'Tindik Telinga',
+            'price' => 40000,
+        ]);
+
+        // 3. Ubah & perbarui sekalian di Master Jasa
+        $this->withHeaders($headers)->postJson('/transaction/service', [
+            'transaction_id' => $trx->id,
+            'doctor_service_id' => $masterId,
+            'service_name' => 'Tindik Telinga Dewasa',
+            'price' => 50000,
+            'save_to_master' => true,
+        ])->assertOk()
+            ->assertJsonPath('saved_to_master', true)
+            ->assertJsonPath('service.name', 'Tindik Telinga Dewasa')
+            ->assertJsonPath('service_amount', 50000);
+
+        $this->assertDatabaseHas('doctor_services', [
+            'id' => $masterId,
+            'name' => 'Tindik Telinga Dewasa',
+            'price' => 50000,
+        ]);
+    }
 }

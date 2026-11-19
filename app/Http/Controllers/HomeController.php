@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Exports\Stocks\StockNotificationExport;
 use App\Models\Batches;
 use App\Models\Item;
 use App\Models\ItemCart;
@@ -15,8 +16,13 @@ use Carbon\Carbon;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Pagination\Paginator;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Http\Request;
+
+use Illuminate\Support\Str;
+use Maatwebsite\Excel\Facades\Excel;
 
 use App\Models\User;
 
@@ -196,7 +202,7 @@ class HomeController extends Controller
 
             $query->select('batches.*')
                 ->selectRaw("{$parsedExpiry} AS parsed_expiry_date")
-                ->orderByRaw('parsed_expiry_date IS NULL ASC')
+                ->whereRaw("{$parsedExpiry} IS NOT NULL AND YEAR({$parsedExpiry}) >= 2000")
                 ->orderBy('parsed_expiry_date')
                 ->orderBy('batches.id')
                 ->limit($limit);
@@ -262,7 +268,12 @@ class HomeController extends Controller
 
         foreach ($formats as $format) {
             try {
-                return Carbon::createFromFormat($format, trim($value));
+                $parsed = Carbon::createFromFormat($format, trim($value));
+                // Abaikan tanggal sentinel / placeholder (mis. 0001-01-01, 1900-01-01) untuk alkes/item non-ED.
+                if ($parsed->year < 2000 || $parsed->year > 2100) {
+                    return null;
+                }
+                return $parsed;
             } catch (\Throwable $e) {
                 continue;
             }
@@ -305,6 +316,100 @@ class HomeController extends Controller
 
     public function stockNotifications(Request $request)
     {
+        $scope = $this->resolveStockAlertScope($request);
+
+        $forceRefresh = $request->boolean('refresh');
+        $cacheKey = 'stock_alerts_v4:' . ($scope['is_global_viewer'] ? 'global' : 'branch_' . $scope['active_pharmacy_id']) . ':' . $scope['selected_filter'];
+
+        if ($forceRefresh) {
+            Cache::forget($cacheKey);
+        }
+
+        $payload = Cache::remember($cacheKey, 60, function () use ($scope) {
+            $daysThreshold = 90;
+            $lowStock = $this->queryLowStockAlerts($scope['target_pharmacy_ids'], $scope['branch_map'], $scope['warehouse_id'], 40);
+            $nearExpiry = $this->queryNearExpiryAlerts($scope['target_pharmacy_ids'], $scope['branch_map'], $scope['warehouse_id'], $daysThreshold, 40);
+
+            $combined = collect($nearExpiry['items'])
+                ->concat($lowStock['items'])
+                ->sortBy([
+                    ['priority_rank', 'asc'],
+                    ['sort_metric', 'asc'],
+                    ['name', 'asc'],
+                ])
+                ->take(60)
+                ->values()
+                ->all();
+
+            return [
+                'notifications' => $combined,
+                'low_stock' => $lowStock['items'],
+                'near_expiry' => $nearExpiry['items'],
+                'summary' => [
+                    'total_count' => $lowStock['total_count'] + $nearExpiry['total_count'],
+                    'low_stock_count' => $lowStock['total_count'],
+                    'out_of_stock_count' => $lowStock['critical_count'],
+                    'near_expiry_count' => $nearExpiry['total_count'],
+                    'expired_count' => $nearExpiry['expired_count'],
+                    'critical_count' => $lowStock['critical_count'] + $nearExpiry['critical_count'],
+                    'days_threshold' => $daysThreshold,
+                ],
+                'updated_at' => Carbon::now()->format('H:i'),
+            ];
+        });
+
+        return response()->json([
+            'notifications' => $payload['notifications'],
+            'low_stock' => $payload['low_stock'],
+            'near_expiry' => $payload['near_expiry'],
+            'summary' => $payload['summary'],
+            'meta' => [
+                'can_filter_branch' => $scope['is_global_viewer'],
+                'active_pharmacy_id' => $scope['active_pharmacy_id'],
+                'active_pharmacy_name' => $scope['active_pharmacy_name'],
+                'selected_filter' => $scope['selected_filter'],
+                'branches' => $scope['available_branches']->values(),
+                'count' => count($payload['notifications']),
+                'updated_at' => $payload['updated_at'],
+            ],
+        ]);
+    }
+
+    public function exportStockNotifications(Request $request)
+    {
+        $scope = $this->resolveStockAlertScope($request);
+        $rawTab = (string) $request->query('tab', 'all');
+        $tab = in_array($rawTab, ['all', 'low_stock', 'near_expiry'], true) ? $rawTab : 'all';
+        $daysThreshold = 90;
+
+        $lowStockItems = ($tab === 'all' || $tab === 'low_stock')
+            ? $this->queryLowStockAlerts($scope['target_pharmacy_ids'], $scope['branch_map'], $scope['warehouse_id'], null)['items']
+            : [];
+
+        $nearExpiryItems = ($tab === 'all' || $tab === 'near_expiry')
+            ? $this->queryNearExpiryAlerts($scope['target_pharmacy_ids'], $scope['branch_map'], $scope['warehouse_id'], $daysThreshold, null)['items']
+            : [];
+
+        $branchLabel = $scope['selected_filter'] === 'all'
+            ? 'Semua Cabang'
+            : ($scope['branch_map'][$scope['selected_filter']]['name'] ?? $scope['active_pharmacy_name']);
+
+        $tabSlug = match ($tab) {
+            'low_stock' => 'Stok-Rendah',
+            'near_expiry' => 'Dekat-ED',
+            default => 'Stok-dan-ED',
+        };
+        $branchSlug = Str::slug($branchLabel, '-');
+        $filename = "Notifikasi-{$tabSlug}-{$branchSlug}-" . Carbon::now()->format('Ymd-His') . '.xlsx';
+
+        return Excel::download(
+            new StockNotificationExport($lowStockItems, $nearExpiryItems, $branchLabel, $tab, $daysThreshold),
+            $filename
+        );
+    }
+
+    private function resolveStockAlertScope(Request $request): array
+    {
         $user = auth()->user();
         $isGlobalViewer = $user && ($user->hasRole('General Manager') || $user->hasRole('administrator') || $user->hasRole('HO'));
 
@@ -314,147 +419,428 @@ class HomeController extends Controller
             ->get()
             ->map(function ($p) {
                 return [
-                    'id' => $p->id,
+                    'id' => (int) $p->id,
                     'name' => $p->name,
                     'short_name' => trim(str_replace(['SAHABAT ', 'SAHABAT'], '', $p->name)),
                 ];
             });
 
-        $activePharmacyId = function_exists('getActivePharmacyId') ? getActivePharmacyId() : 1;
-        $activePharmacy = \App\Models\Pharmacies::find($activePharmacyId);
-        $activePharmacyName = $activePharmacy ? $activePharmacy->name : 'Cabang';
+        $branchMap = $availableBranches->keyBy('id')->all();
+
+        $activePharmacyId = (int) (function_exists('getActivePharmacyId') ? getActivePharmacyId() : 1);
+        $warehouseId = (int) (function_exists('getWarehousePharmacyId') ? getWarehousePharmacyId() : 9);
+        $activePharmacy = $branchMap[$activePharmacyId] ?? null;
+        $activePharmacyName = $activePharmacy['name'] ?? (\App\Models\Pharmacies::whereKey($activePharmacyId)->value('name') ?: 'Cabang');
+
+        if (!isset($branchMap[$activePharmacyId])) {
+            $branchMap[$activePharmacyId] = [
+                'id' => $activePharmacyId,
+                'name' => $activePharmacyName,
+                'short_name' => trim(str_replace(['SAHABAT ', 'SAHABAT'], '', $activePharmacyName)),
+            ];
+        }
 
         $filterPharmacy = $request->query('pharmacy_id');
-
-        $query = \App\Models\ItemsLog::query()
-            ->join('batches', 'batches.id', '=', 'items_log.batches_id')
-            ->leftJoin('pharmacies', 'pharmacies.id', '=', 'batches.pharmacy_id')
-            ->select([
-                'items_log.id',
-                'items_log.transaction_code',
-                'items_log.medicine_id',
-                'items_log.status',
-                'items_log.qty',
-                'items_log.qty_before',
-                'items_log.qty_after',
-                'items_log.created_at',
-                'batches.pharmacy_id',
-                'pharmacies.name as pharmacy_name',
-            ])
-            ->with('medicines:id,name,code')
-            ->orderBy('items_log.id', 'desc');
-
-        $selectedFilter = 'all';
-
         if (!$isGlobalViewer) {
-            $query->where('batches.pharmacy_id', $activePharmacyId);
             $selectedFilter = $activePharmacyId;
+            $targetPharmacyIds = [$activePharmacyId];
+        } elseif ($filterPharmacy && $filterPharmacy !== 'all') {
+            $selectedFilter = (int) $filterPharmacy;
+            $targetPharmacyIds = [$selectedFilter];
         } else {
-            if ($filterPharmacy && $filterPharmacy !== 'all') {
-                $query->where('batches.pharmacy_id', (int) $filterPharmacy);
-                $selectedFilter = (int) $filterPharmacy;
-            } else {
-                $selectedFilter = 'all';
+            $selectedFilter = 'all';
+            $targetPharmacyIds = $availableBranches->pluck('id')->map(fn($id) => (int) $id)->all();
+            if ($targetPharmacyIds === []) {
+                $targetPharmacyIds = [$activePharmacyId];
             }
         }
 
-        $logs = $query->take(35)->get();
-
-        $typeMap = [
-            1 => ['label' => 'Penjualan', 'icon' => '↓', 'sign' => '-', 'class' => 'qty-out', 'color' => 1],
-            2 => ['label' => 'Pembelian', 'icon' => '↑', 'sign' => '+', 'class' => 'qty-in', 'color' => 2],
-            3 => ['label' => 'Retur Penjualan', 'icon' => '↩', 'sign' => '+', 'class' => 'qty-in', 'color' => 3],
-            4 => ['label' => 'Retur Pembelian', 'icon' => '↪', 'sign' => '-', 'class' => 'qty-out', 'color' => 4],
-            5 => ['label' => 'Stock Opname (+)', 'icon' => '↑', 'sign' => '+', 'class' => 'qty-neutral', 'color' => 5],
-            6 => ['label' => 'Stock Opname (-)', 'icon' => '↓', 'sign' => '-', 'class' => 'qty-neutral', 'color' => 6],
-            7 => ['label' => 'Mutasi Stok', 'icon' => '⇄', 'sign' => '', 'class' => 'qty-neutral', 'color' => 5],
-            8 => ['label' => 'Revisi Penerimaan', 'icon' => '✎', 'sign' => '', 'class' => 'qty-neutral', 'color' => 4],
-            9 => ['label' => 'Hapus Penerimaan', 'icon' => '✕', 'sign' => '-', 'class' => 'qty-out', 'color' => 1],
+        return [
+            'is_global_viewer' => $isGlobalViewer,
+            'available_branches' => $availableBranches,
+            'branch_map' => $branchMap,
+            'active_pharmacy_id' => $activePharmacyId,
+            'active_pharmacy_name' => $activePharmacyName,
+            'warehouse_id' => $warehouseId,
+            'selected_filter' => $selectedFilter,
+            'target_pharmacy_ids' => $targetPharmacyIds,
         ];
+    }
 
-        $formatted = $logs->map(function ($log) use ($typeMap) {
-            $info = $typeMap[$log->status] ?? [
-                'label' => 'Lainnya',
-                'icon' => '•',
-                'sign' => '',
-                'class' => 'qty-neutral',
-                'color' => 0,
-            ];
+    /**
+     * Ambil daftar obat dengan stok <= minimal_stock (hanya obat dengan minimal_stock > 0).
+     */
+    private function queryLowStockAlerts(array $pharmacyIds, array $branchMap, int $warehouseId, ?int $limit = 40): array
+    {
+        $warehouseIds = array_values(array_filter($pharmacyIds, fn($id) => (int) $id === $warehouseId));
+        $outletIds = array_values(array_filter($pharmacyIds, fn($id) => (int) $id !== $warehouseId));
 
-            // Penyesuaian khusus untuk Mutasi Stok (status 7)
-            if ($log->status == 7) {
-                if ($log->qty_after > $log->qty_before) {
-                    $info['label'] = 'Mutasi Masuk';
-                    $info['icon'] = '↑';
-                    $info['sign'] = '+';
-                    $info['class'] = 'qty-in';
-                    $info['color'] = 2;
-                } elseif ($log->qty_after < $log->qty_before) {
-                    $info['label'] = 'Mutasi Keluar';
-                    $info['icon'] = '↓';
-                    $info['sign'] = '-';
-                    $info['class'] = 'qty-out';
-                    $info['color'] = 4;
-                }
-            } elseif ($log->status == 8) {
-                if ($log->qty > 0) {
-                    $info['label'] = 'Revisi Masuk';
-                    $info['icon'] = '↑';
-                    $info['sign'] = '+';
-                    $info['class'] = 'qty-in';
-                    $info['color'] = 2;
-                } elseif ($log->qty < 0) {
-                    $info['label'] = 'Revisi Keluar';
-                    $info['icon'] = '↓';
-                    $info['sign'] = '-';
-                    $info['class'] = 'qty-out';
-                    $info['color'] = 4;
-                }
-            }
+        $rows = collect();
 
-            $pharmacyName = $log->pharmacy_name ?? '-';
-            $pharmacyShort = trim(str_replace(['SAHABAT ', 'SAHABAT'], '', $pharmacyName));
+        if ($warehouseIds !== []) {
+            $warehouseRows = DB::table('batches')
+                ->join('medicines', 'medicines.id', '=', 'batches.medicine_id')
+                ->whereIn('batches.pharmacy_id', $warehouseIds)
+                ->where('medicines.minimal_stock', '>', 0)
+                ->groupBy(
+                    'batches.pharmacy_id',
+                    'batches.medicine_id',
+                    'medicines.name',
+                    'medicines.code',
+                    'medicines.unit',
+                    'medicines.minimal_stock'
+                )
+                ->select([
+                    'batches.pharmacy_id',
+                    'batches.medicine_id',
+                    'medicines.name',
+                    'medicines.code',
+                    'medicines.unit',
+                    'medicines.minimal_stock',
+                    DB::raw('COALESCE(SUM(batches.stock), 0) AS current_stock'),
+                    DB::raw('0 AS has_positive_transfer'),
+                ])
+                ->havingRaw('COALESCE(SUM(batches.stock), 0) <= medicines.minimal_stock')
+                ->get();
 
-            $qtyFormatted = abs($log->qty);
-            if (floor($qtyFormatted) == $qtyFormatted) {
-                $qtyFormatted = (int) $qtyFormatted;
-            }
+            $rows = $rows->concat($warehouseRows);
+        }
 
-            $qtyAfterFormatted = null;
-            if ($log->qty_after !== null) {
-                $qtyAfterFormatted = floor($log->qty_after) == $log->qty_after ? (int) $log->qty_after : $log->qty_after;
-            }
+        if ($outletIds !== []) {
+            $outletRows = DB::table('batches')
+                ->join('medicines', 'medicines.id', '=', 'batches.medicine_id')
+                ->leftJoin('medicine_transfer_items as mti', function ($join) {
+                    $join->on('mti.batches_id', '=', 'batches.id')
+                        ->where('mti.status', '=', 1)
+                        ->where(function ($q) {
+                            $q->whereNull('mti.source_type')
+                                ->orWhere('mti.source_type', '!=', 'retur_gudang');
+                        });
+                })
+                ->whereIn('batches.pharmacy_id', $outletIds)
+                ->where('medicines.minimal_stock', '>', 0)
+                ->groupBy(
+                    'batches.pharmacy_id',
+                    'batches.medicine_id',
+                    'medicines.name',
+                    'medicines.code',
+                    'medicines.unit',
+                    'medicines.minimal_stock'
+                )
+                ->select([
+                    'batches.pharmacy_id',
+                    'batches.medicine_id',
+                    'medicines.name',
+                    'medicines.code',
+                    'medicines.unit',
+                    'medicines.minimal_stock',
+                    DB::raw('COALESCE(SUM(mti.qty), 0) AS current_stock'),
+                    DB::raw('MAX(CASE WHEN COALESCE(mti.original_qty, 0) > 0 OR COALESCE(mti.qty, 0) > 0 THEN 1 ELSE 0 END) AS has_positive_transfer'),
+                ])
+                ->havingRaw('COALESCE(SUM(mti.qty), 0) <= medicines.minimal_stock')
+                ->get();
 
-            return [
-                'id' => $log->id,
-                'name' => $log->medicines->name ?? '-',
-                'code' => $log->medicines->code ?? null,
-                'transaction_code' => $log->transaction_code,
-                'label' => $info['label'],
-                'icon' => $info['icon'],
-                'sign' => $info['sign'],
-                'class' => $info['class'],
-                'color' => $info['color'],
-                'qty' => $qtyFormatted,
-                'qty_after' => $qtyAfterFormatted,
-                'pharmacy_id' => $log->pharmacy_id,
-                'pharmacy_name' => $pharmacyName,
-                'pharmacy_short' => $pharmacyShort,
-                'time' => safeDateFormat($log->created_at, 'd M Y H:i'),
-                'time_relative' => $log->created_at ? $log->created_at->diffForHumans() : '',
-            ];
+            $rows = $rows->concat($outletRows);
+        }
+
+        // Filter: hanya tampilkan obat yang pernah memiliki stok (> 0) di cabang tersebut
+        // (stok saat ini > 0, pernah menerima mutasi masuk > 0, atau punya riwayat items_log dengan qty_before/qty_after > 0).
+        $needsHistoryCheck = $rows->filter(function ($row) {
+            return (float) ($row->current_stock ?? 0) <= 0
+                && (int) ($row->has_positive_transfer ?? 0) === 0;
         });
 
-        return response()->json([
-            'notifications' => $formatted,
-            'meta' => [
-                'can_filter_branch' => $isGlobalViewer,
-                'active_pharmacy_id' => $activePharmacyId,
-                'active_pharmacy_name' => $activePharmacyName,
-                'selected_filter' => $selectedFilter,
-                'branches' => $availableBranches,
-                'count' => $formatted->count(),
-            ],
-        ]);
+        $historicalPositiveKeys = [];
+        if ($needsHistoryCheck->isNotEmpty()) {
+            $checkPharmacyIds = $needsHistoryCheck->pluck('pharmacy_id')->map(fn($v) => (int) $v)->unique()->values()->all();
+            $checkMedicineIds = $needsHistoryCheck->pluck('medicine_id')->map(fn($v) => (int) $v)->unique()->values()->all();
+
+            foreach (array_chunk($checkMedicineIds, 500) as $medChunk) {
+                $historyRows = DB::table('items_log')
+                    ->join('batches', 'batches.id', '=', 'items_log.batches_id')
+                    ->whereIn('batches.pharmacy_id', $checkPharmacyIds)
+                    ->whereIn('batches.medicine_id', $medChunk)
+                    ->where(function ($q) {
+                        $q->where('items_log.qty_before', '>', 0)
+                            ->orWhere('items_log.qty_after', '>', 0);
+                    })
+                    ->select('batches.pharmacy_id', 'batches.medicine_id')
+                    ->distinct()
+                    ->get();
+
+                foreach ($historyRows as $hr) {
+                    $historicalPositiveKeys[((int) $hr->pharmacy_id) . ':' . ((int) $hr->medicine_id)] = true;
+                }
+            }
+        }
+
+        $rows = $rows->filter(function ($row) use ($historicalPositiveKeys) {
+            if ((float) ($row->current_stock ?? 0) > 0) {
+                return true;
+            }
+            if ((int) ($row->has_positive_transfer ?? 0) === 1) {
+                return true;
+            }
+
+            $key = ((int) $row->pharmacy_id) . ':' . ((int) $row->medicine_id);
+            return isset($historicalPositiveKeys[$key]);
+        })->values();
+
+        $totalCount = $rows->count();
+        $criticalCount = 0;
+
+        $sorted = $rows->map(function ($row) use ($branchMap, &$criticalCount) {
+            $currentStock = (float) ($row->current_stock ?? 0);
+            $minimalStock = max(1, (int) ($row->minimal_stock ?? 0));
+            $isOut = $currentStock <= 0;
+            if ($isOut) {
+                $criticalCount++;
+            }
+
+            $ratio = max(0.0, min(1.0, $currentStock / $minimalStock));
+            $pharmacyId = (int) $row->pharmacy_id;
+            $branch = $branchMap[$pharmacyId] ?? ['name' => 'Cabang', 'short_name' => 'Cabang'];
+
+            return [
+                'id' => "low-{$pharmacyId}-{$row->medicine_id}",
+                'type' => 'low_stock',
+                'severity' => $isOut ? 'critical' : 'warning',
+                'status' => $isOut ? 'out_of_stock' : 'low_stock',
+                'label' => $isOut ? 'Stok Habis' : 'Stok Rendah',
+                'medicine_id' => (int) $row->medicine_id,
+                'name' => $row->name ?? '-',
+                'code' => $row->code ?? null,
+                'unit' => $row->unit ?? '',
+                'current_stock' => $this->formatAlertQty($currentStock),
+                'minimal_stock' => $minimalStock,
+                'stock_percent' => (int) round($ratio * 100),
+                'pharmacy_id' => $pharmacyId,
+                'pharmacy_name' => $branch['name'],
+                'pharmacy_short' => $branch['short_name'],
+                'priority_rank' => $isOut ? 1 : 3,
+                'sort_metric' => $ratio,
+            ];
+        })
+            ->sortBy([
+                ['priority_rank', 'asc'],
+                ['sort_metric', 'asc'],
+                ['name', 'asc'],
+            ]);
+
+        if ($limit !== null) {
+            $sorted = $sorted->take($limit);
+        }
+
+        $mapped = $sorted->values()->all();
+
+        return [
+            'items' => $mapped,
+            'total_count' => $totalCount,
+            'critical_count' => $criticalCount,
+        ];
+    }
+
+    /**
+     * Ambil daftar batch stok > 0 yang sudah kedaluwarsa atau mendekati ED (<= $daysThreshold hari).
+     */
+    private function queryNearExpiryAlerts(
+        array $pharmacyIds,
+        array $branchMap,
+        int $warehouseId,
+        int $daysThreshold = 90,
+        ?int $limit = 40
+    ): array {
+        $warehouseIds = array_values(array_filter($pharmacyIds, fn($id) => (int) $id === $warehouseId));
+        $outletIds = array_values(array_filter($pharmacyIds, fn($id) => (int) $id !== $warehouseId));
+
+        $isMysql = DB::connection()->getDriverName() === 'mysql';
+        $today = Carbon::today()->startOfDay();
+        $cutoffDate = $today->copy()->addDays($daysThreshold)->toDateString();
+
+        $parsedExpirySql = "COALESCE("
+            . "STR_TO_DATE(batches.expired_date, '%Y-%m-%d %H:%i:%s'),"
+            . "STR_TO_DATE(batches.expired_date, '%Y-%m-%d %H:%i'),"
+            . "STR_TO_DATE(batches.expired_date, '%Y-%m-%d'),"
+            . "STR_TO_DATE(batches.expired_date, '%d/%m/%Y %H:%i:%s'),"
+            . "STR_TO_DATE(batches.expired_date, '%d/%m/%Y %H:%i'),"
+            . "STR_TO_DATE(batches.expired_date, '%d/%m/%Y'),"
+            . "STR_TO_DATE(batches.expired_date, '%d-%m-%Y %H:%i:%s'),"
+            . "STR_TO_DATE(batches.expired_date, '%d-%m-%Y %H:%i'),"
+            . "STR_TO_DATE(batches.expired_date, '%d-%m-%Y')"
+            . ")";
+
+        $rows = collect();
+
+        if ($warehouseIds !== []) {
+            $q = DB::table('batches')
+                ->join('medicines', 'medicines.id', '=', 'batches.medicine_id')
+                ->whereIn('batches.pharmacy_id', $warehouseIds)
+                ->where('batches.stock', '>', 0)
+                ->whereNotNull('batches.expired_date')
+                ->where('batches.expired_date', '!=', '')
+                ->where('batches.expired_date', '!=', '0000-00-00')
+                ->select([
+                    'batches.id as batch_id',
+                    'batches.name as batch_name',
+                    'batches.pharmacy_id',
+                    'batches.medicine_id',
+                    'batches.expired_date',
+                    'batches.stock as current_stock',
+                    'medicines.name',
+                    'medicines.code',
+                    'medicines.unit',
+                ]);
+
+            if ($isMysql) {
+                $q->whereRaw("{$parsedExpirySql} IS NOT NULL AND YEAR({$parsedExpirySql}) >= 2000 AND {$parsedExpirySql} <= ?", [$cutoffDate]);
+            }
+
+            $rows = $rows->concat($q->get());
+        }
+
+        if ($outletIds !== []) {
+            $q = DB::table('batches')
+                ->join('medicines', 'medicines.id', '=', 'batches.medicine_id')
+                ->join('medicine_transfer_items as mti', function ($join) {
+                    $join->on('mti.batches_id', '=', 'batches.id')
+                        ->where('mti.status', '=', 1)
+                        ->where(function ($sub) {
+                            $sub->whereNull('mti.source_type')
+                                ->orWhere('mti.source_type', '!=', 'retur_gudang');
+                        });
+                })
+                ->whereIn('batches.pharmacy_id', $outletIds)
+                ->whereNotNull('batches.expired_date')
+                ->where('batches.expired_date', '!=', '')
+                ->where('batches.expired_date', '!=', '0000-00-00')
+                ->groupBy(
+                    'batches.id',
+                    'batches.name',
+                    'batches.pharmacy_id',
+                    'batches.medicine_id',
+                    'batches.expired_date',
+                    'medicines.name',
+                    'medicines.code',
+                    'medicines.unit'
+                )
+                ->select([
+                    'batches.id as batch_id',
+                    'batches.name as batch_name',
+                    'batches.pharmacy_id',
+                    'batches.medicine_id',
+                    'batches.expired_date',
+                    DB::raw('COALESCE(SUM(mti.qty), 0) AS current_stock'),
+                    'medicines.name',
+                    'medicines.code',
+                    'medicines.unit',
+                ])
+                ->havingRaw('COALESCE(SUM(mti.qty), 0) > 0');
+
+            if ($isMysql) {
+                $q->whereRaw("{$parsedExpirySql} IS NOT NULL AND YEAR({$parsedExpirySql}) >= 2000 AND {$parsedExpirySql} <= ?", [$cutoffDate]);
+            }
+
+            $rows = $rows->concat($q->get());
+        }
+
+        $expiredCount = 0;
+        $criticalCount = 0;
+
+        $filtered = $rows->map(function ($row) use ($branchMap, $today, $daysThreshold, &$expiredCount, &$criticalCount) {
+            $expiry = $this->parseExpiryDate($row->expired_date);
+            if (!$expiry) {
+                return null;
+            }
+
+            $daysLeft = (int) $today->diffInDays($expiry->copy()->startOfDay(), false);
+            if ($daysLeft > $daysThreshold) {
+                return null;
+            }
+
+            $isExpired = $daysLeft < 0;
+            $isCritical = $daysLeft <= 30;
+            if ($isExpired) {
+                $expiredCount++;
+            }
+            if ($isCritical) {
+                $criticalCount++;
+            }
+
+            if ($isExpired) {
+                $status = 'expired';
+                $label = 'Sudah ED';
+                $countdown = 'Lewat ' . abs($daysLeft) . ' hr';
+                $priorityRank = 0;
+            } elseif ($daysLeft === 0) {
+                $status = 'expiring_soon';
+                $label = 'ED Hari Ini';
+                $countdown = 'Hari ini';
+                $priorityRank = 1;
+            } elseif ($daysLeft <= 30) {
+                $status = 'expiring_soon';
+                $label = 'ED < 30 Hari';
+                $countdown = $daysLeft . ' hr lagi';
+                $priorityRank = 2;
+            } else {
+                $status = 'near_expiry';
+                $label = 'Dekat ED';
+                $countdown = $daysLeft . ' hr lagi';
+                $priorityRank = 4;
+            }
+
+            $pharmacyId = (int) $row->pharmacy_id;
+            $branch = $branchMap[$pharmacyId] ?? ['name' => 'Cabang', 'short_name' => 'Cabang'];
+
+            return [
+                'id' => "ed-{$pharmacyId}-{$row->batch_id}",
+                'type' => 'near_expiry',
+                'severity' => $isCritical ? 'critical' : 'warning',
+                'status' => $status,
+                'label' => $label,
+                'countdown' => $countdown,
+                'days_left' => $daysLeft,
+                'expired_date' => $expiry->format('d M Y'),
+                'batch_id' => (int) $row->batch_id,
+                'batch_name' => $row->batch_name ?: '-',
+                'medicine_id' => (int) $row->medicine_id,
+                'name' => $row->name ?? '-',
+                'code' => $row->code ?? null,
+                'unit' => $row->unit ?? '',
+                'current_stock' => $this->formatAlertQty((float) ($row->current_stock ?? 0)),
+                'pharmacy_id' => $pharmacyId,
+                'pharmacy_name' => $branch['name'],
+                'pharmacy_short' => $branch['short_name'],
+                'priority_rank' => $priorityRank,
+                'sort_metric' => $daysLeft,
+            ];
+        })
+            ->filter()
+            ->values();
+
+        $totalCount = $filtered->count();
+
+        $sortedCollection = $filtered
+            ->sortBy([
+                ['days_left', 'asc'],
+                ['name', 'asc'],
+            ]);
+
+        if ($limit !== null) {
+            $sortedCollection = $sortedCollection->take($limit);
+        }
+
+        $sorted = $sortedCollection->values()->all();
+
+        return [
+            'items' => $sorted,
+            'total_count' => $totalCount,
+            'expired_count' => $expiredCount,
+            'critical_count' => $criticalCount,
+        ];
+    }
+
+    private function formatAlertQty(float $qty): int|float
+    {
+        return floor($qty) == $qty ? (int) $qty : round($qty, 2);
     }
 }
