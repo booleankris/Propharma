@@ -57,6 +57,7 @@ use App\Http\Controllers\ReturController;
 use App\Http\Controllers\SalesController;
 use App\Http\Controllers\SquadController;
 use App\Http\Controllers\StaffStatsController;
+use App\Http\Controllers\StockRevisionController;
 use App\Http\Controllers\SuppliesController;
 use App\Http\Controllers\TransactionReportController;
 use App\Http\Controllers\TransfersController;
@@ -403,6 +404,16 @@ Route::middleware(['auth', 'role:General Manager|Kasir|Gudang PMI|HO|administrat
     Route::get('supplies/batches', [SuppliesController::class, 'getBatchesByMedicine'])->name('supplies.batches');
     Route::get('/supplies/scanner', [SuppliesController::class, 'scannerPage'])->name('supplies.scanner');
     Route::get('/supplies/scan', [SuppliesController::class, 'scanBarcode'])->name('supplies.scan');
+
+    // Stock Revision (Revisi Stok Terfokus -> Masuk Kartu Stok)
+    Route::prefix('stock-revision')->name('supplies.revision.')->group(function () {
+        Route::get('/', [StockRevisionController::class, 'index'])->name('index');
+        Route::get('/search-medicine', [StockRevisionController::class, 'searchMedicines'])->name('searchMedicine');
+        Route::get('/anomalies', [StockRevisionController::class, 'anomalies'])->name('anomalies');
+        Route::get('/history', [StockRevisionController::class, 'history'])->name('history');
+        Route::get('/medicine/{medicineId}', [StockRevisionController::class, 'inspectMedicine'])->name('inspect');
+        Route::post('/', [StockRevisionController::class, 'store'])->name('store');
+    });
 
     // Stock Detail
     Route::get('/stock-detail', [SuppliesController::class, 'stockDetail'])->name('supplies.stockDetail');

@@ -179,17 +179,28 @@
             <div class="">
 
                 <div class="card shadow-md rounded-2xl p-6 bg-white">
-                    <div class="flex items-center gap-2">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-blue-600" viewBox="0 0 24 24"
-                            fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
-                            stroke-linejoin="round" class="icon icon-tabler icons-tabler-outline icon-tabler-repeat">
-                            <path stroke="none" d="M0 0h24v24H0z" fill="none" />
-                            <path d="M4 12v-3a3 3 0 0 1 3 -3h13m-3 -3l3 3l-3 3" />
-                            <path d="M20 12v3a3 3 0 0 1 -3 3h-13m3 3l-3 -3l3 -3" />
-                        </svg>
-                        <h2 class="text-lg font-semibold text-gray-800">Kartu Stock</h2>
-                        @if(isWarehousePharmacy())
-                            <span class="px-2.5 py-0.5 text-xs font-bold bg-blue-50 text-blue-700 border border-blue-200 rounded-full">Apotek SAHABAT PMI</span>
+                    <div class="flex flex-wrap items-center justify-between gap-2">
+                        <div class="flex items-center gap-2">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-blue-600" viewBox="0 0 24 24"
+                                fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                                stroke-linejoin="round" class="icon icon-tabler icons-tabler-outline icon-tabler-repeat">
+                                <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+                                <path d="M4 12v-3a3 3 0 0 1 3 -3h13m-3 -3l3 3l-3 3" />
+                                <path d="M20 12v3a3 3 0 0 1 -3 3h-13m3 3l-3 -3l3 -3" />
+                            </svg>
+                            <h2 class="text-lg font-semibold text-gray-800">Kartu Stock</h2>
+                            @if(isWarehousePharmacy())
+                                <span class="px-2.5 py-0.5 text-xs font-bold bg-blue-50 text-blue-700 border border-blue-200 rounded-full">Apotek SAHABAT PMI</span>
+                            @endif
+                        </div>
+                        @if(hasFeatureAccess('supplies.revision', 'General Manager|Koordinator|koordinator|administrator'))
+                            <a href="{{ route('supplies.revision.index') }}"
+                                class="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-indigo-50 text-indigo-700 border border-indigo-200 hover:bg-indigo-600 hover:text-white text-xs font-bold transition-colors">
+                                <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                </svg>
+                                Revisi Stok
+                            </a>
                         @endif
                     </div>
                     <div class="flex flex-wrap items-end gap-4 py-2">

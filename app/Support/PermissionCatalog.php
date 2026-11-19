@@ -172,6 +172,11 @@ class PermissionCatalog
                         'description' => 'Input/import Excel Stock Opname (/stockopname) dan penyesuaian stok fisik.',
                         'roles' => $nonOnlineRoles,
                     ],
+                    'supplies.revision' => [
+                        'label' => 'Revisi Stok Terfokus (Masuk Kartu Stok)',
+                        'description' => 'Revisi & penyelarasan stok batch terhadap saldo Kartu Stok (/stock-revision) tanpa mengubah Saldo Awal.',
+                        'roles' => ['General Manager', 'Koordinator', 'koordinator', 'administrator'],
+                    ],
                     'transfers.manage' => [
                         'label' => 'Mutasi Stok Antar Cabang & Etalase',
                         'description' => 'Buat mutasi keluar, request mutasi, terima/tolak mutasi masuk (wajib PIN), dan kelola etalase cabang.',

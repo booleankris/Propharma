@@ -20,6 +20,7 @@ use App\Models\Etalases;
 use App\Models\Pharmacies;
 use App\Models\StockOpname;
 use App\Services\StockDataReportService;
+use App\Services\StockLedgerService;
 use App\Services\StockOpnameImportService;
 use Carbon\Carbon;
 use DataTables;
@@ -52,195 +53,24 @@ class SuppliesController extends Controller
         return null;
     }
 
-    private function stockLogDelta(ItemsLog $log): int
+    private function stockLedger(): StockLedgerService
     {
-        $status = (int) $log->status;
-
-        if ($status === 1 || $status === 4) {
-            return -abs((int) $log->qty);
-        }
-
-        if (in_array($status, [2, 3], true)) {
-            return abs((int) $log->qty);
-        }
-
-        // Revisi Penerimaan (status 8): qty is already signed (+ for added, - for reduced)
-        if ($status === 8) {
-            return (int) $log->qty;
-        }
-
-        // Hapus Penerimaan (status 9): qty is reversed inventory (-)
-        if ($status === 9) {
-            return -abs((int) $log->qty);
-        }
-
-        // Opname (status 5): prefer the `total` field which stores the actual
-        // signed discrepancy (counterPhysic - counterBefore). The qty_before /
-        // qty_after columns on legacy rows may contain global medicines.stock
-        // snapshots rather than branch-specific values, making the difference
-        // unreliable. Fall back to qty_after - qty_before only when `total` is
-        // missing or is a non-numeric placeholder (e.g. "-").
-        if ($status === 5) {
-            $totalVal = $log->total;
-            if ($totalVal !== null && $totalVal !== '' && $totalVal !== '-' && is_numeric($totalVal)) {
-                return (int) $totalVal;
-            }
-            // Fallback: use qty delta
-            return (int) $log->qty_after - (int) $log->qty_before;
-        }
-
-        // Adjustment (status 6) and Mutation (status 7): use qty_after - qty_before
-        return (int) $log->qty_after - (int) $log->qty_before;
+        return app(StockLedgerService::class);
     }
 
-    /**
-     * Hitung running balance sekuensial dengan memprioritaskan patokan tetap
-     * dari baris SO-SALDO-AWAL (forward replay) agar SALDO AWAL konsisten
-     * dan tidak ikut berubah-ubah jika ada selisih di tabel stok batch/etalase.
-     *
-     * Jika tidak ada baris SO-SALDO-AWAL sama sekali, fallback ke hitung mundur
-     * dari $fallbackRealtimeStock.
-     *
-     * @param \Illuminate\Support\Collection<int, ItemsLog> $orderedRows
-     * @param int $fallbackRealtimeStock
-     * @return array{runningMap: array<int, array{start: int, end: int, before: int, after: int}>, initialStart: int, finalEnd: int, hasOpeningAnchor: bool}
-     */
+    private function stockLogDelta(ItemsLog $log): int
+    {
+        return $this->stockLedger()->stockLogDelta($log);
+    }
+
     private function buildRunningLedger($orderedRows, int $fallbackRealtimeStock): array
     {
-        $rows = $orderedRows->values();
-        if ($rows->isEmpty()) {
-            return [
-                'runningMap'       => [],
-                'initialStart'     => 0,
-                'finalEnd'         => $fallbackRealtimeStock,
-                'hasOpeningAnchor' => false,
-            ];
-        }
-
-        $anchorIdx = null;
-        foreach ($rows as $idx => $row) {
-            if (($row->type ?? null) === 'SO-SALDO-AWAL') {
-                $anchorIdx = $idx;
-            }
-        }
-
-        $runningMap = [];
-
-        if ($anchorIdx !== null) {
-            $anchorQty = (int) $rows[$anchorIdx]->qty_before;
-
-            // 1. Jika ada baris sebelum SO-SALDO-AWAL, hitung mundur secara kontinu dari SO-SALDO-AWAL ke baris ke-0
-            $backRunning = $anchorQty;
-            for ($i = $anchorIdx - 1; $i >= 0; $i--) {
-                $r = $rows[$i];
-                $delta = $this->stockLogDelta($r);
-                $rowEnd = $backRunning;
-                $rowStart = $rowEnd - $delta;
-                $backRunning = $rowStart;
-
-                $runningMap[$r->id] = [
-                    'start'  => $rowStart,
-                    'end'    => $rowEnd,
-                    'before' => $rowStart,
-                    'after'  => $rowEnd,
-                ];
-            }
-
-            $initialStart = $backRunning;
-
-            // 2. Pada baris SO-SALDO-AWAL dan seluruh baris setelahnya, hitung MAJU (forward) secara konsisten
-            $currRunning = $anchorQty;
-            $count = $rows->count();
-            for ($i = $anchorIdx; $i < $count; $i++) {
-                $r = $rows[$i];
-                if ($i === $anchorIdx) {
-                    $rowStart = $currRunning;
-                    $rowEnd = $currRunning;
-                } else {
-                    $rowStart = $currRunning;
-                    $delta = $this->stockLogDelta($r);
-                    $rowEnd = $rowStart + $delta;
-                    $currRunning = $rowEnd;
-                }
-
-                $runningMap[$r->id] = [
-                    'start'  => $rowStart,
-                    'end'    => $rowEnd,
-                    'before' => $rowStart,
-                    'after'  => $rowEnd,
-                ];
-            }
-
-            return [
-                'runningMap'       => $runningMap,
-                'initialStart'     => $initialStart,
-                'finalEnd'         => $currRunning,
-                'hasOpeningAnchor' => true,
-            ];
-        }
-
-        // Fallback (jika belum pernah ada SO-SALDO-AWAL): hitung mundur dari stok real-time
-        $totalMovement = $rows->sum(fn($log) => $this->stockLogDelta($log));
-        $currRunning = $fallbackRealtimeStock - $totalMovement;
-        $initialStart = $currRunning;
-
-        foreach ($rows as $r) {
-            $rowStart = $currRunning;
-            $delta = $this->stockLogDelta($r);
-            $rowEnd = $rowStart + $delta;
-            $currRunning = $rowEnd;
-
-            $runningMap[$r->id] = [
-                'start'  => $rowStart,
-                'end'    => $rowEnd,
-                'before' => $rowStart,
-                'after'  => $rowEnd,
-            ];
-        }
-
-        return [
-            'runningMap'       => $runningMap,
-            'initialStart'     => $initialStart,
-            'finalEnd'         => $currRunning,
-            'hasOpeningAnchor' => false,
-        ];
+        return $this->stockLedger()->buildRunningLedger($orderedRows, $fallbackRealtimeStock);
     }
 
     private function calculateRealtimeStock($medicineId, $pharmacyId, $type = 'total')
     {
-        if (!$medicineId) return 0;
-
-        $warehouseId = getWarehousePharmacyId();
-        $canSeeWarehouse = canAccessWarehouseStock($pharmacyId);
-
-        $storageStock = $canSeeWarehouse
-            ? (int) Batches::where('medicine_id', $medicineId)
-                ->where('pharmacy_id', $warehouseId)
-                ->sum('stock')
-            : 0;
-
-        if ($type === 'storage') {
-            return $storageStock;
-        }
-
-        // Jika farmasi adalah Gudang (id 9), stok etalase/pelayanan diambil dari SAHABAT PMI (id 1)
-        $counterPharmacyId = isWarehousePharmacy($pharmacyId) ? 1 : $pharmacyId;
-
-        $counterStock = (int) MedicineTransferItems::whereHas('batches', function ($b) use ($medicineId, $counterPharmacyId) {
-                $b->where('medicine_id', $medicineId)
-                  ->where('pharmacy_id', $counterPharmacyId);
-            })
-            ->where('status', 1)
-            ->where(function ($q) {
-                $q->whereNull('source_type')->orWhere('source_type', '!=', 'retur_gudang');
-            })
-            ->sum('qty');
-
-        if ($type === 'counter') {
-            return $counterStock;
-        }
-
-        return $storageStock + $counterStock;
+        return $this->stockLedger()->calculateRealtimeStock((int) $medicineId, (int) $pharmacyId, (string) $type);
     }
 
     // Stok Pelayanan
@@ -651,6 +481,9 @@ class SuppliesController extends Controller
                     } else if ($row->status == 5) {
                         return "<div style='text-align: center; font-weight: bold; text-transform: uppercase; background-color: #ede9fe; color: #6d28d9; padding: 6px 4px; width:100px; font-size: 9px; font-family: Poppins; border-radius: 25px;'>Stock Opname</div>";
                     } else if ($row->status == 6) {
+                        if (($row->type ?? null) === 'REVISI STOK') {
+                            return "<div style='text-align: center; font-weight: bold; text-transform: uppercase; background-color: #eef2ff; color: #4338ca; padding: 6px 4px; width:100px; font-size: 9px; font-family: Poppins; border-radius: 25px;'>Revisi Stok</div>";
+                        }
                         return "<div style='text-align: center; font-weight: bold; text-transform: uppercase; background-color: #e0f2fe; color: #0369a1; padding: 6px 4px; width:100px; font-size: 9px; font-family: Poppins; border-radius: 25px;'>Penyesuaian</div>";
                     } else if ($row->status == 7) {
                         return "<div style='text-align: center; font-weight: bold; text-transform: uppercase; background-color: #aeffeaad; color: #238787; padding: 6px 4px; width:100px; font-size: 9px; font-family: Poppins; border-radius: 25px;'>Mutasi Stok</div>";
@@ -844,7 +677,9 @@ class SuppliesController extends Controller
                         8 => ['label' => 'Revisi Faktur', 'bg' => '#e0e7ff', 'color' => '#4338ca'],
                         9 => ['label' => 'Hapus Terima', 'bg' => '#ffe4e6', 'color' => '#be123c'],
                     ];
-                    $s = $map[$row->status] ?? ['label' => $row->type ?: '—', 'bg' => '#F1EFE8', 'color' => '#5F5E5A'];
+                    $s = (($row->status == 6) && (($row->type ?? null) === 'REVISI STOK'))
+                        ? ['label' => 'Revisi Stok', 'bg' => '#eef2ff', 'color' => '#4338ca']
+                        : ($map[$row->status] ?? ['label' => $row->type ?: '—', 'bg' => '#F1EFE8', 'color' => '#5F5E5A']);
                     return "
                     <div style='
                         text-align:center;font-weight:600;text-transform:uppercase;
@@ -1663,6 +1498,9 @@ class SuppliesController extends Controller
                         case 5:
                             return '<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-purple-50 text-purple-700 border border-purple-200 whitespace-nowrap">Stock Opname</span>';
                         case 6:
+                            if (($row->type ?? null) === 'REVISI STOK') {
+                                return '<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200 whitespace-nowrap">Revisi Stok</span>';
+                            }
                             return '<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-sky-50 text-sky-700 border border-sky-200 whitespace-nowrap">Penyesuaian</span>';
                         case 7:
                             return '<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-teal-50 text-teal-700 border border-teal-200 whitespace-nowrap">Mutasi Stok</span>';
