@@ -670,7 +670,7 @@
                                         data-transfer-id="{{ $transfer->id }}" title="Pilih etalase tujuan penerima">
                                         <option value="">— Pilih Etalase —</option>
                                         @if (count($etalases ?? []) > 0)
-                                            <option value="default">Default (Riwayat / Acak)</option>
+                                            <option value="default" selected>Default (Riwayat / Acak)</option>
                                         @endif
                                         @foreach ($etalases ?? [] as $et)
                                             <option value="{{ $et->id }}">{{ $et->name }}</option>
