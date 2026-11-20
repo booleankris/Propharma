@@ -18,6 +18,9 @@ class MedicineTransferItems extends Model
         'etalases_id',
         'etalase_updated_by',
         'etalase_updated_at',
+        'transfer_location_id',
+        'location_updated_by',
+        'location_updated_at',
         'qty',
         'original_qty',
         'status',
@@ -27,6 +30,7 @@ class MedicineTransferItems extends Model
     protected $casts = [
         'stock_deducted_at' => 'datetime',
         'etalase_updated_at' => 'datetime',
+        'location_updated_at' => 'datetime',
     ];
 
     protected static function booted(): void
@@ -78,5 +82,15 @@ class MedicineTransferItems extends Model
     public function etalaseUpdater()
     {
         return $this->belongsTo(User::class, 'etalase_updated_by');
+    }
+
+    public function transferLocation()
+    {
+        return $this->belongsTo(TransferLocation::class, 'transfer_location_id');
+    }
+
+    public function locationUpdater()
+    {
+        return $this->belongsTo(User::class, 'location_updated_by');
     }
 }

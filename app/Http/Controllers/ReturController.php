@@ -16,13 +16,110 @@ use App\Models\Receiving;
 use App\Models\ReceivingItems;
 use App\Models\ReceivingDetails;
 use App\Models\Retur;
+use App\Models\User;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 class ReturController extends Controller
 {
+    /**
+     * Role yang diizinkan untuk menyetujui Retur Penjualan via PIN pribadi.
+     */
+    protected const AUTHORIZED_RETUR_PIN_ROLES = [
+        'retur',
+        'administrator',
+        'general manager',
+    ];
+
+    /**
+     * Cek apakah user memiliki salah satu role otorisasi retur penjualan.
+     */
+    protected function isAuthorizedReturPinUser(User $user): bool
+    {
+        $roleNames = $user->relationLoaded('roles')
+            ? $user->roles->pluck('name')
+            : $user->getRoleNames();
+
+        foreach ($roleNames as $roleName) {
+            if (in_array(strtolower(trim((string) $roleName)), self::AUTHORIZED_RETUR_PIN_ROLES, true)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Validasi 4 digit PIN dan pastikan pemilik PIN memiliki role yang berhak (lintas cabang diperbolehkan).
+     *
+     * @return array{user: ?User, message: ?string, status: int}
+     */
+    protected function resolveReturPinActor(?string $rawPin): array
+    {
+        $pin = trim((string) $rawPin);
+        if ($pin === '' || !preg_match('/^\d{4}$/', $pin)) {
+            return [
+                'user' => null,
+                'message' => 'PIN wajib diisi 4 digit angka sebelum memproses retur.',
+                'status' => 422,
+            ];
+        }
+
+        $candidates = User::with('roles:id,name')
+            ->where('secret_pin', $pin)
+            ->get();
+
+        if ($candidates->isEmpty()) {
+            return [
+                'user' => null,
+                'message' => 'PIN salah, silakan coba lagi.',
+                'status' => 422,
+            ];
+        }
+
+        $authorized = $candidates->first(fn (User $candidate) => $this->isAuthorizedReturPinUser($candidate));
+        if (!$authorized) {
+            return [
+                'user' => null,
+                'message' => 'PIN tidak memiliki akses Retur (khusus role Retur, General Manager, atau administrator).',
+                'status' => 403,
+            ];
+        }
+
+        return [
+            'user' => $authorized,
+            'message' => null,
+            'status' => 200,
+        ];
+    }
+
+    /**
+     * Endpoint verifikasi PIN untuk modal Retur Penjualan.
+     */
+    public function verifyReturPin(Request $request)
+    {
+        $result = $this->resolveReturPinActor($request->input('pin'));
+        $user = $result['user'];
+
+        if (!$user) {
+            return response()->json([
+                'success' => false,
+                'message' => $result['message'],
+            ]);
+        }
+
+        return response()->json([
+            'success' => true,
+            'user' => [
+                'id' => $user->id,
+                'name' => $user->name ?: ($user->username ?? 'User'),
+                'username' => $user->username ?? null,
+            ],
+        ]);
+    }
 
     /**
      * Ambil daftar akun Kas & Bank aktif untuk cabang tertentu.
@@ -373,7 +470,26 @@ class ReturController extends Controller
             'old_qty' => 'required',
             'transfer_id' => 'required',
             'account_id' => 'nullable|string',
+            'pin' => ['required', 'digits:4'],
+        ], [
+            'pin.required' => 'PIN wajib diisi sebelum memproses retur penjualan.',
+            'pin.digits' => 'PIN harus terdiri dari 4 digit angka.',
         ]);
+
+        $pinCheck = $this->resolveReturPinActor($request->input('pin'));
+        $pinActor = $pinCheck['user'];
+        if (!$pinActor) {
+            if (!$request->expectsJson() && !$request->ajax()) {
+                return redirect()->back()
+                    ->withErrors(['pin' => $pinCheck['message']])
+                    ->withInput();
+            }
+
+            return response()->json([
+                'success' => false,
+                'message' => $pinCheck['message'],
+            ], $pinCheck['status']);
+        }
 
         $findcode = MedicineTransactions::findOrFail($request->transaction_id);
 
@@ -502,19 +618,23 @@ class ReturController extends Controller
                 'date' => $now,
                 'status' => 3,
                 'batches_id' => $batchIdForLog,
-                'user_id' => auth()->user()->id,
+                'user_id' => $pinActor->id,
             ]);
 
             // Create record di tabel Retur
             $returCode = $this->generateReturCode();
-            Retur::create([
+            $returPayload = [
                 'code' => $returCode,
                 'transaction_id' => $request->transaction_id,
                 'medicine_id' => $request->medicine_id,
                 'qty_retur' => $request->qty_retur,
                 'total_retur' => $request->total_retur,
                 'status' => 1,
-            ]);
+            ];
+            if (Schema::hasColumn('retur', 'user_id')) {
+                $returPayload['user_id'] = $pinActor->id;
+            }
+            Retur::create($returPayload);
 
             $activeshift = activeShift();
 
@@ -526,6 +646,7 @@ class ReturController extends Controller
                 "debtor_id" => $getTransactiondata->debtor_id,
                 "doctor_id" => $getTransactiondata->doctor_id,
                 "patient_id" => $getTransactiondata->patient_id,
+                "user_id" => $pinActor->id,
                 "transaction_type" => in_array($getTransactiondata->transaction_type, ['KREDIT', 'RESEP KREDIT'], true) ? 'RETUR KREDIT' : 'RETUR JUAL',
                 "transaction_code" => "RT",
                 "paid" => "-",
@@ -578,7 +699,7 @@ class ReturController extends Controller
                     'amount' => $refundAmount,
                     'reference_number' => $returCode,
                     'notes' => 'Pengembalian dana retur penjualan (' . $viaLabel . '): ' . $medName . ' (' . $patientName . ' - Struk: ' . $origCode . ')',
-                    'created_by' => auth()->id(),
+                    'created_by' => $pinActor->id,
                 ]);
 
                 $refundAccount->decrement('balance', $refundAmount);
@@ -589,15 +710,20 @@ class ReturController extends Controller
 
             DB::commit();
 
+            $actorName = $pinActor->name ?: ($pinActor->username ?? 'User');
             $newRemainingQty = max(0, $remainingQty - (float) $request->qty_retur);
             return response()->json([
                 'success' => true,
                 'message' => $newRemainingQty <= 0
-                    ? 'Retur berhasil disimpan. Seluruh quantity obat ini telah selesai diretur dan dikunci.'
-                    : 'Retur berhasil disimpan. Sisa quantity yang dapat diretur: ' . $newRemainingQty . '.',
+                    ? "Retur berhasil disimpan oleh {$actorName}. Seluruh quantity obat ini telah selesai diretur dan dikunci."
+                    : "Retur berhasil disimpan oleh {$actorName}. Sisa quantity yang dapat diretur: {$newRemainingQty}.",
                 'remaining_qty' => $newRemainingQty,
                 'is_locked' => ($newRemainingQty <= 0),
                 'retur_code' => $this->generateReturCode(), // next retur code
+                'actor' => [
+                    'id' => $pinActor->id,
+                    'name' => $actorName,
+                ],
             ]);
         } catch (\Throwable $e) {
             DB::rollBack();

@@ -171,6 +171,7 @@
                                 <th>Pasien</th>
                                 <th>Obat</th>
                                 <th>Jenis</th>
+                                <th>Petugas</th>
                                 <th class="col-right">Total Retur</th>
                                 <th class="col-right">Total</th>
                             </tr>
@@ -248,6 +249,12 @@
                     },
                     {
                         data: 'jenis'
+                    },
+                    {
+                        data: 'actor_name',
+                        render: val => val && val !== '-'
+                            ? `<span class="inline-block text-[11px] font-medium px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700">${$('<div>').text(val).html()}</span>`
+                            : '<span class="text-gray-400">-</span>'
                     },
                     {
                         data: 'qty_retur',

@@ -251,8 +251,9 @@
                                 </table>
                             </div>
                         </div>
-                        <form method="post" action="{{ route('returdata.returItem') }}" class="mt-3">
+                        <form id="legacyReturForm" method="post" action="{{ route('returdata.returItem') }}" class="mt-3">
                             @csrf
+                            <input id="legacy_retur_pin" type="hidden" name="pin">
                             <div class="flex flex-wrap py-2 w-full gap-1">
                                 <input id="medicine_id" type="hidden" name="medicine_id">
                                 <input id="cart_id" type="hidden" name="cart_id">
@@ -345,6 +346,8 @@
             </div>
         </div>
     </section>
+
+    @include('kasir.retur.partials.pin_modal')
 @endsection
 
 @section('scripts')
@@ -586,6 +589,25 @@
 
                 loadMedicineForRetur(data);
             });
+
+            const legacyForm = document.getElementById('legacyReturForm');
+            const legacyPinInput = document.getElementById('legacy_retur_pin');
+            if (legacyForm && legacyPinInput) {
+                legacyForm.addEventListener('submit', async function(e) {
+                    if (legacyPinInput.value && /^\d{4}$/.test(legacyPinInput.value)) {
+                        return;
+                    }
+                    e.preventDefault();
+                    const res = await window.requestReturPin({
+                        title: 'Otorisasi PIN Retur',
+                        subtitle: 'Masukkan 4 digit PIN user role Retur, General Manager, atau administrator.',
+                    });
+                    if (res && res.pin) {
+                        legacyPinInput.value = res.pin;
+                        legacyForm.submit();
+                    }
+                });
+            }
         });
     </script>
 

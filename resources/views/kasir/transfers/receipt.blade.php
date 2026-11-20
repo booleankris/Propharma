@@ -173,6 +173,7 @@
         })->values();
 
         $senderDisplayName = $senderName;
+        $isPmiDestination = isPmiPharmacy($transfer->destination_pharmacy_id ?: $sortedItems->first()?->batches?->pharmacy_id);
     @endphp
 
     <h1>Tanda Terima Barang</h1>
@@ -203,6 +204,9 @@
                 <th class="satuan-col">Satuan</th>
                 <th class="batch-col">Batch</th>
                 <th class="ed-col">Expired Date</th>
+                @if ($isPmiDestination)
+                    <th style="width: 85px;">Lokasi</th>
+                @endif
             </tr>
         </thead>
         <tbody>
@@ -222,6 +226,9 @@
                 <td class="satuan-col">{{ strtoupper($unit) }}</td>
                 <td class="batch-col">{{ $batchName }}</td>
                 <td class="ed-col">{{ $ed }}</td>
+                @if ($isPmiDestination)
+                    <td>{{ $item->transferLocation?->name ?? '—' }}</td>
+                @endif
             </tr>
             @endforeach
         </tbody>

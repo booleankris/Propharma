@@ -9,6 +9,7 @@ use App\Models\Medicines;
 use App\Models\MedicineTransferItems;
 use App\Models\MedicineTransfers;
 use App\Models\Pharmacies;
+use App\Models\TransferLocation;
 use App\Models\Transfers;
 use App\Models\User;
 use Carbon\Carbon;
@@ -180,6 +181,120 @@ class TransfersController extends Controller
             ->where(function ($q) use ($pharmacyId) {
                 $q->where('pharmacy_id', $pharmacyId)
                   ->orWhereNull('pharmacy_id');
+            })
+            ->exists();
+
+        return $exists ? $id : null;
+    }
+
+    /**
+     * Cek ketersediaan tabel transfer_locations & kolom transfer_location_id pada item mutasi.
+     */
+    protected function hasTransferLocationSchema(): bool
+    {
+        return Schema::hasTable('transfer_locations')
+            && Schema::hasColumn('medicine_transfer_items', 'transfer_location_id');
+    }
+
+    /**
+     * Cek ketersediaan kolom audit pada tabel transfer_locations.
+     */
+    protected function hasTransferLocationAuditColumns(): bool
+    {
+        return Schema::hasTable('transfer_locations')
+            && Schema::hasColumn('transfer_locations', 'created_by')
+            && Schema::hasColumn('transfer_locations', 'updated_by');
+    }
+
+    /**
+     * Cek ketersediaan kolom audit lokasi pada tabel medicine_transfer_items.
+     */
+    protected function hasTransferItemLocationAuditColumns(): bool
+    {
+        return Schema::hasColumn('medicine_transfer_items', 'location_updated_by')
+            && Schema::hasColumn('medicine_transfer_items', 'location_updated_at');
+    }
+
+    /**
+     * Pastikan 3 lokasi default PMI selalu tersedia saat tabel transfer_locations kosong.
+     */
+    protected function ensureDefaultPmiTransferLocations(): void
+    {
+        if (!Schema::hasTable('transfer_locations')) {
+            return;
+        }
+
+        if (TransferLocation::where(function ($q) {
+            $q->where('pharmacy_id', 1)->orWhereNull('pharmacy_id');
+        })->exists()) {
+            return;
+        }
+
+        $now = Carbon::now();
+        foreach (['Pelayanan Lt.1', 'Pelayanan Lt.2', 'Online'] as $defaultName) {
+            TransferLocation::create([
+                'name' => $defaultName,
+                'pharmacy_id' => 1,
+                'status' => 1,
+                'created_at' => $now,
+                'updated_at' => $now,
+            ]);
+        }
+    }
+
+    /**
+     * Format data lokasi tujuan PMI beserta info audit pembuat/pengubah.
+     */
+    protected function formatTransferLocationPayload(TransferLocation $location): array
+    {
+        return [
+            'id' => $location->id,
+            'name' => $location->name,
+            'pharmacy_id' => $location->pharmacy_id,
+            'updated_by_name' => $this->hasTransferLocationAuditColumns() ? ($location->updated_by_name ?? null) : null,
+            'updated_at_formatted' => $location->updated_at ? $location->updated_at->format('d M Y H:i') : null,
+        ];
+    }
+
+    /**
+     * Ambil daftar lokasi mutasi PMI (default: Pelayanan Lt.1, Pelayanan Lt.2, Online).
+     */
+    protected function getTransferLocationsForPharmacy(int $pharmacyId = 1)
+    {
+        if (!Schema::hasTable('transfer_locations')) {
+            return collect();
+        }
+
+        $this->ensureDefaultPmiTransferLocations();
+
+        $query = TransferLocation::query();
+        if ($this->hasTransferLocationAuditColumns()) {
+            $query->with(['creator:id,name,username', 'updater:id,name,username']);
+        }
+
+        $targetPharmacyId = $pharmacyId > 0 ? $pharmacyId : 1;
+        $query->where(function ($q) use ($targetPharmacyId) {
+            $q->where('pharmacy_id', $targetPharmacyId)->orWhereNull('pharmacy_id');
+        });
+
+        return $query->orderBy('id')->get()->map(function (TransferLocation $location) {
+            return (object) $this->formatTransferLocationPayload($location);
+        })->values();
+    }
+
+    /**
+     * Validasi bahwa ID lokasi mutasi PMI valid.
+     */
+    protected function resolvePmiTransferLocationId($locationId): ?int
+    {
+        if (empty($locationId) || !Schema::hasTable('transfer_locations')) {
+            return null;
+        }
+
+        $id = (int) $locationId;
+        $exists = TransferLocation::whereKey($id)
+            ->where(function ($q) {
+                $q->where('pharmacy_id', 1)->orWhereNull('pharmacy_id');
             })
             ->exists();
 
@@ -427,7 +542,8 @@ class TransfersController extends Controller
         }
 
         $pharmacies = $pharmaciesQuery->get();
-        return view('kasir.transfers.create_transfers', compact('now', 'pharmacies', 'code'));
+        $transferLocations = $this->getTransferLocationsForPharmacy(1);
+        return view('kasir.transfers.create_transfers', compact('now', 'pharmacies', 'code', 'transferLocations'));
     }
 
     public function createTransferRequest()
@@ -443,6 +559,7 @@ class TransfersController extends Controller
             'pharmacies' => $pharmacies,
             'code' => $this->generateTransfersCode(),
             'now' => Carbon::now(),
+            'transferLocations' => isPmiPharmacy($currentPharmacyId) ? $this->getTransferLocationsForPharmacy(1) : collect(),
         ]);
     }
 
@@ -503,6 +620,7 @@ class TransfersController extends Controller
             'items' => 'required|array|min:1',
             'items.*.batches_id' => 'required|exists:batches,id',
             'items.*.etalases_id' => 'nullable|exists:etalases,id',
+            'items.*.transfer_location_id' => 'nullable|integer',
             'items.*.source_type' => 'required|in:gudang,pelayanan',
             'items.*.qty' => 'required|integer|min:1',
         ]);
@@ -570,7 +688,7 @@ class TransfersController extends Controller
             ]);
 
             foreach ($validated['items'] as $line) {
-                MedicineTransferItems::create([
+                $itemCreate = [
                     'medicine_transfer_id' => $transfer->id,
                     'requested_medicine_id' => Batches::find($line['batches_id'])->medicine_id,
                     'source_batches_id' => $line['batches_id'],
@@ -578,7 +696,15 @@ class TransfersController extends Controller
                     'etalases_id' => $line['etalases_id'] ?? null,
                     'qty' => $line['qty'],
                     'status' => 0,
-                ]);
+                ];
+                if (isPmiPharmacy($requesterPharmacyId) && $this->hasTransferLocationSchema()) {
+                    $resolvedLoc = $this->resolvePmiTransferLocationId($line['transfer_location_id'] ?? null);
+                    if (!empty($line['transfer_location_id']) && !$resolvedLoc) {
+                        throw \Illuminate\Validation\ValidationException::withMessages(['items' => 'Lokasi tujuan PMI tidak valid.']);
+                    }
+                    $itemCreate['transfer_location_id'] = $resolvedLoc;
+                }
+                MedicineTransferItems::create($itemCreate);
             }
 
             return $transfer;
@@ -677,6 +803,9 @@ class TransfersController extends Controller
                             'status' => 0,
                             'stock_deducted_at' => $now,
                         ];
+                        if ($this->hasTransferLocationSchema() && $requestedItem->transfer_location_id) {
+                            $itemData['transfer_location_id'] = $requestedItem->transfer_location_id;
+                        }
                         if ($requestedItem->batches_id === null) {
                             $requestedItem->update($itemData);
                         } else {
@@ -744,6 +873,7 @@ class TransfersController extends Controller
             'items' => 'required|array|min:1',
             'items.*.batches_id' => 'required|exists:batches,id',
             'items.*.etalases_id' => 'nullable|exists:etalases,id',
+            'items.*.transfer_location_id' => 'nullable|integer',
             'items.*.qty' => 'required|integer|min:1',
             'items.*.source_type' => 'required|in:gudang,pelayanan',
             'pin' => 'nullable|string',
@@ -790,10 +920,22 @@ class TransfersController extends Controller
                     }
                 }
 
-                // Aggregate items with identical batches_id and source_type to prevent duplicate entries
+                $isPmiDest = isPmiPharmacy((int) $request->pharmacy);
+                $hasLocationSchema = $this->hasTransferLocationSchema();
+                $hasLocationAudit = $this->hasTransferItemLocationAuditColumns();
+
+                // Aggregate items with identical batches_id, source_type, and PMI location to prevent unintended merges
                 $aggregatedItems = [];
                 foreach ($request->items as $line) {
-                    $key = $line['batches_id'] . '_' . ($line['source_type'] ?? 'gudang');
+                    $resolvedLocId = null;
+                    if ($isPmiDest && $hasLocationSchema) {
+                        $resolvedLocId = $this->resolvePmiTransferLocationId($line['transfer_location_id'] ?? null);
+                        if (!$resolvedLocId) {
+                            throw new \Exception('Pilih lokasi tujuan PMI untuk setiap barang yang dimutasi ke PMI.');
+                        }
+                    }
+
+                    $key = $line['batches_id'] . '_' . ($line['source_type'] ?? 'gudang') . '_' . ($resolvedLocId ?? 'none');
                     if (isset($aggregatedItems[$key])) {
                         $aggregatedItems[$key]['qty'] += (int) $line['qty'];
                     } else {
@@ -801,6 +943,7 @@ class TransfersController extends Controller
                             'batches_id' => $line['batches_id'],
                             'source_type' => $line['source_type'] ?? 'gudang',
                             'etalases_id' => $line['etalases_id'] ?? null,
+                            'transfer_location_id' => $resolvedLocId,
                             'qty' => (int) $line['qty'],
                         ];
                     }
@@ -873,7 +1016,7 @@ class TransfersController extends Controller
                     );
 
                     // ── Create transfer item with stock_deducted_at ───────────
-                    MedicineTransferItems::create([
+                    $itemCreateData = [
                         'medicine_transfer_id' => $transfer->id,
                         'batches_id' => $destBatch->id,
                         'source_batches_id' => $sourceBatch->id,
@@ -883,7 +1026,15 @@ class TransfersController extends Controller
                         'original_qty' => $qty,
                         'status' => 0,
                         'stock_deducted_at' => $now,
-                    ]);
+                    ];
+                    if ($hasLocationSchema && !empty($line['transfer_location_id'])) {
+                        $itemCreateData['transfer_location_id'] = $line['transfer_location_id'];
+                        if ($hasLocationAudit) {
+                            $itemCreateData['location_updated_by'] = $this->actorId();
+                            $itemCreateData['location_updated_at'] = $now;
+                        }
+                    }
+                    MedicineTransferItems::create($itemCreateData);
 
                     // Sync medicines master stock
                     $medRecord = Medicines::find($sourceBatch->medicine_id);
@@ -927,7 +1078,7 @@ class TransfersController extends Controller
 
     public function printReceipt($id)
     {
-        $transfer = MedicineTransfers::with([
+        $relations = [
             'items.batches.medicines',
             'items.batches.pharmacy',
             'items.sourceBatch.medicines',
@@ -939,7 +1090,11 @@ class TransfersController extends Controller
             'requester.pharmacy',
             'sourcePharmacy',
             'destinationPharmacy',
-        ])->findOrFail($id);
+        ];
+        if ($this->hasTransferLocationSchema()) {
+            $relations[] = 'items.transferLocation';
+        }
+        $transfer = MedicineTransfers::with($relations)->findOrFail($id);
         $this->authorizeTransferParticipant($transfer);
 
         // Urut abjad berdasarkan nama item obat
@@ -1176,6 +1331,195 @@ class TransfersController extends Controller
             'updated_at_formatted' => $now->format('d M Y H:i'),
         ]);
     }
+
+    /**
+     * Daftar lokasi tujuan mutasi PMI (default: Pelayanan Lt.1, Pelayanan Lt.2, Online).
+     */
+    public function locationIndex(Request $request)
+    {
+        $pharmacyId = (int) ($request->query('pharmacy_id') ?: 1);
+
+        return response()->json(
+            $this->getTransferLocationsForPharmacy($pharmacyId)
+        );
+    }
+
+    /**
+     * Tambah lokasi tujuan mutasi PMI baru (mendukung audit PIN seperti Etalase).
+     */
+    public function locationStore(Request $request)
+    {
+        if (!Schema::hasTable('transfer_locations')) {
+            return response()->json(['message' => 'Tabel lokasi mutasi PMI belum dimigrasi.'], 500);
+        }
+
+        $validated = $request->validate([
+            'name' => 'required|string|max:255',
+            'pharmacy_id' => 'nullable|integer',
+            'pin' => 'nullable|string',
+        ]);
+
+        if ($request->filled('pin') && !$this->resolvePinActor($request)) {
+            return response()->json(['message' => 'PIN pribadi salah.'], 422);
+        }
+
+        $this->ensureDefaultPmiTransferLocations();
+
+        $actorId = $this->actorId();
+        $pharmacyId = !empty($validated['pharmacy_id']) ? (int) $validated['pharmacy_id'] : 1;
+        $name = trim($validated['name']);
+
+        $duplicate = TransferLocation::where('pharmacy_id', $pharmacyId)
+            ->whereRaw('LOWER(name) = ?', [strtolower($name)])
+            ->exists();
+        if ($duplicate) {
+            return response()->json(['message' => 'Nama lokasi sudah ada untuk PMI.'], 422);
+        }
+
+        $payload = [
+            'name' => $name,
+            'pharmacy_id' => $pharmacyId,
+            'status' => 1,
+        ];
+        if ($this->hasTransferLocationAuditColumns()) {
+            $payload['created_by'] = $actorId;
+            $payload['updated_by'] = $actorId;
+        }
+
+        $location = TransferLocation::create($payload);
+        if ($this->hasTransferLocationAuditColumns()) {
+            $location->load(['creator:id,name,username', 'updater:id,name,username']);
+        }
+
+        return response()->json($this->formatTransferLocationPayload($location), 201);
+    }
+
+    /**
+     * Ubah nama lokasi tujuan mutasi PMI (mendukung audit PIN).
+     */
+    public function locationUpdate(Request $request, TransferLocation $transferLocation)
+    {
+        $validated = $request->validate([
+            'name' => 'required|string|max:255',
+            'pin' => 'nullable|string',
+        ]);
+
+        if ($request->filled('pin') && !$this->resolvePinActor($request)) {
+            return response()->json(['message' => 'PIN pribadi salah.'], 422);
+        }
+
+        $name = trim($validated['name']);
+        $duplicate = TransferLocation::where('pharmacy_id', $transferLocation->pharmacy_id)
+            ->where('id', '!=', $transferLocation->id)
+            ->whereRaw('LOWER(name) = ?', [strtolower($name)])
+            ->exists();
+        if ($duplicate) {
+            return response()->json(['message' => 'Nama lokasi sudah ada untuk PMI.'], 422);
+        }
+
+        $payload = ['name' => $name];
+        if ($this->hasTransferLocationAuditColumns()) {
+            $payload['updated_by'] = $this->actorId();
+        }
+
+        $transferLocation->update($payload);
+        if ($this->hasTransferLocationAuditColumns()) {
+            $transferLocation->load(['creator:id,name,username', 'updater:id,name,username']);
+        }
+
+        return response()->json($this->formatTransferLocationPayload($transferLocation));
+    }
+
+    /**
+     * Hapus lokasi tujuan mutasi PMI (kosongkan referensi item terkait).
+     */
+    public function locationDestroy(Request $request, TransferLocation $transferLocation)
+    {
+        if ($request->filled('pin') && !$this->resolvePinActor($request)) {
+            return response()->json(['message' => 'PIN pribadi salah.'], 422);
+        }
+
+        $id = $transferLocation->id;
+        $actorId = $this->actorId();
+        $now = Carbon::now();
+
+        DB::transaction(function () use ($transferLocation, $actorId, $now) {
+            if (Schema::hasColumn('medicine_transfer_items', 'transfer_location_id')) {
+                $itemUpdate = ['transfer_location_id' => null];
+                if ($this->hasTransferItemLocationAuditColumns()) {
+                    $itemUpdate['location_updated_by'] = $actorId;
+                    $itemUpdate['location_updated_at'] = $now;
+                }
+                MedicineTransferItems::where('transfer_location_id', $transferLocation->id)->update($itemUpdate);
+            }
+            $transferLocation->delete();
+        });
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Lokasi berhasil dihapus.',
+            'deleted_id' => $id,
+        ]);
+    }
+
+    /**
+     * Simpan perubahan lokasi PMI pada item mutasi (wajib PIN pribadi).
+     */
+    public function updateItemLocation(Request $request, MedicineTransferItems $item)
+    {
+        if (!$this->hasTransferLocationSchema()) {
+            return response()->json(['message' => 'Tabel lokasi mutasi PMI belum tersedia.'], 500);
+        }
+
+        $currentPharmacyId = (int) getActivePharmacyId();
+        $item->loadMissing(['batches', 'transfer']);
+        $destPharmacyId = (int) ($item->transfer?->destination_pharmacy_id ?: $item->batches?->pharmacy_id ?: 0);
+
+        if (!isPmiPharmacy($destPharmacyId)) {
+            return response()->json(['message' => 'Pilihan lokasi khusus untuk mutasi tujuan SAHABAT PMI.'], 422);
+        }
+
+        $isReceiver = isPmiPharmacy($currentPharmacyId);
+        $isPendingSender = ((int) $item->status === 0 && (int) ($item->transfer?->source_pharmacy_id) === $currentPharmacyId);
+        if (!$isReceiver && !$isPendingSender) {
+            return response()->json(['message' => 'Anda tidak berhak mengubah lokasi item ini.'], 403);
+        }
+
+        if (!$this->resolvePinActor($request)) {
+            return response()->json(['message' => 'PIN pribadi salah atau belum diisi.'], 422);
+        }
+
+        $rawLocationId = $request->input('transfer_location_id');
+        if ($rawLocationId === null || $rawLocationId === '') {
+            $chosenLocationId = null;
+        } else {
+            $chosenLocationId = $this->resolvePmiTransferLocationId($rawLocationId);
+            if (!$chosenLocationId) {
+                return response()->json(['message' => 'Lokasi tujuan PMI tidak valid.'], 422);
+            }
+        }
+
+        $actorId = $this->actorId();
+        $now = Carbon::now();
+        $updateData = ['transfer_location_id' => $chosenLocationId];
+        if ($this->hasTransferItemLocationAuditColumns()) {
+            $updateData['location_updated_by'] = $actorId;
+            $updateData['location_updated_at'] = $now;
+        }
+        $item->update($updateData);
+
+        $actorUser = $actorId ? User::find($actorId) : null;
+        $actorName = $actorUser ? ($actorUser->name ?: ($actorUser->username ?? 'User')) : 'User';
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Lokasi PMI obat berhasil diperbarui.',
+            'transfer_location_id' => $chosenLocationId,
+            'location_name' => $item->fresh('transferLocation')?->transferLocation?->name ?? 'Belum dipilih',
+            'updated_by_name' => $actorName,
+            'updated_at_formatted' => $now->format('d M Y H:i'),
+        ]);
+    }
     public function incomingTransfers()
     {
         $pharmacyId = getActivePharmacyId();
@@ -1185,13 +1529,15 @@ class TransfersController extends Controller
         $expiredDate = request('expired_date');
         $status = request('status'); // '', 'unreceived', 'received'
 
-        $applyFilters = function ($query) use ($search, $startDate, $endDate, $expiredDate, $status) {
+        $hasLocationSchema = $this->hasTransferLocationSchema();
+
+        $applyFilters = function ($query) use ($search, $startDate, $endDate, $expiredDate, $status, $hasLocationSchema) {
             $query->whereDoesntHave('items', function ($q) {
                 $q->whereNotNull('receiving_items_id');
             });
 
             if ($search) {
-                $query->where(function ($sq) use ($search) {
+                $query->where(function ($sq) use ($search, $hasLocationSchema) {
                     $sq->where('code', 'like', "%{$search}%")
                         ->orWhereHas('items.batches.medicines', function ($subQ) use ($search) {
                             $subQ->where('name', 'like', "%{$search}%")
@@ -1200,7 +1546,16 @@ class TransfersController extends Controller
                         ->orWhereHas('items.sourceBatch.medicines', function ($subQ) use ($search) {
                             $subQ->where('name', 'like', "%{$search}%")
                                 ->orWhere('code', 'like', "%{$search}%");
+                        })
+                        ->orWhereHas('items.requestedMedicine', function ($subQ) use ($search) {
+                            $subQ->where('name', 'like', "%{$search}%")
+                                ->orWhere('code', 'like', "%{$search}%");
                         });
+                    if ($hasLocationSchema) {
+                        $sq->orWhereHas('items.transferLocation', function ($locQ) use ($search) {
+                            $locQ->where('name', 'like', "%{$search}%");
+                        });
+                    }
                 });
             }
 
@@ -1227,13 +1582,29 @@ class TransfersController extends Controller
         };
 
         // ── Mutasi Keluar: transfers WHERE source batch belongs to this pharmacy ──
-        $pendingRequests = MedicineTransfers::with(['users.pharmacy', 'sourcePharmacy', 'destinationPharmacy', 'sender', 'receiver', 'requester', 'items.requestedMedicine', 'items.sourceBatch'])
+        $requestRelations = ['users.pharmacy', 'sourcePharmacy', 'destinationPharmacy', 'sender', 'receiver', 'requester', 'items.requestedMedicine', 'items.sourceBatch'];
+        $cardRelations = ['users.pharmacy', 'sourcePharmacy', 'destinationPharmacy', 'sender', 'receiver', 'requester', 'items.batches.pharmacy', 'items.sourceBatch.pharmacy'];
+        if ($hasLocationSchema) {
+            $requestRelations[] = 'items.transferLocation';
+            $cardRelations[] = 'items.transferLocation';
+        }
+
+        $pendingRequests = MedicineTransfers::with($requestRelations)
             ->where('is_request', true)->where('request_status', 0)
             ->where('source_pharmacy_id', $pharmacyId)->latest()->get();
-        $submittedRequests = MedicineTransfers::with(['users.pharmacy', 'sourcePharmacy', 'destinationPharmacy', 'sender', 'receiver', 'requester', 'items.requestedMedicine', 'items.sourceBatch'])
-            ->where('is_request', true)->where('destination_pharmacy_id', $pharmacyId)->latest()->get();
+        $submittedRequests = MedicineTransfers::with($requestRelations)
+            ->where('is_request', true)
+            ->where('destination_pharmacy_id', $pharmacyId)
+            ->whereIn('request_status', [0, 1])
+            ->where('status', '!=', 2)
+            ->where(function ($q) {
+                $q->where('status', 0)
+                    ->orWhereHas('items', fn($i) => $i->where('status', 0));
+            })
+            ->latest()
+            ->get();
 
-        $pendingQuery = MedicineTransfers::with(['users.pharmacy', 'sourcePharmacy', 'destinationPharmacy', 'sender', 'receiver', 'requester'])
+        $pendingQuery = MedicineTransfers::with($cardRelations)
             ->where(function ($query) {
                 $query->where('is_request', false)->orWhere('request_status', 1);
             })
@@ -1253,7 +1624,7 @@ class TransfersController extends Controller
             ->withQueryString();
 
         // ── Mutasi Masuk: transfers WHERE destination batch belongs to this pharmacy ──
-        $acceptedQuery = MedicineTransfers::with(['users.pharmacy', 'sourcePharmacy', 'destinationPharmacy', 'sender', 'receiver', 'requester'])
+        $acceptedQuery = MedicineTransfers::with($cardRelations)
             ->where(function ($query) {
                 $query->where('is_request', false)->orWhere('request_status', 1);
             })
@@ -1270,7 +1641,7 @@ class TransfersController extends Controller
             ->withQueryString();
 
         // ── Ditolak: transfers with denied status involving this pharmacy ──
-        $deniedQuery = MedicineTransfers::with(['users.pharmacy', 'sourcePharmacy', 'destinationPharmacy', 'sender', 'receiver', 'requester'])
+        $deniedQuery = MedicineTransfers::with($cardRelations)
             ->where(function ($q) {
                 $q->where('status', 2)
                     ->orWhereHas('items', fn($i) => $i->where('status', 2));
@@ -1289,8 +1660,9 @@ class TransfersController extends Controller
             ->withQueryString();
 
         $etalases = $this->getEtalasesForPharmacy((int) $pharmacyId);
+        $transferLocations = $this->getTransferLocationsForPharmacy(1);
 
-        return view('kasir.transfers.transfers', compact('pending', 'accepted', 'denied', 'pendingRequests', 'submittedRequests', 'etalases'));
+        return view('kasir.transfers.transfers', compact('pending', 'accepted', 'denied', 'pendingRequests', 'submittedRequests', 'etalases', 'transferLocations'));
     }
 
     public function exportTransfers(Request $request)
@@ -1462,12 +1834,18 @@ class TransfersController extends Controller
         $isBulkDefault = ($rawBulkEtalase === 'default');
         $defaultEtalaseId = $isBulkDefault ? null : $this->resolveDestinationEtalaseId($rawBulkEtalase, (int) $currentPharmacyId);
         $itemEtalases = (array) $request->input('item_etalases', []);
+        $hasLocationSchema = $this->hasTransferLocationSchema();
+        $hasLocationAudit = $this->hasTransferItemLocationAuditColumns();
+        $bulkLocationId = ($hasLocationSchema && isPmiPharmacy($currentPharmacyId))
+            ? $this->resolvePmiTransferLocationId($request->input('transfer_location_id'))
+            : null;
+        $itemLocations = (array) $request->input('item_locations', []);
         $branchEtalases = isWarehousePharmacy($currentPharmacyId)
             ? collect()
             : $this->getEtalasesForPharmacy((int) $currentPharmacyId);
 
         try {
-            DB::transaction(function () use ($transfer, $currentPharmacyId, $defaultEtalaseId, $isBulkDefault, $itemEtalases, $branchEtalases) {
+            DB::transaction(function () use ($transfer, $currentPharmacyId, $defaultEtalaseId, $isBulkDefault, $itemEtalases, $branchEtalases, $hasLocationSchema, $hasLocationAudit, $bulkLocationId, $itemLocations) {
                 $now = Carbon::now();
                 $lockedTransfer = MedicineTransfers::whereKey($transfer->getKey())->lockForUpdate()->firstOrFail();
                 if ((int) $lockedTransfer->status === 1) {
@@ -1494,6 +1872,20 @@ class TransfersController extends Controller
                         $item->etalases_id = $chosenEtalaseId;
                     }
 
+                    if ($hasLocationSchema && isPmiPharmacy($currentPharmacyId)) {
+                        $rawLocChoice = $itemLocations[$item->id] ?? null;
+                        $chosenLocId = $this->resolvePmiTransferLocationId($rawLocChoice)
+                            ?: $bulkLocationId
+                            ?: $this->resolvePmiTransferLocationId($item->transfer_location_id);
+                        if ($chosenLocId && (int) $item->transfer_location_id !== $chosenLocId) {
+                            $item->transfer_location_id = $chosenLocId;
+                            if ($hasLocationAudit) {
+                                $item->location_updated_by = $this->actorId();
+                                $item->location_updated_at = $now;
+                            }
+                        }
+                    }
+
                     $this->processItemTransferStock($item, $lockedTransfer, $now);
                 }
 
@@ -1515,9 +1907,23 @@ class TransfersController extends Controller
 
     public function getTransferItems($id)
     {
-        $relations = ['users.pharmacy', 'receiver', 'items.batches.medicines', 'items.batches.pharmacy', 'items.etalases'];
+        $relations = [
+            'users.pharmacy',
+            'receiver',
+            'items.batches.medicines',
+            'items.batches.pharmacy',
+            'items.sourceBatch.medicines',
+            'items.requestedMedicine',
+            'items.etalases',
+        ];
         if ($this->hasTransferItemEtalaseAuditColumns()) {
             $relations[] = 'items.etalaseUpdater';
+        }
+        if ($this->hasTransferLocationSchema()) {
+            $relations[] = 'items.transferLocation';
+            if ($this->hasTransferItemLocationAuditColumns()) {
+                $relations[] = 'items.locationUpdater';
+            }
         }
         $transfer = MedicineTransfers::with($relations)->findOrFail($id);
         $currentPharmacyId = getActivePharmacyId();
@@ -1534,6 +1940,7 @@ class TransfersController extends Controller
         ];
 
         $etalases = $this->getEtalasesForPharmacy((int) $currentPharmacyId);
+        $transferLocations = $this->getTransferLocationsForPharmacy(1);
         $itemDefaultEtalases = [];
         if (!isWarehousePharmacy($currentPharmacyId) && $etalases->isNotEmpty()) {
             foreach ($transfer->items as $it) {
@@ -1543,7 +1950,7 @@ class TransfersController extends Controller
             }
         }
 
-        return view('kasir.transfers.partials.items_table', compact('transfer', 'statusMap', 'etalases', 'itemDefaultEtalases'));
+        return view('kasir.transfers.partials.items_table', compact('transfer', 'statusMap', 'etalases', 'itemDefaultEtalases', 'transferLocations'));
     }
 
     public function acceptItem(Request $request, MedicineTransferItems $item)
@@ -1581,8 +1988,15 @@ class TransfersController extends Controller
             return redirect(url()->previous() . '#accepted')->with('message', 'Pilih etalase tujuan terlebih dahulu sebelum menerima obat.');
         }
 
+        $hasLocationSchema = $this->hasTransferLocationSchema();
+        $hasLocationAudit = $this->hasTransferItemLocationAuditColumns();
+        $chosenLocationId = ($hasLocationSchema && isPmiPharmacy($currentPharmacyId))
+            ? ($this->resolvePmiTransferLocationId($request->input('transfer_location_id'))
+                ?: $this->resolvePmiTransferLocationId($item->transfer_location_id))
+            : null;
+
         try {
-            DB::transaction(function () use ($item, $chosenEtalaseId) {
+            DB::transaction(function () use ($item, $chosenEtalaseId, $chosenLocationId, $hasLocationSchema, $hasLocationAudit) {
                 $now = Carbon::now();
                 $transfer = MedicineTransfers::whereKey($item->medicine_transfer_id)->lockForUpdate()->firstOrFail();
                 $lockedItem = MedicineTransferItems::whereKey($item->getKey())->lockForUpdate()->firstOrFail();
@@ -1592,6 +2006,14 @@ class TransfersController extends Controller
 
                 if ($chosenEtalaseId) {
                     $lockedItem->etalases_id = $chosenEtalaseId;
+                }
+
+                if ($hasLocationSchema && $chosenLocationId && (int) $lockedItem->transfer_location_id !== $chosenLocationId) {
+                    $lockedItem->transfer_location_id = $chosenLocationId;
+                    if ($hasLocationAudit) {
+                        $lockedItem->location_updated_by = $this->actorId();
+                        $lockedItem->location_updated_at = $now;
+                    }
                 }
 
                 $this->processItemTransferStock($lockedItem, $transfer, $now);

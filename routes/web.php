@@ -364,6 +364,7 @@ Route::middleware(['auth', 'role:General Manager|Kasir|Gudang PMI|HO|administrat
 
     // Sales Retur
     Route::get('/retur', [ReturController::class, 'retur'])->name('returdata.retur');
+    Route::post('/retur/verifypin', [ReturController::class, 'verifyReturPin'])->name('returdata.verifypin');
     Route::post('/returitem', [ReturController::class, 'returItem'])->name('returdata.returItem');
     Route::get('/salesdata/returdata', [ReturController::class, 'returdata'])->name('returdata.returdata');
     Route::get('/salesdata/getreturmedicine', [ReturController::class, 'getReturMedicines'])->name('returdata.medicines');
@@ -441,6 +442,11 @@ Route::middleware(['auth', 'role:General Manager|Kasir|Gudang PMI|HO|administrat
     Route::put('/etalases/{etalase}', [TransfersController::class, 'update'])->name('etalases.update');
     Route::delete('/etalases/{etalase}', [TransfersController::class, 'destroy'])->name('etalases.destroy');
     Route::post('/transfers/items/{item}/etalase', [TransfersController::class, 'updateItemEtalase'])->name('transfers.updateItemEtalase');
+    Route::get('/transfer-locations', [TransfersController::class, 'locationIndex'])->name('transfer_locations.index');
+    Route::post('/transfer-locations', [TransfersController::class, 'locationStore'])->name('transfer_locations.store');
+    Route::put('/transfer-locations/{transferLocation}', [TransfersController::class, 'locationUpdate'])->name('transfer_locations.update');
+    Route::delete('/transfer-locations/{transferLocation}', [TransfersController::class, 'locationDestroy'])->name('transfer_locations.destroy');
+    Route::post('/transfers/items/{item}/location', [TransfersController::class, 'updateItemLocation'])->name('transfers.updateItemLocation');
     Route::get('/transfers/export', [TransfersController::class, 'exportTransfers'])->name('transfers.export');
     Route::get('/transfers/export/status/{id}', [TransfersController::class, 'exportStatus'])->name('transfers.export.status');
     Route::get('/transfers/incoming', [TransfersController::class, 'incomingTransfers'])->name('transfers.incoming');

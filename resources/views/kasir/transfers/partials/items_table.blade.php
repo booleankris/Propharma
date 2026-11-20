@@ -1,9 +1,13 @@
+@php
+    $headerDestPharmacyId = (int) ($transfer->destination_pharmacy_id ?: ($transfer->items->first()?->batches?->pharmacy_id ?? 0));
+    $isPmiTransfer = isPmiPharmacy($headerDestPharmacyId);
+@endphp
 <div class="w-full overflow-x-auto">
     <table class="w-full text-left text-xs sm:text-sm text-slate-600 border-collapse">
         <thead class="bg-slate-100/80 text-[11px] uppercase tracking-wider text-slate-500 border-b border-slate-200">
             <tr>
                 <th class="py-3.5 px-6 font-bold">Obat</th>
-                <th class="py-3.5 px-6 font-bold">Tgl Exp. / Etalase Tujuan</th>
+                <th class="py-3.5 px-6 font-bold">{{ $isPmiTransfer ? 'Tgl Exp. / Etalase / Lokasi PMI' : 'Tgl Exp. / Etalase Tujuan' }}</th>
                 <th class="py-3.5 px-6 font-bold text-center">Jumlah</th>
                 <th class="py-3.5 px-6 font-bold text-center">Status</th>
                 <th class="py-3.5 px-6 font-bold text-center w-48">Aksi Konfirmasi</th>
@@ -13,15 +17,17 @@
             @forelse($transfer->items as $item)
                 @php
                     $currentPharmacyId = getActivePharmacyId();
-                    $isDestinationPharmacy = ($item->batches?->pharmacy_id == $currentPharmacyId);
+                    $isDestinationPharmacy = ((int) ($item->batches?->pharmacy_id ?: $transfer->destination_pharmacy_id) === (int) $currentPharmacyId);
+                    $medModel = $item->batches?->medicines ?? $item->requestedMedicine ?? $item->sourceBatch?->medicines;
+                    $expDate = $item->batches?->expired_date ?? $item->sourceBatch?->expired_date;
                 @endphp
                 <tr class="hover:bg-slate-50/80 transition-colors">
                     <td class="py-4 px-6">
                         <div class="font-bold text-slate-800 text-sm">
-                            {{ $item->batches?->medicines?->name ?? '—' }}
+                            {{ $medModel?->name ?? '—' }}
                         </div>
                         <div class="text-[11px] text-slate-400 font-mono mt-0.5">
-                            {{ $item->batches?->medicines?->code ?? '—' }}
+                            {{ $medModel?->code ?? '—' }}
                         </div>
                     </td>
                     <td class="py-4 px-6">
@@ -30,7 +36,7 @@
                                 <svg class="w-4 h-4 text-slate-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
                                 </svg>
-                                {{ $item->batches?->expired_date ? \Carbon\Carbon::parse($item->batches->expired_date)->format('d M Y') : '—' }}
+                                {{ $expDate ? \Carbon\Carbon::parse($expDate)->format('d M Y') : '—' }}
                             </span>
                             @php
                                 $auditUserName = $item->etalaseUpdater?->name
@@ -85,11 +91,58 @@
                                     </span>
                                 @endif
                             @endif
+
+                            @if ($isPmiTransfer)
+                                @php
+                                    $canEditLocation = ($isDestinationPharmacy || ((int) $item->status === 0 && (int) $transfer->source_pharmacy_id === (int) $currentPharmacyId))
+                                        && (int) $item->status !== 2;
+                                    $locAuditUserName = $item->locationUpdater?->name
+                                        ?? $item->locationUpdater?->username
+                                        ?? null;
+                                    $locAuditTime = $item->location_updated_at?->format('d M Y H:i');
+                                @endphp
+                                <div class="pt-1 mt-0.5 border-t border-slate-100 flex flex-col gap-1">
+                                    @if ($canEditLocation)
+                                        <div class="inline-flex flex-wrap items-center gap-1.5">
+                                            <span class="text-[10px] font-semibold uppercase tracking-wide text-sky-700">Lokasi:</span>
+                                            <select class="item-location-select text-xs bg-white border border-slate-200 rounded-lg px-2 py-1 text-slate-700 outline-none focus:border-sky-500 max-w-[180px] transition"
+                                                data-transfer-id="{{ $transfer->id }}"
+                                                data-item-id="{{ $item->id }}"
+                                                data-item-status="{{ $item->status }}"
+                                                data-autosave-location="{{ !$isDestinationPharmacy && (int) $item->status === 0 ? '1' : '0' }}"
+                                                data-current-location-id="{{ $item->transfer_location_id ?? '' }}"
+                                                title="Pilih lokasi tujuan PMI">
+                                                <option value="">— Pilih Lokasi PMI —</option>
+                                                @foreach ($transferLocations ?? [] as $loc)
+                                                    <option value="{{ $loc->id }}" @selected($item->transfer_location_id == $loc->id)>{{ $loc->name }}</option>
+                                                @endforeach
+                                            </select>
+                                            <button type="button" onclick="window.openManageLocationModal(this)"
+                                                title="Tambah / ubah / hapus lokasi PMI"
+                                                class="inline-flex items-center gap-1 px-2 py-1 text-[11px] font-semibold bg-white border border-slate-200 hover:bg-indigo-50 hover:border-indigo-200 hover:text-indigo-700 text-slate-600 rounded-lg transition">
+                                                + / Kelola
+                                            </button>
+                                        </div>
+                                        <span class="item-location-audit text-[10px] text-slate-400 {{ $locAuditUserName ? '' : 'hidden' }}" data-item-id="{{ $item->id }}">
+                                            @if ($locAuditUserName)
+                                                Lokasi diubah oleh: <strong class="font-medium text-slate-600">{{ $locAuditUserName }}</strong>@if ($locAuditTime) ({{ $locAuditTime }})@endif
+                                            @endif
+                                        </span>
+                                    @else
+                                        <span class="inline-flex items-center gap-1.5 text-xs font-medium text-sky-700">
+                                            <span class="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Lokasi:</span>
+                                            <span class="px-2 py-0.5 rounded bg-sky-50 border border-sky-200 text-sky-800 text-[11px] font-semibold">
+                                                {{ $item->transferLocation?->name ?? 'Belum dipilih' }}
+                                            </span>
+                                        </span>
+                                    @endif
+                                </div>
+                            @endif
                         </div>
                     </td>
                     <td class="py-4 px-6 text-center whitespace-nowrap">
                         <span class="inline-flex items-center px-3 py-1 rounded-lg bg-emerald-50 text-emerald-700 font-mono text-xs font-bold border border-emerald-200 shadow-sm">
-                            {{ rtrim(rtrim(number_format((float) ($item->original_qty ?? $item->qty), 2, ',', '.'), '0'), ',') }} {{ $item->batches?->medicines?->unit ?? '' }}
+                            {{ rtrim(rtrim(number_format((float) ($item->original_qty ?? $item->qty), 2, ',', '.'), '0'), ',') }} {{ $medModel?->unit ?? '' }}
                         </span>
                     </td>
                     <td class="py-4 px-6 text-center whitespace-nowrap">

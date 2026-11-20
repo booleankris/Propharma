@@ -151,7 +151,7 @@
                                 <summary class="flex cursor-pointer list-none items-center justify-between gap-3 bg-slate-50 px-3 py-2.5 text-xs font-semibold text-slate-600 hover:bg-slate-100"><span>Lihat daftar item</span><span class="text-[10px] text-slate-400">{{ $requestTransfer->items->count() }} item <span class="inline-block transition-transform group-open:rotate-180">⌄</span></span></summary>
                                 <div class="max-h-56 overflow-y-auto divide-y divide-slate-100">
                                     @foreach ($requestTransfer->items as $requestedItem)
-                                        <div class="flex items-center justify-between gap-3 px-3 py-2.5 text-xs"><div class="min-w-0"><div class="font-semibold text-slate-700 truncate">{{ $requestedItem->requestedMedicine?->name ?? 'Obat' }}</div><div class="text-[10px] text-slate-400 mt-0.5">Batch {{ $requestedItem->sourceBatch?->name ?? '—' }} · {{ $requestedItem->requestedMedicine?->unit ?? '' }}</div></div><span class="shrink-0 font-mono font-bold text-slate-700">× {{ rtrim(rtrim(number_format((float) ($requestedItem->original_qty ?? $requestedItem->qty), 2, ',', '.'), '0'), ',') }}</span></div>
+                                        <div class="flex items-center justify-between gap-3 px-3 py-2.5 text-xs"><div class="min-w-0"><div class="font-semibold text-slate-700 truncate">{{ $requestedItem->requestedMedicine?->name ?? 'Obat' }}</div><div class="text-[10px] text-slate-400 mt-0.5">Batch {{ $requestedItem->sourceBatch?->name ?? '—' }} · {{ $requestedItem->requestedMedicine?->unit ?? '' }}@if($requestedItem->transferLocation) · <span class="text-sky-700 font-semibold">Lokasi: {{ $requestedItem->transferLocation->name }}</span>@endif</div></div><span class="shrink-0 font-mono font-bold text-slate-700">× {{ rtrim(rtrim(number_format((float) ($requestedItem->original_qty ?? $requestedItem->qty), 2, ',', '.'), '0'), ',') }}</span></div>
                                     @endforeach
                                 </div>
                             </details>
@@ -168,32 +168,28 @@
 
             <details class="bg-white border border-indigo-200 rounded-2xl overflow-hidden group">
                 <summary class="flex cursor-pointer list-none items-center justify-between gap-3 px-4 sm:px-5 py-4 bg-indigo-50/60 hover:bg-indigo-50">
-                    <div class="flex items-center gap-3"><span class="grid place-items-center w-9 h-9 rounded-xl bg-white text-indigo-700 border border-indigo-100 font-bold">↑</span><div><h3 class="font-bold text-slate-800 text-sm">Permintaan Saya</h3><p class="text-xs text-slate-500 mt-0.5">Pantau status permintaan cabang ini.</p></div></div>
-                    <div class="flex items-center gap-2"><span class="shrink-0 rounded-full bg-indigo-100 text-indigo-800 px-2.5 py-1 text-xs font-bold">{{ $submittedRequests->count() }} permintaan</span><span class="text-indigo-700 transition-transform group-open:rotate-180">⌄</span></div>
+                    <div class="flex items-center gap-3"><span class="grid place-items-center w-9 h-9 rounded-xl bg-white text-indigo-700 border border-indigo-100 font-bold">↑</span><div><h3 class="font-bold text-slate-800 text-sm">Permintaan Saya (Belum Diterima)</h3><p class="text-xs text-slate-500 mt-0.5">Hanya menampilkan permintaan yang masih menunggu. Riwayat diterima/ditolak tergabung di daftar mutasi di bawah.</p></div></div>
+                    <div class="flex items-center gap-2"><span class="shrink-0 rounded-full bg-indigo-100 text-indigo-800 px-2.5 py-1 text-xs font-bold">{{ $submittedRequests->count() }} aktif</span><span class="text-indigo-700 transition-transform group-open:rotate-180">⌄</span></div>
                 </summary>
                 <div class="p-3 sm:p-4 space-y-3">
                     @forelse ($submittedRequests as $requestTransfer)
                         @php
                             [$requestLabel, $requestClass] = match ((int) $requestTransfer->request_status) {
                                 0 => ['Menunggu ' . ($requestTransfer->sourcePharmacy?->name ?? 'pengirim'), 'bg-amber-50 text-amber-700 border-amber-100'],
-                                1 => match ((int) $requestTransfer->status) {
-                                    1 => ['Diterima', 'bg-emerald-50 text-emerald-700 border-emerald-100'],
-                                    2 => ['Ditolak setelah disetujui', 'bg-rose-50 text-rose-700 border-rose-100'],
-                                    default => ['Disetujui · menunggu penerimaan', 'bg-emerald-50 text-emerald-700 border-emerald-100'],
-                                },
+                                1 => ['Disetujui · menunggu penerimaan', 'bg-emerald-50 text-emerald-700 border-emerald-100'],
                                 default => ['Ditolak', 'bg-rose-50 text-rose-700 border-rose-100'],
                             };
                         @endphp
                         <article class="rounded-xl border border-slate-200 bg-white overflow-hidden">
-                            <div class="flex flex-wrap items-start justify-between gap-2 p-3 sm:p-4"><div><div class="font-bold text-sm text-slate-800">{{ $requestTransfer->code }}</div><div class="text-xs text-slate-500 mt-1">Ke {{ $requestTransfer->sourcePharmacy?->name ?? 'Cabang' }} · {{ $requestTransfer->created_at?->format('d M Y H:i') }}</div></div><span class="rounded-full border px-2.5 py-1 text-[10px] font-bold {{ $requestClass }}">{{ $requestLabel }}</span></div>
+                            <div class="flex flex-wrap items-start justify-between gap-2 p-3 sm:p-4"><div><div class="font-bold text-sm text-slate-800">{{ $requestTransfer->code }}</div><div class="text-xs text-slate-500 mt-1">Ke {{ $requestTransfer->sourcePharmacy?->name ?? 'Cabang' }} · {{ $requestTransfer->created_at?->format('d M Y H:i') }}</div></div><div class="flex items-center gap-2"><span class="rounded-full border px-2.5 py-1 text-[10px] font-bold {{ $requestClass }}">{{ $requestLabel }}</span>@if((int) $requestTransfer->request_status === 1)<button type="button" onclick="window.switchTab('accepted')" class="rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white px-2.5 py-1 text-[10px] font-semibold transition">Terima di Mutasi Masuk →</button>@endif</div></div>
                             <details class="mx-3 sm:mx-4 mb-3 sm:mb-4 rounded-lg border border-slate-200 overflow-hidden group"><summary class="flex cursor-pointer list-none items-center justify-between gap-3 bg-slate-50 px-3 py-2.5 text-xs font-semibold text-slate-600 hover:bg-slate-100"><span>Lihat daftar item</span><span class="text-[10px] text-slate-400">{{ $requestTransfer->items->count() }} item <span class="inline-block transition-transform group-open:rotate-180">⌄</span></span></summary><div class="max-h-56 overflow-y-auto divide-y divide-slate-100">
                                 @foreach ($requestTransfer->items as $requestedItem)
-                                    <div class="flex items-center justify-between gap-3 px-3 py-2.5 text-xs"><div class="min-w-0"><div class="font-semibold text-slate-700 truncate">{{ $requestedItem->requestedMedicine?->name ?? $requestedItem->batches?->medicines?->name ?? 'Obat' }}</div><div class="text-[10px] text-slate-400 mt-0.5">Batch {{ $requestedItem->sourceBatch?->name ?? '—' }} · {{ $requestedItem->requestedMedicine?->unit ?? '' }}</div></div><span class="shrink-0 font-mono font-bold text-slate-700">× {{ rtrim(rtrim(number_format((float) ($requestedItem->original_qty ?? $requestedItem->qty), 2, ',', '.'), '0'), ',') }}</span></div>
+                                    <div class="flex items-center justify-between gap-3 px-3 py-2.5 text-xs"><div class="min-w-0"><div class="font-semibold text-slate-700 truncate">{{ $requestedItem->requestedMedicine?->name ?? $requestedItem->batches?->medicines?->name ?? 'Obat' }}</div><div class="text-[10px] text-slate-400 mt-0.5">Batch {{ $requestedItem->sourceBatch?->name ?? '—' }} · {{ $requestedItem->requestedMedicine?->unit ?? '' }}@if($requestedItem->transferLocation) · <span class="text-sky-700 font-semibold">Lokasi: {{ $requestedItem->transferLocation->name }}</span>@endif</div></div><span class="shrink-0 font-mono font-bold text-slate-700">× {{ rtrim(rtrim(number_format((float) ($requestedItem->original_qty ?? $requestedItem->qty), 2, ',', '.'), '0'), ',') }}</span></div>
                                 @endforeach
                             </div></details>
                         </article>
                     @empty
-                        <div class="flex items-center gap-3 rounded-xl border border-dashed border-slate-200 bg-slate-50/70 px-4 py-5"><span class="grid place-items-center w-9 h-9 rounded-full bg-white border border-slate-200 text-indigo-400">↗</span><div><p class="text-xs font-semibold text-slate-600">Belum ada permintaan mutasi</p><p class="text-[11px] text-slate-400 mt-0.5">Permintaan yang Anda kirim akan tercatat di sini.</p></div></div>
+                        <div class="flex items-center gap-3 rounded-xl border border-dashed border-slate-200 bg-slate-50/70 px-4 py-5"><span class="grid place-items-center w-9 h-9 rounded-full bg-white border border-slate-200 text-indigo-400">✓</span><div><p class="text-xs font-semibold text-slate-600">Tidak ada permintaan yang masih menunggu</p><p class="text-[11px] text-slate-400 mt-0.5">Riwayat permintaan yang sudah diterima atau ditolak tampil di tab Mutasi Masuk &amp; Ditolak di bawah.</p></div></div>
                     @endforelse
                 </div>
             </details>
@@ -226,8 +222,8 @@
                     <input type="date" name="expired_date" value="{{ request('expired_date') }}" class="text-xs bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 outline-none focus:border-indigo-500 transition">
                 </div>
                 <div>
-                    <label class="block text-[11px] font-semibold text-slate-500 mb-1">Cari Obat</label>
-                    <input type="text" name="search" value="{{ request('search') }}" placeholder="Nama obat / kode..." class="text-xs bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 outline-none focus:border-indigo-500 transition w-44 sm:w-52">
+                    <label class="block text-[11px] font-semibold text-slate-500 mb-1">Cari Obat / Lokasi</label>
+                    <input type="text" name="search" value="{{ request('search') }}" placeholder="Nama obat, kode, lokasi..." class="text-xs bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 outline-none focus:border-indigo-500 transition w-44 sm:w-52">
                 </div>
                 <div>
                     <label class="block text-[11px] font-semibold text-slate-500 mb-1">Status Penerimaan</label>
@@ -256,6 +252,14 @@
                         <path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h7" />
                     </svg>
                     <span>Kelola Etalase</span>
+                </button>
+                <button type="button" onclick="window.openManageLocationModal()"
+                    class="inline-flex items-center gap-1.5 bg-white hover:bg-sky-50 text-sky-700 border border-sky-200 px-3.5 py-2 rounded-xl text-xs font-semibold transition shadow-sm">
+                    <svg class="w-4 h-4 text-sky-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 21s-6-5.686-6-10a6 6 0 1112 0c0 4.314-6 10-6 10z" />
+                        <circle cx="12" cy="11" r="2" />
+                    </svg>
+                    <span>Kelola Lokasi PMI</span>
                 </button>
                 <a href="{{ route('transfers.export', request()->all()) }}" id="export-excel-btn" class="inline-flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-xl text-xs font-semibold transition shadow-sm">
                     <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
@@ -456,11 +460,17 @@
             @forelse($pending as $transfer)
                 @php
                     $firstItem = $transfer->items->first();
-                    $fromName = $firstItem?->sourceBatch?->pharmacy?->name 
+                    $fromName = $transfer->sourcePharmacy?->name
+                        ?? $firstItem?->sourceBatch?->pharmacy?->name
                         ?? ($firstItem?->source_type === 'gudang' ? 'GUDANG PMI' : ($transfer->users?->pharmacy?->name ?? 'Gudang / Asal'));
-                    $toName = $firstItem?->batches?->pharmacy?->name ?? 'Apotek Tujuan';
+                    $toName = $transfer->destinationPharmacy?->name
+                        ?? $firstItem?->batches?->pharmacy?->name
+                        ?? 'Apotek Tujuan';
                     [$statusLabel, $statusClass] = $statusMap[$transfer->status] ?? ['—', ''];
                     $hasPendingItems = $transfer->items->contains('status', 0);
+                    $destPharmacyId = (int) ($transfer->destination_pharmacy_id ?: ($firstItem?->batches?->pharmacy_id ?? 0));
+                    $isPmiCard = isPmiPharmacy($destPharmacyId);
+                    $pmiLocNames = $isPmiCard ? $transfer->items->pluck('transferLocation.name')->filter()->unique()->values() : collect();
                 @endphp
 
                 <div class="bg-white rounded-2xl border border-slate-200/80 shadow-sm transition-all hover:shadow-md overflow-hidden">
@@ -472,6 +482,11 @@
                                 <span class="font-mono text-xs px-2.5 py-1 bg-slate-100 border border-slate-200 rounded-lg text-slate-800 font-bold tracking-tight">
                                     {{ $transfer->code }}
                                 </span>
+                                @if ($transfer->is_request)
+                                    <span class="px-2 py-0.5 rounded-md bg-indigo-50 text-indigo-700 border border-indigo-200 text-[10px] font-bold uppercase tracking-wide">
+                                        Permintaan
+                                    </span>
+                                @endif
                                 <span class="text-xs text-slate-400 font-medium">
                                     {{ $transfer->created_at->format('d M Y, H:i') }}
                                 </span>
@@ -488,6 +503,17 @@
                                 </svg>
                                 <span class="font-bold text-indigo-700">{{ $toName }}</span>
                             </div>
+
+                            @if($isPmiCard)
+                                <div class="flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-lg border {{ $pmiLocNames->isNotEmpty() ? 'text-sky-700 bg-sky-50 border-sky-200' : 'text-amber-700 bg-amber-50 border-amber-200' }}"
+                                    data-transfer-location-badge="{{ $transfer->id }}">
+                                    <svg class="w-3.5 h-3.5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                        <path d="M12 21s-6-5.686-6-10a6 6 0 1112 0c0 4.314-6 10-6 10z" />
+                                        <circle cx="12" cy="11" r="2" />
+                                    </svg>
+                                    <span>Lokasi: <strong class="font-semibold">{{ $pmiLocNames->isNotEmpty() ? $pmiLocNames->implode(', ') : 'Belum dipilih' }}</strong></span>
+                                </div>
+                            @endif
 
                             {{-- Pelaku Mutasi (PIN pribadi; fallback akun login) --}}
                             @if($transfer->sender_display_name)
@@ -600,11 +626,17 @@
             @forelse($accepted as $transfer)
                 @php
                     $firstItem = $transfer->items->first();
-                    $fromName = $firstItem?->sourceBatch?->pharmacy?->name 
+                    $fromName = $transfer->sourcePharmacy?->name
+                        ?? $firstItem?->sourceBatch?->pharmacy?->name
                         ?? ($firstItem?->source_type === 'gudang' ? 'GUDANG PMI' : ($transfer->users?->pharmacy?->name ?? 'Gudang / Asal'));
-                    $toName = $firstItem?->batches?->pharmacy?->name ?? 'Apotek Tujuan';
+                    $toName = $transfer->destinationPharmacy?->name
+                        ?? $firstItem?->batches?->pharmacy?->name
+                        ?? 'Apotek Tujuan';
                     [$statusLabel, $statusClass] = $statusMap[$transfer->status] ?? ['—', ''];
                     $hasPendingItems = $transfer->items->contains('status', 0);
+                    $destPharmacyId = (int) ($transfer->destination_pharmacy_id ?: ($firstItem?->batches?->pharmacy_id ?? 0));
+                    $isPmiCard = isPmiPharmacy($destPharmacyId);
+                    $pmiLocNames = $isPmiCard ? $transfer->items->pluck('transferLocation.name')->filter()->unique()->values() : collect();
                 @endphp
 
                 <div class="bg-white rounded-2xl border border-slate-200/80 shadow-sm transition-all hover:shadow-md overflow-hidden">
@@ -616,6 +648,11 @@
                                 <span class="font-mono text-xs px-2.5 py-1 bg-slate-100 border border-slate-200 rounded-lg text-slate-800 font-bold tracking-tight">
                                     {{ $transfer->code }}
                                 </span>
+                                @if ($transfer->is_request)
+                                    <span class="px-2 py-0.5 rounded-md bg-indigo-50 text-indigo-700 border border-indigo-200 text-[10px] font-bold uppercase tracking-wide">
+                                        Permintaan
+                                    </span>
+                                @endif
                                 <span class="text-xs text-slate-400 font-medium">
                                     {{ $transfer->created_at->format('d M Y, H:i') }}
                                 </span>
@@ -632,6 +669,17 @@
                                 </svg>
                                 <span class="font-bold text-emerald-800">{{ $toName }}</span>
                             </div>
+
+                            @if($isPmiCard)
+                                <div class="flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-lg border {{ $pmiLocNames->isNotEmpty() ? 'text-sky-700 bg-sky-50 border-sky-200' : 'text-amber-700 bg-amber-50 border-amber-200' }}"
+                                    data-transfer-location-badge="{{ $transfer->id }}">
+                                    <svg class="w-3.5 h-3.5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                        <path d="M12 21s-6-5.686-6-10a6 6 0 1112 0c0 4.314-6 10-6 10z" />
+                                        <circle cx="12" cy="11" r="2" />
+                                    </svg>
+                                    <span>Lokasi: <strong class="font-semibold">{{ $pmiLocNames->isNotEmpty() ? $pmiLocNames->implode(', ') : 'Belum dipilih' }}</strong></span>
+                                </div>
+                            @endif
 
                             {{-- Pelaku Mutasi (PIN pribadi; fallback akun login) --}}
                             @if($transfer->sender_display_name)
@@ -685,6 +733,25 @@
                                         <span>Etalase</span>
                                     </button>
                                 </div>
+                                @if (isPmiPharmacy($transfer->destination_pharmacy_id ?? getActivePharmacyId()) && count($transferLocations ?? []) > 0)
+                                    <div class="inline-flex items-center gap-1.5">
+                                        <select class="transfer-bulk-location-select text-xs bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 text-slate-700 outline-none focus:border-sky-500 max-w-[170px] transition"
+                                            data-transfer-id="{{ $transfer->id }}" title="Ubah lokasi tujuan PMI untuk semua item pending">
+                                            <option value="">— Lokasi PMI —</option>
+                                            @foreach ($transferLocations ?? [] as $loc)
+                                                <option value="{{ $loc->id }}">{{ $loc->name }}</option>
+                                            @endforeach
+                                        </select>
+                                        <button type="button" onclick="window.openManageLocationModal(this)"
+                                            title="Tambah / ubah / hapus lokasi PMI"
+                                            class="inline-flex items-center gap-1 px-2.5 py-1.5 text-[11px] font-semibold bg-white border border-slate-200 hover:bg-indigo-50 hover:border-indigo-200 hover:text-indigo-700 text-slate-600 rounded-lg transition">
+                                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+                                                <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" />
+                                            </svg>
+                                            <span>Lokasi</span>
+                                        </button>
+                                    </div>
+                                @endif
                                 <form method="POST" action="{{ route('transfers.accept', $transfer) }}" class="inline pin-required"
                                     data-accept-transfer-id="{{ $transfer->id }}"
                                     data-require-etalase="{{ isWarehousePharmacy() ? '0' : '1' }}"
@@ -778,9 +845,15 @@
                 
                 @php
                     $firstItem = $transfer->items->first();
-                    $fromName = $firstItem?->sourceBatch?->pharmacy?->name 
+                    $fromName = $transfer->sourcePharmacy?->name
+                        ?? $firstItem?->sourceBatch?->pharmacy?->name
                         ?? ($firstItem?->source_type === 'gudang' ? 'GUDANG PMI' : ($transfer->users?->pharmacy?->name ?? 'Gudang / Asal'));
-                    $toName = $firstItem?->batches?->pharmacy?->name ?? 'Apotek Tujuan';
+                    $toName = $transfer->destinationPharmacy?->name
+                        ?? $firstItem?->batches?->pharmacy?->name
+                        ?? 'Apotek Tujuan';
+                    $destPharmacyId = (int) ($transfer->destination_pharmacy_id ?: ($firstItem?->batches?->pharmacy_id ?? 0));
+                    $isPmiCard = isPmiPharmacy($destPharmacyId);
+                    $pmiLocNames = $isPmiCard ? $transfer->items->pluck('transferLocation.name')->filter()->unique()->values() : collect();
                 @endphp
 
                 <div class="bg-white rounded-2xl border border-slate-200/80 shadow-sm transition-all hover:shadow-md overflow-hidden">
@@ -792,6 +865,11 @@
                                 <span class="font-mono text-xs px-2.5 py-1 bg-slate-100 border border-slate-200 rounded-lg text-slate-800 font-bold tracking-tight">
                                     {{ $transfer->code }}
                                 </span>
+                                @if ($transfer->is_request)
+                                    <span class="px-2 py-0.5 rounded-md bg-indigo-50 text-indigo-700 border border-indigo-200 text-[10px] font-bold uppercase tracking-wide">
+                                        Permintaan
+                                    </span>
+                                @endif
                                 <span class="text-xs text-slate-400 font-medium">
                                     {{ $transfer->created_at->format('d M Y, H:i') }}
                                 </span>
@@ -808,6 +886,17 @@
                                 </svg>
                                 <span class="font-bold text-rose-700">{{ $toName }}</span>
                             </div>
+
+                            @if($isPmiCard)
+                                <div class="flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-lg border {{ $pmiLocNames->isNotEmpty() ? 'text-sky-700 bg-sky-50 border-sky-200' : 'text-amber-700 bg-amber-50 border-amber-200' }}"
+                                    data-transfer-location-badge="{{ $transfer->id }}">
+                                    <svg class="w-3.5 h-3.5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                        <path d="M12 21s-6-5.686-6-10a6 6 0 1112 0c0 4.314-6 10-6 10z" />
+                                        <circle cx="12" cy="11" r="2" />
+                                    </svg>
+                                    <span>Lokasi: <strong class="font-semibold">{{ $pmiLocNames->isNotEmpty() ? $pmiLocNames->implode(', ') : 'Belum dipilih' }}</strong></span>
+                                </div>
+                            @endif
 
                             {{-- Pelaku Mutasi (PIN pribadi; fallback akun login) --}}
                             @if($transfer->sender_display_name)

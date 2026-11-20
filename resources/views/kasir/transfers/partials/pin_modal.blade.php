@@ -18,7 +18,7 @@
         <button type="button" id="etalasePopoverManageBtn"
             class="w-full flex items-center justify-center gap-1.5 px-2.5 py-1.5 text-[11px] font-semibold text-indigo-700 hover:bg-indigo-50 rounded-lg transition">
             <span>⚙</span>
-            <span>Kelola / Ubah / Hapus Etalase</span>
+            <span id="etalasePopoverManageBtnLabel">Kelola / Ubah / Hapus Etalase</span>
         </button>
     </div>
 </div>
@@ -57,8 +57,8 @@
     <div class="bg-white rounded-2xl w-full max-w-xl shadow-2xl border border-slate-200 overflow-hidden">
         <div class="px-5 py-4 border-b border-slate-100 bg-slate-50/70 flex items-start justify-between gap-3">
             <div class="min-w-0">
-                <h3 class="text-sm font-bold text-slate-800">Kelola Etalase Cabang</h3>
-                <p class="text-[11px] text-slate-500 mt-0.5">Tambah, ubah, atau hapus etalase secara cepat. Setiap perubahan dicatat atas pemilik PIN.</p>
+                <h3 id="manageEtalaseModalTitle" class="text-sm font-bold text-slate-800">Kelola Etalase Cabang</h3>
+                <p id="manageEtalaseModalDesc" class="text-[11px] text-slate-500 mt-0.5">Tambah, ubah, atau hapus etalase secara cepat. Setiap perubahan dicatat atas pemilik PIN.</p>
                 <div class="mt-2.5 flex flex-wrap items-center gap-2">
                     <span id="manageEtalasePinBadge" class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-slate-100 text-slate-600 border border-slate-200">
                         Belum verifikasi PIN
@@ -168,7 +168,53 @@
         const ETALASE_UPDATE_TPL = @json(route('etalases.update', ['etalase' => '__ID__']));
         const ETALASE_DESTROY_TPL = @json(route('etalases.destroy', ['etalase' => '__ID__']));
         const ITEM_ETALASE_TPL = @json(route('transfers.updateItemEtalase', ['item' => '__ID__']));
+        const LOCATION_INDEX_URL = @json(route('transfer_locations.index'));
+        const LOCATION_STORE_URL = @json(route('transfer_locations.store'));
+        const LOCATION_UPDATE_TPL = @json(route('transfer_locations.update', ['transferLocation' => '__ID__']));
+        const LOCATION_DESTROY_TPL = @json(route('transfer_locations.destroy', ['transferLocation' => '__ID__']));
+        const ITEM_LOCATION_TPL = @json(route('transfers.updateItemLocation', ['item' => '__ID__']));
         const PIN_SESSION_TTL_MS = 5 * 60 * 1000;
+
+        const CATALOG_CONFIG = {
+            etalase: {
+                key: 'etalase',
+                label: 'Etalase',
+                labelLower: 'etalase',
+                modalTitle: 'Kelola Etalase Cabang',
+                modalDesc: 'Tambah, ubah, atau hapus etalase secara cepat. Setiap perubahan dicatat atas pemilik PIN.',
+                addPlaceholder: 'Nama etalase baru (mis. Rak Depan A1)',
+                searchPlaceholder: 'Cari etalase...',
+                popoverSearchPlaceholder: 'Ketik cari etalase...',
+                manageBtnLabel: 'Kelola / Ubah / Hapus Etalase',
+                emptyPlaceholder: '— Pilih Etalase —',
+                indexUrl: ETALASE_INDEX_URL,
+                storeUrl: ETALASE_STORE_URL,
+                updateTpl: ETALASE_UPDATE_TPL,
+                destroyTpl: ETALASE_DESTROY_TPL,
+                itemUpdateTpl: ITEM_ETALASE_TPL,
+                selector: '.transfer-bulk-etalase-select, .item-etalase-select',
+                eventName: 'transfer-etalases-updated',
+            },
+            location: {
+                key: 'location',
+                label: 'Lokasi PMI',
+                labelLower: 'lokasi',
+                modalTitle: 'Kelola Lokasi Mutasi PMI',
+                modalDesc: 'Tambah, ubah, atau hapus lokasi tujuan di PMI (mis. Pelayanan Lt.1, Pelayanan Lt.2, Online). Setiap perubahan dicatat atas pemilik PIN.',
+                addPlaceholder: 'Nama lokasi baru (mis. Pelayanan Lt.1 / Online)',
+                searchPlaceholder: 'Cari lokasi...',
+                popoverSearchPlaceholder: 'Ketik cari lokasi PMI...',
+                manageBtnLabel: 'Kelola / Ubah / Hapus Lokasi',
+                emptyPlaceholder: '— Pilih Lokasi PMI —',
+                indexUrl: LOCATION_INDEX_URL,
+                storeUrl: LOCATION_STORE_URL,
+                updateTpl: LOCATION_UPDATE_TPL,
+                destroyTpl: LOCATION_DESTROY_TPL,
+                itemUpdateTpl: ITEM_LOCATION_TPL,
+                selector: '.transfer-create-location-select, .transfer-stage-location-select, .transfer-cart-location-select, .transfer-bulk-location-select, .item-location-select',
+                eventName: 'transfer-locations-updated',
+            },
+        };
 
         const modal = document.getElementById('transferPinModal');
         const card = document.getElementById('transferPinCard');
@@ -188,6 +234,8 @@
         const confirmIconWrap = document.getElementById('transferConfirmIconWrap');
 
         const manageModal = document.getElementById('manageEtalaseModal');
+        const manageModalTitle = document.getElementById('manageEtalaseModalTitle');
+        const manageModalDesc = document.getElementById('manageEtalaseModalDesc');
         const manageList = document.getElementById('manageEtalaseList');
         const manageAddForm = document.getElementById('manageEtalaseAddForm');
         const manageNewNameInput = document.getElementById('manageEtalaseNewName');
@@ -199,6 +247,7 @@
         const etalasePopoverInput = document.getElementById('etalasePopoverSearchInput');
         const etalasePopoverOptions = document.getElementById('etalasePopoverOptions');
         const etalasePopoverManageBtn = document.getElementById('etalasePopoverManageBtn');
+        const etalasePopoverManageBtnLabel = document.getElementById('etalasePopoverManageBtnLabel');
 
         let value = '';
         let busy = false;
@@ -206,10 +255,13 @@
         let confirmResolver = null;
         let etalasePinSession = null;
         let cachedEtalases = [];
+        let cachedLocations = [];
+        let activeCatalogMode = 'etalase';
         let activeTargetSelect = null;
         let popoverSelect = null;
         let popoverTrigger = null;
         let popoverActiveIdx = -1;
+        let popoverMode = 'etalase';
 
         function csrf() {
             return document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || @json(csrf_token());
@@ -502,6 +554,32 @@
             return data;
         }
 
+        function getCatalogModeForSelect(sel) {
+            if (!sel) return 'etalase';
+            if (sel.classList.contains('transfer-create-location-select')
+                || sel.classList.contains('transfer-stage-location-select')
+                || sel.classList.contains('transfer-cart-location-select')
+                || sel.classList.contains('transfer-bulk-location-select')
+                || sel.classList.contains('item-location-select')) {
+                return 'location';
+            }
+            return 'etalase';
+        }
+
+        function getCatalogCache(mode) {
+            return mode === 'location' ? cachedLocations : cachedEtalases;
+        }
+
+        function setCatalogCache(mode, list) {
+            const normalized = Array.isArray(list) ? list : [];
+            if (mode === 'location') {
+                cachedLocations = normalized;
+            } else {
+                cachedEtalases = normalized;
+            }
+            return normalized;
+        }
+
         function resolveSelectValue(sel, rawValue) {
             if (String(rawValue) === 'default' && sel?.classList.contains('item-etalase-select')) {
                 const resolvedDefault = String(sel.dataset.defaultEtalaseId || '').trim();
@@ -512,27 +590,30 @@
             return String(rawValue);
         }
 
-        function applyEtalaseToSelect(sel, etalaseId) {
+        function applyCatalogValueToSelect(sel, val) {
             if (!sel) return;
-            sel.value = resolveSelectValue(sel, etalaseId);
+            sel.value = resolveSelectValue(sel, val);
             window.syncEtalaseTriggerLabel(sel);
-            if (sel.classList.contains('transfer-bulk-etalase-select')) {
-                sel.dispatchEvent(new Event('change', { bubbles: true }));
-                return;
-            }
             if (sel.classList.contains('item-etalase-select') && String(sel.dataset.itemStatus) === '1') {
                 window.saveAcceptedItemEtalase(sel);
+                return;
             }
+            if (sel.classList.contains('item-location-select') && String(sel.dataset.itemStatus) === '1') {
+                window.saveAcceptedItemLocation(sel);
+                return;
+            }
+            sel.dispatchEvent(new Event('change', { bubbles: true }));
         }
 
-        // ── Searchable Combobox Popover untuk Etalase ───────────────────
+        // ── Searchable Combobox Popover untuk Etalase & Lokasi PMI ───────
         window.syncEtalaseTriggerLabel = function (select) {
             const btn = select?._comboboxTrigger;
             if (!btn) return;
+            const cfg = CATALOG_CONFIG[getCatalogModeForSelect(select)];
             const textEl = btn.querySelector('.etalase-combobox-text');
             const selectedOpt = select.options[select.selectedIndex];
             const hasValue = Boolean(select.value);
-            const nextText = selectedOpt?.textContent || '— Pilih Etalase —';
+            const nextText = selectedOpt?.textContent || cfg.emptyPlaceholder;
             const nextClass = `etalase-combobox-text truncate ${hasValue ? 'text-slate-800 font-medium' : 'text-slate-500'}`;
             if (textEl) {
                 if (textEl.textContent !== nextText) textEl.textContent = nextText;
@@ -588,6 +669,7 @@
 
         function renderPopoverOptions() {
             if (!popoverSelect || !etalasePopoverOptions) return;
+            const cfg = CATALOG_CONFIG[popoverMode] || CATALOG_CONFIG.etalase;
             const rawQ = (etalasePopoverInput?.value || '').trim();
             const q = rawQ.toLowerCase();
             const currentVal = String(popoverSelect.value || '');
@@ -622,11 +704,25 @@
 
                 btn.onclick = () => {
                     const targetSel = popoverSelect;
-                    closeEtalasePopover(true);
-                    applyEtalaseToSelect(targetSel, opt.value);
+                    const chosenVal = opt.value;
+                    const hasEnterNext = Boolean(targetSel?.dataset?.enterNext) && chosenVal !== '';
+                    closeEtalasePopover(!hasEnterNext);
+                    applyCatalogValueToSelect(targetSel, chosenVal);
+                    if (hasEnterNext) {
+                        advanceFocusAfterCatalogSelect(targetSel);
+                    }
                 };
                 etalasePopoverOptions.appendChild(btn);
             });
+
+            if (q === '' && currentVal !== '') {
+                const selectedIdx = filtered.findIndex((opt) => String(opt.value) === currentVal);
+                if (selectedIdx >= 0) {
+                    highlightPopoverOption(selectedIdx);
+                }
+            } else if (q !== '' && filtered.length > 0) {
+                highlightPopoverOption(0);
+            }
 
             const exactMatch = q !== '' && allOpts.some((o) => o.value !== '' && o.textContent.trim().toLowerCase() === q);
             if (rawQ !== '' && !exactMatch) {
@@ -637,19 +733,23 @@
                 plus.textContent = '+';
                 const txt = document.createElement('span');
                 txt.className = 'truncate';
-                txt.textContent = `Buat Etalase "${rawQ}"`;
+                txt.textContent = `Buat ${cfg.label} "${rawQ}"`;
                 createBtn.append(plus, txt);
 
                 createBtn.onclick = async () => {
                     const targetSel = popoverSelect;
+                    const mode = popoverMode;
                     closeEtalasePopover();
-                    const session = await ensureEtalasePin('PIN Tambah Etalase', `Masukkan PIN pribadi Anda untuk menambah etalase "${rawQ}".`);
+                    const session = await ensureEtalasePin(`PIN Tambah ${cfg.label}`, `Masukkan PIN pribadi Anda untuk menambah ${cfg.labelLower} "${rawQ}".`);
                     if (!session) return;
                     try {
-                        const created = await apiJson(ETALASE_STORE_URL, 'POST', { name: rawQ, pin: session.pin });
-                        window.notifyTransfer('success', `Etalase "${created.name}" ditambahkan & dipilih.`);
-                        await window.refreshAllEtalaseSelects({ targetSelect: targetSel, selectId: created.id });
-                        applyEtalaseToSelect(targetSel, created.id);
+                        const created = await apiJson(cfg.storeUrl, 'POST', { name: rawQ, pin: session.pin });
+                        window.notifyTransfer('success', `${cfg.label} "${created.name}" ditambahkan & dipilih.`);
+                        await window.refreshCatalogSelects(mode, { targetSelect: targetSel, selectId: created.id });
+                        applyCatalogValueToSelect(targetSel, created.id);
+                        if (targetSel?.dataset?.enterNext) {
+                            advanceFocusAfterCatalogSelect(targetSel);
+                        }
                     } catch (err) {
                         window.notifyTransfer('error', err.message);
                     }
@@ -658,11 +758,46 @@
             } else if (filtered.length === 0) {
                 const empty = document.createElement('div');
                 empty.className = 'px-3 py-4 text-center text-xs text-slate-400';
-                empty.textContent = 'Tidak ada etalase ditemukan.';
+                empty.textContent = `Tidak ada ${cfg.labelLower} ditemukan.`;
                 etalasePopoverOptions.appendChild(empty);
             }
 
             positionEtalasePopover();
+        }
+
+        function advanceFocusAfterCatalogSelect(selectEl) {
+            const target = selectEl?.dataset?.enterNext;
+            if (!target) return;
+
+            setTimeout(() => {
+                if (target === 'row-qty') {
+                    const qtyInput = selectEl.closest('tr')?.querySelector('.cart-qty-input');
+                    if (qtyInput) {
+                        qtyInput.focus();
+                        qtyInput.select();
+                    }
+                    return;
+                }
+                if (target === 'add-item') {
+                    const addBtn = document.getElementById('addItemBtn');
+                    if (addBtn && !addBtn.disabled) {
+                        addBtn.click();
+                    } else {
+                        const qtyEl = document.getElementById('stageQty');
+                        qtyEl?.focus();
+                        qtyEl?.select?.();
+                    }
+                    return;
+                }
+                const nextEl = document.querySelector(target);
+                if (nextEl) {
+                    const focusTarget = nextEl._comboboxTrigger || nextEl;
+                    focusTarget.focus();
+                    if (focusTarget instanceof HTMLInputElement) {
+                        focusTarget.select();
+                    }
+                }
+            }, 15);
         }
 
         function openEtalasePopover(select, triggerBtn) {
@@ -673,7 +808,15 @@
             }
             popoverSelect = select;
             popoverTrigger = triggerBtn;
-            if (etalasePopoverInput) etalasePopoverInput.value = '';
+            popoverMode = getCatalogModeForSelect(select);
+            const cfg = CATALOG_CONFIG[popoverMode] || CATALOG_CONFIG.etalase;
+            if (etalasePopoverInput) {
+                etalasePopoverInput.value = '';
+                etalasePopoverInput.placeholder = cfg.popoverSearchPlaceholder;
+            }
+            if (etalasePopoverManageBtnLabel) {
+                etalasePopoverManageBtnLabel.textContent = cfg.manageBtnLabel;
+            }
             etalasePopover.classList.remove('hidden');
             renderPopoverOptions();
             setTimeout(() => etalasePopoverInput?.focus(), 10);
@@ -701,8 +844,9 @@
 
         etalasePopoverManageBtn?.addEventListener('click', () => {
             const targetSel = popoverSelect;
+            const mode = popoverMode;
             closeEtalasePopover();
-            window.openManageEtalaseModal(targetSel);
+            window.openManageCatalogModal(mode, targetSel);
         });
 
         document.addEventListener('click', (e) => {
@@ -717,24 +861,35 @@
             closeEtalasePopover();
         }, true);
 
+        const ALL_SEARCHABLE_SELECTOR = `${CATALOG_CONFIG.etalase.selector}, ${CATALOG_CONFIG.location.selector}`;
+
         window.initEtalaseSearchableSelects = function (root = document) {
             if (!root || !root.querySelectorAll) return;
-            root.querySelectorAll('.transfer-bulk-etalase-select, .item-etalase-select').forEach((sel) => {
+            root.querySelectorAll(ALL_SEARCHABLE_SELECTOR).forEach((sel) => {
                 if (sel._comboboxTrigger) {
                     window.syncEtalaseTriggerLabel(sel);
                     return;
                 }
-                const isBulk = sel.classList.contains('transfer-bulk-etalase-select');
+                const mode = getCatalogModeForSelect(sel);
+                const cfg = CATALOG_CONFIG[mode];
+                const isBulk = sel.classList.contains('transfer-bulk-etalase-select') || sel.classList.contains('transfer-bulk-location-select');
+                const isFullWidth = sel.classList.contains('transfer-create-location-select')
+                    || sel.classList.contains('transfer-stage-location-select')
+                    || sel.classList.contains('transfer-cart-location-select');
                 sel.classList.add('sr-only');
                 sel.tabIndex = -1;
                 sel.setAttribute('aria-hidden', 'true');
 
                 const btn = document.createElement('button');
                 btn.type = 'button';
-                btn.className = isBulk
-                    ? 'etalase-combobox-trigger inline-flex items-center justify-between gap-2 text-xs bg-white border border-slate-200 hover:border-slate-300 rounded-lg px-2.5 py-1.5 w-[170px] text-left outline-none focus:border-emerald-500 transition'
-                    : 'etalase-combobox-trigger inline-flex items-center justify-between gap-2 text-xs bg-white border border-slate-200 hover:border-slate-300 rounded-lg px-2.5 py-1 w-[180px] text-left outline-none focus:border-emerald-500 transition';
-                btn.title = sel.title || 'Cari & pilih etalase';
+                if (isFullWidth) {
+                    btn.className = 'etalase-combobox-trigger flex items-center justify-between gap-2 w-full rounded-lg border border-slate-200 bg-slate-50/50 hover:border-slate-300 px-3.5 py-2.5 text-sm text-left outline-none focus:border-sky-500 focus:bg-white transition';
+                } else if (isBulk) {
+                    btn.className = 'etalase-combobox-trigger inline-flex items-center justify-between gap-2 text-xs bg-white border border-slate-200 hover:border-slate-300 rounded-lg px-2.5 py-1.5 w-[170px] text-left outline-none focus:border-emerald-500 transition';
+                } else {
+                    btn.className = 'etalase-combobox-trigger inline-flex items-center justify-between gap-2 text-xs bg-white border border-slate-200 hover:border-slate-300 rounded-lg px-2.5 py-1 w-[180px] text-left outline-none focus:border-emerald-500 transition';
+                }
+                btn.title = sel.title || `Cari & pilih ${cfg.labelLower}`;
 
                 const text = document.createElement('span');
                 text.className = 'etalase-combobox-text truncate text-slate-500';
@@ -761,13 +916,20 @@
                     ev.stopPropagation();
                     openEtalasePopover(sel, btn);
                 });
+                btn.addEventListener('keydown', (ev) => {
+                    if (ev.key === 'ArrowDown') {
+                        ev.preventDefault();
+                        openEtalasePopover(sel, btn);
+                    }
+                });
 
                 window.syncEtalaseTriggerLabel(sel);
             });
         };
 
-        function renderManageEtalaseList(list) {
+        function renderManageEtalaseList(list, mode = activeCatalogMode) {
             if (!manageList) return;
+            const cfg = CATALOG_CONFIG[mode] || CATALOG_CONFIG.etalase;
             const q = (manageSearchInput?.value || '').trim().toLowerCase();
             const filtered = q
                 ? (list || []).filter((et) => String(et.name || '').toLowerCase().includes(q))
@@ -775,7 +937,7 @@
 
             manageList.replaceChildren();
             if (!Array.isArray(filtered) || filtered.length === 0) {
-                manageList.innerHTML = `<div class="p-6 text-center text-xs text-slate-400">${q ? 'Tidak ada etalase yang cocok dengan pencarian.' : 'Belum ada etalase untuk cabang ini.'}</div>`;
+                manageList.innerHTML = `<div class="p-6 text-center text-xs text-slate-400">${q ? `Tidak ada ${cfg.labelLower} yang cocok dengan pencarian.` : `Belum ada ${cfg.labelLower} untuk cabang ini.`}</div>`;
                 return;
             }
 
@@ -811,7 +973,7 @@
                         pickBtn.onclick = () => {
                             const sel = activeTargetSelect;
                             window.closeManageEtalaseModal();
-                            applyEtalaseToSelect(sel, et.id);
+                            applyCatalogValueToSelect(sel, et.id);
                         };
                         actions.appendChild(pickBtn);
                     }
@@ -825,7 +987,7 @@
 
                     const delBtn = document.createElement('button');
                     delBtn.type = 'button';
-                    delBtn.title = 'Hapus etalase';
+                    delBtn.title = `Hapus ${cfg.labelLower}`;
                     delBtn.className = 'px-2.5 py-1.5 text-[11px] font-semibold bg-white border border-slate-200 hover:bg-rose-50 hover:border-rose-200 hover:text-rose-700 text-slate-600 rounded-lg transition';
                     delBtn.textContent = 'Hapus';
                     delBtn.onclick = showDeleteConfirmMode;
@@ -858,21 +1020,21 @@
                     const submitRename = async () => {
                         const newName = input.value.trim();
                         if (!newName) {
-                            window.highlightInvalidField(input, 'Nama etalase tidak boleh kosong.');
+                            window.highlightInvalidField(input, `Nama ${cfg.labelLower} tidak boleh kosong.`);
                             return;
                         }
                         if (newName === et.name) {
                             showNormalMode();
                             return;
                         }
-                        const session = await ensureEtalasePin('PIN Ubah Etalase', `Masukkan PIN pribadi Anda untuk mengubah etalase "${et.name}".`);
+                        const session = await ensureEtalasePin(`PIN Ubah ${cfg.label}`, `Masukkan PIN pribadi Anda untuk mengubah ${cfg.labelLower} "${et.name}".`);
                         if (!session) return;
                         saveBtn.disabled = true;
                         input.disabled = true;
                         try {
-                            await apiJson(ETALASE_UPDATE_TPL.replace('__ID__', et.id), 'PUT', { name: newName, pin: session.pin });
-                            window.notifyTransfer('success', `Etalase diubah menjadi "${newName}".`);
-                            await window.refreshAllEtalaseSelects();
+                            await apiJson(cfg.updateTpl.replace('__ID__', et.id), 'PUT', { name: newName, pin: session.pin });
+                            window.notifyTransfer('success', `${cfg.label} diubah menjadi "${newName}".`);
+                            await window.refreshCatalogSelects(mode);
                         } catch (err) {
                             window.notifyTransfer('error', err.message);
                             saveBtn.disabled = false;
@@ -895,7 +1057,7 @@
                     row.replaceChildren();
                     const msg = document.createElement('div');
                     msg.className = 'text-xs text-rose-700 font-medium flex-1 min-w-0';
-                    msg.textContent = `Hapus etalase "${et.name}"? Item mutasi terkait akan dikosongkan.`;
+                    msg.textContent = `Hapus ${cfg.labelLower} "${et.name}"? Item mutasi terkait akan dikosongkan.`;
 
                     const actions = document.createElement('div');
                     actions.className = 'flex items-center gap-1.5 shrink-0';
@@ -905,13 +1067,13 @@
                     yesBtn.textContent = 'Ya, Hapus';
                     yesBtn.className = 'px-2.5 py-1.5 text-[11px] font-semibold bg-rose-600 hover:bg-rose-700 text-white rounded-lg transition';
                     yesBtn.onclick = async () => {
-                        const session = await ensureEtalasePin('PIN Hapus Etalase', `Masukkan PIN pribadi Anda untuk menghapus etalase "${et.name}".`);
+                        const session = await ensureEtalasePin(`PIN Hapus ${cfg.label}`, `Masukkan PIN pribadi Anda untuk menghapus ${cfg.labelLower} "${et.name}".`);
                         if (!session) return;
                         yesBtn.disabled = true;
                         try {
-                            await apiJson(ETALASE_DESTROY_TPL.replace('__ID__', et.id), 'DELETE', { pin: session.pin });
-                            window.notifyTransfer('success', `Etalase "${et.name}" dihapus.`);
-                            await window.refreshAllEtalaseSelects({ deletedId: et.id });
+                            await apiJson(cfg.destroyTpl.replace('__ID__', et.id), 'DELETE', { pin: session.pin });
+                            window.notifyTransfer('success', `${cfg.label} "${et.name}" dihapus.`);
+                            await window.refreshCatalogSelects(mode, { deletedId: et.id });
                         } catch (err) {
                             window.notifyTransfer('error', err.message);
                             yesBtn.disabled = false;
@@ -933,18 +1095,18 @@
             });
         }
 
-        window.refreshAllEtalaseSelects = async function (opts = {}) {
-            const list = await apiJson(ETALASE_INDEX_URL, 'GET');
-            cachedEtalases = Array.isArray(list) ? list : [];
+        window.refreshCatalogSelects = async function (mode = 'etalase', opts = {}) {
+            const cfg = CATALOG_CONFIG[mode] || CATALOG_CONFIG.etalase;
+            const list = setCatalogCache(mode, await apiJson(cfg.indexUrl, 'GET'));
             const deletedId = opts.deletedId ? String(opts.deletedId) : null;
 
-            document.querySelectorAll('.transfer-bulk-etalase-select, .item-etalase-select').forEach((sel) => {
-                const isBulk = sel.classList.contains('transfer-bulk-etalase-select');
+            document.querySelectorAll(cfg.selector).forEach((sel) => {
+                const isBulk = sel.classList.contains('transfer-bulk-etalase-select') || sel.classList.contains('transfer-bulk-location-select');
                 const prevVal = opts.targetSelect === sel && opts.selectId
                     ? String(opts.selectId)
                     : (deletedId && String(sel.value) === deletedId ? '' : String(sel.value || ''));
 
-                const placeholder = sel.querySelector('option[value=""]')?.textContent || (isBulk ? '— Pilih Etalase —' : '— Tanpa / Pilih Etalase —');
+                const placeholder = sel.querySelector('option[value=""]')?.textContent || cfg.emptyPlaceholder;
                 const prevDefaultOpt = sel.querySelector('option[value="default"]');
                 const prevDefaultText = prevDefaultOpt?.textContent || '';
                 sel.replaceChildren();
@@ -954,29 +1116,29 @@
                 emptyOpt.textContent = placeholder;
                 sel.appendChild(emptyOpt);
 
-                if ((isBulk && cachedEtalases.length > 0) || (!isBulk && prevDefaultOpt)) {
+                if (mode === 'etalase' && ((isBulk && list.length > 0) || (!isBulk && prevDefaultOpt))) {
                     const defaultOpt = document.createElement('option');
                     defaultOpt.value = 'default';
                     defaultOpt.textContent = isBulk ? 'Default (Riwayat / Acak)' : (prevDefaultText || 'Default (Riwayat / Acak)');
                     sel.appendChild(defaultOpt);
                 }
 
-                cachedEtalases.forEach((et) => {
+                list.forEach((entry) => {
                     const opt = document.createElement('option');
-                    opt.value = String(et.id);
-                    opt.textContent = et.name;
+                    opt.value = String(entry.id);
+                    opt.textContent = entry.name;
                     sel.appendChild(opt);
                 });
 
-                if (!isBulk && cachedEtalases.length > 0) {
+                if (mode === 'etalase' && !isBulk && list.length > 0) {
                     const defId = String(sel.dataset.defaultEtalaseId || '');
-                    const defStillValid = defId && cachedEtalases.some((et) => String(et.id) === defId);
+                    const defStillValid = defId && list.some((et) => String(et.id) === defId);
                     if (!defStillValid) {
-                        sel.dataset.defaultEtalaseId = String(cachedEtalases[Math.floor(Math.random() * cachedEtalases.length)].id);
+                        sel.dataset.defaultEtalaseId = String(list[Math.floor(Math.random() * list.length)].id);
                         sel.dataset.defaultEtalaseSource = 'random';
                     }
                     const refreshedDefOpt = sel.querySelector('option[value="default"]');
-                    const resolvedDef = cachedEtalases.find((et) => String(et.id) === String(sel.dataset.defaultEtalaseId));
+                    const resolvedDef = list.find((et) => String(et.id) === String(sel.dataset.defaultEtalaseId));
                     if (refreshedDefOpt && resolvedDef) {
                         const prefix = sel.dataset.defaultEtalaseSource === 'previous' ? 'Sebelumnya' : 'Acak';
                         refreshedDefOpt.textContent = `Default (${prefix}: ${resolvedDef.name})`;
@@ -988,36 +1150,57 @@
                 if (sel.classList.contains('item-etalase-select') && deletedId && sel.dataset.currentEtalaseId === deletedId) {
                     sel.dataset.currentEtalaseId = '';
                 }
+                if (sel.classList.contains('item-location-select') && deletedId && sel.dataset.currentLocationId === deletedId) {
+                    sel.dataset.currentLocationId = '';
+                }
                 window.syncEtalaseTriggerLabel(sel);
             });
 
             window.initEtalaseSearchableSelects();
-            if (manageModal && !manageModal.classList.contains('hidden')) {
-                renderManageEtalaseList(cachedEtalases);
+            if (manageModal && !manageModal.classList.contains('hidden') && activeCatalogMode === mode) {
+                renderManageEtalaseList(list, mode);
             }
-            return cachedEtalases;
+            window.dispatchEvent(new CustomEvent(cfg.eventName, { detail: { list, opts } }));
+            return list;
         };
 
-        window.openManageEtalaseModal = async function (triggerEl = null) {
+        window.refreshAllEtalaseSelects = (opts = {}) => window.refreshCatalogSelects('etalase', opts);
+        window.refreshAllLocationSelects = (opts = {}) => window.refreshCatalogSelects('location', opts);
+
+        window.openManageCatalogModal = async function (mode = 'etalase', triggerEl = null) {
             if (!manageModal) return;
+            activeCatalogMode = CATALOG_CONFIG[mode] ? mode : 'etalase';
+            const cfg = CATALOG_CONFIG[activeCatalogMode];
+
             activeTargetSelect = triggerEl instanceof HTMLSelectElement
                 ? triggerEl
                 : (triggerEl?.parentElement?.querySelector('select') || null);
-            if (manageSearchInput) manageSearchInput.value = '';
+            if (manageModalTitle) manageModalTitle.textContent = cfg.modalTitle;
+            if (manageModalDesc) manageModalDesc.textContent = cfg.modalDesc;
+            if (manageNewNameInput) {
+                manageNewNameInput.value = '';
+                manageNewNameInput.placeholder = cfg.addPlaceholder;
+            }
+            if (manageSearchInput) {
+                manageSearchInput.value = '';
+                manageSearchInput.placeholder = cfg.searchPlaceholder;
+            }
             updatePinSessionBadge();
 
             manageModal.classList.remove('hidden');
             manageModal.classList.add('flex');
-            manageList.innerHTML = '<div class="p-6 text-center text-xs text-slate-400">Memuat daftar etalase...</div>';
+            manageList.innerHTML = `<div class="p-6 text-center text-xs text-slate-400">Memuat daftar ${cfg.labelLower}...</div>`;
             try {
-                const list = await apiJson(ETALASE_INDEX_URL, 'GET');
-                cachedEtalases = Array.isArray(list) ? list : [];
-                renderManageEtalaseList(cachedEtalases);
+                const list = setCatalogCache(activeCatalogMode, await apiJson(cfg.indexUrl, 'GET'));
+                renderManageEtalaseList(list, activeCatalogMode);
                 setTimeout(() => manageNewNameInput?.focus(), 40);
             } catch (err) {
                 manageList.innerHTML = `<div class="p-6 text-center text-xs text-rose-500">${err.message}</div>`;
             }
         };
+
+        window.openManageEtalaseModal = (triggerEl = null) => window.openManageCatalogModal('etalase', triggerEl);
+        window.openManageLocationModal = (triggerEl = null) => window.openManageCatalogModal('location', triggerEl);
 
         window.closeManageEtalaseModal = function () {
             if (!manageModal) return;
@@ -1031,28 +1214,30 @@
         });
 
         manageSearchInput?.addEventListener('input', () => {
-            renderManageEtalaseList(cachedEtalases);
+            renderManageEtalaseList(getCatalogCache(activeCatalogMode), activeCatalogMode);
         });
 
         manageAddForm?.addEventListener('submit', async (e) => {
             e.preventDefault();
+            const mode = activeCatalogMode;
+            const cfg = CATALOG_CONFIG[mode] || CATALOG_CONFIG.etalase;
             const name = manageNewNameInput?.value.trim() || '';
             if (!name) {
-                window.highlightInvalidField(manageNewNameInput, 'Nama etalase wajib diisi.');
+                window.highlightInvalidField(manageNewNameInput, `Nama ${cfg.labelLower} wajib diisi.`);
                 return;
             }
-            const session = await ensureEtalasePin('PIN Tambah Etalase', `Masukkan PIN pribadi Anda untuk menambah etalase "${name}".`);
+            const session = await ensureEtalasePin(`PIN Tambah ${cfg.label}`, `Masukkan PIN pribadi Anda untuk menambah ${cfg.labelLower} "${name}".`);
             if (!session) return;
             const btn = manageAddForm.querySelector('button[type="submit"]');
             if (btn) btn.disabled = true;
             try {
-                const created = await apiJson(ETALASE_STORE_URL, 'POST', { name, pin: session.pin });
+                const created = await apiJson(cfg.storeUrl, 'POST', { name, pin: session.pin });
                 manageNewNameInput.value = '';
-                window.notifyTransfer('success', `Etalase "${created.name}" berhasil ditambahkan.`);
+                window.notifyTransfer('success', `${cfg.label} "${created.name}" berhasil ditambahkan.`);
                 const targetSel = activeTargetSelect;
-                await window.refreshAllEtalaseSelects({ targetSelect: targetSel, selectId: created.id });
+                await window.refreshCatalogSelects(mode, { targetSelect: targetSel, selectId: created.id });
                 if (targetSel) {
-                    applyEtalaseToSelect(targetSel, created.id);
+                    applyCatalogValueToSelect(targetSel, created.id);
                 }
             } catch (err) {
                 window.notifyTransfer('error', err.message);
@@ -1061,26 +1246,33 @@
             }
         });
 
-        // Simpan perubahan / pengosongan pilihan etalase pada item mutasi yang sudah diterima (wajib PIN)
-        window.saveAcceptedItemEtalase = async function (triggerEl) {
+        async function saveAcceptedItemCatalogField(mode, triggerEl) {
+            const isLoc = mode === 'location';
+            const cfg = CATALOG_CONFIG[mode];
+            const selectClass = isLoc ? '.item-location-select' : '.item-etalase-select';
+            const currentAttr = isLoc ? 'currentLocationId' : 'currentEtalaseId';
+            const responseKey = isLoc ? 'transfer_location_id' : 'etalases_id';
+            const auditSelectorPrefix = isLoc ? '.item-location-audit' : '.item-etalase-audit';
+            const emptyLabel = isLoc ? 'Tanpa Lokasi' : 'Tanpa Etalase';
+
             const wrapper = triggerEl?.closest('div');
             const select = triggerEl instanceof HTMLSelectElement
                 ? triggerEl
-                : wrapper?.querySelector('.item-etalase-select');
+                : wrapper?.querySelector(selectClass);
             if (!select) return;
 
             const itemId = select.dataset.itemId;
-            const prevId = select.dataset.currentEtalaseId || '';
+            const prevId = select.dataset[currentAttr] || '';
             const nextId = select.value || '';
             if (nextId === prevId) return;
 
-            const nextLabel = nextId ? (select.options[select.selectedIndex]?.textContent || 'etalase terpilih') : 'Tanpa Etalase';
+            const nextLabel = nextId ? (select.options[select.selectedIndex]?.textContent || `${cfg.labelLower} terpilih`) : emptyLabel;
             const pinRes = await window.requestTransferPin({
-                title: 'PIN Ubah Etalase Obat',
-                subtitle: 'Masukkan 4 digit PIN Anda untuk menyimpan perubahan etalase.',
+                title: `PIN Ubah ${cfg.label}`,
+                subtitle: `Masukkan 4 digit PIN Anda untuk menyimpan perubahan ${cfg.labelLower}.`,
                 confirmMessage: nextId
-                    ? `Ubah etalase obat ini ke "${nextLabel}"?`
-                    : 'Kosongkan pilihan etalase pada obat ini?',
+                    ? `Ubah ${cfg.labelLower} obat ini ke "${nextLabel}"?`
+                    : `Kosongkan pilihan ${cfg.labelLower} pada obat ini?`,
             });
             if (!pinRes) {
                 select.value = prevId;
@@ -1093,34 +1285,53 @@
             window.syncEtalaseTriggerLabel(select);
 
             try {
-                const res = await apiJson(ITEM_ETALASE_TPL.replace('__ID__', itemId), 'POST', {
-                    etalases_id: nextId || null,
-                    pin: pinRes.pin,
-                });
-                select.dataset.currentEtalaseId = res.etalases_id ? String(res.etalases_id) : '';
-                select.value = select.dataset.currentEtalaseId;
+                const body = { pin: pinRes.pin };
+                body[responseKey] = nextId || null;
+                const res = await apiJson(cfg.itemUpdateTpl.replace('__ID__', itemId), 'POST', body);
+                select.dataset[currentAttr] = res[responseKey] ? String(res[responseKey]) : '';
+                select.value = select.dataset[currentAttr];
                 window.syncEtalaseTriggerLabel(select);
 
-                const auditEl = document.querySelector(`.item-etalase-audit[data-item-id="${itemId}"]`);
+                const auditEl = document.querySelector(`${auditSelectorPrefix}[data-item-id="${itemId}"]`);
                 if (auditEl) {
                     auditEl.classList.remove('hidden');
-                    auditEl.innerHTML = `Diubah oleh: <strong class="font-medium text-slate-600"></strong>${res.updated_at_formatted ? ` (${res.updated_at_formatted})` : ''}`;
+                    auditEl.innerHTML = `${isLoc ? 'Lokasi diubah oleh' : 'Diubah oleh'}: <strong class="font-medium text-slate-600"></strong>${res.updated_at_formatted ? ` (${res.updated_at_formatted})` : ''}`;
                     auditEl.querySelector('strong').textContent = res.updated_by_name || 'User';
                 }
-                window.notifyTransfer('success', res.message || 'Etalase obat diperbarui.');
+                if (isLoc && select.dataset.transferId) {
+                    const transferId = select.dataset.transferId;
+                    const names = [...new Set(
+                        [...document.querySelectorAll(`.item-location-select[data-transfer-id="${transferId}"]`)]
+                            .map((s) => s.value ? (s.options[s.selectedIndex]?.textContent || '').trim() : '')
+                            .filter(Boolean)
+                    )];
+                    const badge = document.querySelector(`[data-transfer-location-badge="${transferId}"]`);
+                    if (badge) {
+                        const strong = badge.querySelector('strong');
+                        if (strong) {
+                            strong.textContent = names.length ? names.join(', ') : 'Belum dipilih';
+                        }
+                        badge.className = `flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-lg border ${names.length ? 'text-sky-700 bg-sky-50 border-sky-200' : 'text-amber-700 bg-amber-50 border-amber-200'}`;
+                    }
+                }
+                window.notifyTransfer('success', res.message || `${cfg.label} obat diperbarui.`);
             } catch (err) {
                 select.value = prevId;
                 window.syncEtalaseTriggerLabel(select);
-                window.notifyTransfer('error', err.message || 'Gagal memperbarui etalase obat.');
+                window.notifyTransfer('error', err.message || `Gagal memperbarui ${cfg.labelLower} obat.`);
             } finally {
                 select.disabled = false;
                 select.classList.remove('opacity-60');
                 window.syncEtalaseTriggerLabel(select);
             }
-        };
+        }
 
-        // Sinkronkan pilihan etalase header transfer ke seluruh dropdown item pending,
-        // serta simpan otomatis saat user mengganti etalase pada item berstatus diterima (1).
+        // Simpan perubahan pilihan etalase / lokasi PMI pada item mutasi (wajib PIN)
+        window.saveAcceptedItemEtalase = (triggerEl) => saveAcceptedItemCatalogField('etalase', triggerEl);
+        window.saveAcceptedItemLocation = (triggerEl) => saveAcceptedItemCatalogField('location', triggerEl);
+
+        // Sinkronkan pilihan etalase & lokasi header transfer ke seluruh dropdown item pending,
+        // serta simpan otomatis saat user mengganti pilihan pada item yang sudah diterima / tersimpan.
         document.addEventListener('change', function (e) {
             const target = e.target;
             if (!(target instanceof HTMLSelectElement)) return;
@@ -1140,6 +1351,19 @@
                 return;
             }
 
+            if (target.classList.contains('transfer-bulk-location-select')) {
+                const transferId = target.dataset.transferId;
+                window.syncEtalaseTriggerLabel(target);
+                if (!transferId) return;
+                document.querySelectorAll(`.item-location-select[data-transfer-id="${transferId}"]`).forEach((sel) => {
+                    if (String(sel.dataset.itemStatus || '0') === '0') {
+                        sel.value = target.value;
+                        window.syncEtalaseTriggerLabel(sel);
+                    }
+                });
+                return;
+            }
+
             if (target.classList.contains('item-etalase-select')) {
                 if (target.value === 'default' && target.dataset.defaultEtalaseId) {
                     target.value = target.dataset.defaultEtalaseId;
@@ -1147,6 +1371,14 @@
                 window.syncEtalaseTriggerLabel(target);
                 if (String(target.dataset.itemStatus) === '1' && e.isTrusted) {
                     window.saveAcceptedItemEtalase(target);
+                }
+                return;
+            }
+
+            if (target.classList.contains('item-location-select')) {
+                window.syncEtalaseTriggerLabel(target);
+                if (e.isTrusted && (String(target.dataset.itemStatus) === '1' || target.dataset.autosaveLocation === '1')) {
+                    window.saveAcceptedItemLocation(target);
                 }
             }
         });
@@ -1158,8 +1390,8 @@
             const observer = new MutationObserver((mutations) => {
                 const hasNewSelect = mutations.some((m) => [...m.addedNodes].some((node) => {
                     if (!(node instanceof Element)) return false;
-                    return node.matches?.('.transfer-bulk-etalase-select, .item-etalase-select')
-                        || Boolean(node.querySelector?.('.transfer-bulk-etalase-select, .item-etalase-select'));
+                    return node.matches?.(ALL_SEARCHABLE_SELECTOR)
+                        || Boolean(node.querySelector?.(ALL_SEARCHABLE_SELECTOR));
                 }));
                 if (!hasNewSelect || initQueued) return;
                 initQueued = true;
@@ -1209,7 +1441,7 @@
             form.submit();
         }, true);
 
-        // Form dengan class "pin-required" otomatis memvalidasi etalase, lalu menggabungkan
+        // Form dengan class "pin-required" otomatis memvalidasi etalase & lokasi PMI, lalu menggabungkan
         // konfirmasi + input PIN dalam satu modal (#transferPinModal).
         document.addEventListener('submit', async function (e) {
             const form = e.target;
@@ -1219,7 +1451,7 @@
             e.stopImmediatePropagation();
             if (form.dataset.submitting) return;
 
-            form.querySelectorAll('input[name="etalases_id"], input[name^="item_etalases["]').forEach((el) => el.remove());
+            form.querySelectorAll('input[name="etalases_id"], input[name^="item_etalases["], input[name="transfer_location_id"], input[name^="item_locations["]').forEach((el) => el.remove());
 
             if (form.dataset.acceptItemId) {
                 const itemId = form.dataset.acceptItemId;
@@ -1234,6 +1466,13 @@
                 }
                 if (chosen) {
                     setHiddenInput(form, 'etalases_id', chosen);
+                }
+
+                const itemLocSelect = document.querySelector(`.item-location-select[data-item-id="${itemId}"]`);
+                const bulkLocSelect = transferId ? document.querySelector(`.transfer-bulk-location-select[data-transfer-id="${transferId}"]`) : null;
+                const chosenLoc = (itemLocSelect?.value || bulkLocSelect?.value || '').trim();
+                if (chosenLoc) {
+                    setHiddenInput(form, 'transfer_location_id', chosenLoc);
                 }
             } else if (form.dataset.acceptTransferId) {
                 const transferId = form.dataset.acceptTransferId;
@@ -1256,6 +1495,20 @@
                     const val = String(s.value || '').trim();
                     if (id && val) {
                         setHiddenInput(form, `item_etalases[${id}]`, val);
+                    }
+                });
+
+                const bulkLocSelect = document.querySelector(`.transfer-bulk-location-select[data-transfer-id="${transferId}"]`);
+                const itemLocSelects = [...document.querySelectorAll(`.item-location-select[data-transfer-id="${transferId}"][data-item-status="0"]`)];
+                const bulkLocVal = (bulkLocSelect?.value || '').trim();
+                if (bulkLocVal) {
+                    setHiddenInput(form, 'transfer_location_id', bulkLocVal);
+                }
+                itemLocSelects.forEach((s) => {
+                    const id = s.dataset.itemId;
+                    const val = String(s.value || '').trim();
+                    if (id && val) {
+                        setHiddenInput(form, `item_locations[${id}]`, val);
                     }
                 });
             }

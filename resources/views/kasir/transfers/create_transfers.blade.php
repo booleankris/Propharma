@@ -120,6 +120,39 @@
                         @endforeach
                     </select>
                 </div>
+
+                {{-- Pilihan Lokasi Tujuan PMI (tampil otomatis jika tujuan SAHABAT PMI / ID 1) --}}
+                <div id="pmiLocationContainer" class="hidden mt-4 pt-4 border-t border-slate-100">
+                    <div class="flex flex-wrap items-center justify-between gap-2 mb-1.5">
+                        <label for="headerLocationSelect" class="block text-xs font-semibold text-slate-700">
+                            Lokasi Tujuan di PMI <span class="text-rose-500">*</span>
+                        </label>
+                        <span class="text-[11px] text-slate-400">Otomatis dipakai item baru &amp; dapat diubah per item di tabel bawah</span>
+                    </div>
+                    <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+                        <div class="flex-1 min-w-0">
+                            <select id="headerLocationSelect" onchange="onHeaderLocationChange()"
+                                data-enter-next="#searchInput"
+                                title="Pilih lokasi tujuan PMI"
+                                class="transfer-create-location-select w-full rounded-lg border border-slate-200 bg-slate-50/50 px-3.5 py-2.5 text-sm text-slate-800 outline-none focus:border-sky-500 focus:bg-white transition">
+                                <option value="">— Pilih Lokasi PMI —</option>
+                                @foreach ($transferLocations ?? [] as $loc)
+                                    <option value="{{ $loc->id }}">{{ $loc->name }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+                        <div class="flex items-center gap-2 shrink-0">
+                            <button type="button" id="applyHeaderLocationAllBtn" onclick="applyHeaderLocationToAllCartItems()"
+                                class="hidden px-3 py-2.5 text-xs font-semibold text-sky-700 bg-sky-50 hover:bg-sky-100 border border-sky-200 rounded-lg transition whitespace-nowrap">
+                                Terapkan ke Semua Item
+                            </button>
+                            <button type="button" onclick="window.openManageLocationModal(document.getElementById('headerLocationSelect'))"
+                                class="inline-flex items-center justify-center gap-1.5 px-3.5 py-2.5 text-xs font-semibold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 rounded-lg transition whitespace-nowrap">
+                                <span>+ / Kelola Lokasi</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
             </div>
 
             <!-- Item Search Card -->
@@ -197,6 +230,28 @@
                         </div>
                     </div>
 
+                    <div id="stageLocationContainer" class="hidden">
+                        <label for="stageLocationSelect" class="block text-[11px] font-semibold text-slate-600 uppercase tracking-wider mb-1">
+                            Lokasi PMI <span class="text-rose-500">*</span>
+                        </label>
+                        <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+                            <div class="flex-1 min-w-0">
+                                <select id="stageLocationSelect" title="Pilih lokasi tujuan PMI untuk item ini"
+                                    data-enter-next="add-item"
+                                    class="transfer-stage-location-select w-full px-3 py-2.5 bg-white border border-slate-200 rounded-lg text-sm text-slate-800 outline-none focus:border-sky-500">
+                                    <option value="">— Pilih Lokasi PMI —</option>
+                                    @foreach ($transferLocations ?? [] as $loc)
+                                        <option value="{{ $loc->id }}">{{ $loc->name }}</option>
+                                    @endforeach
+                                </select>
+                            </div>
+                            <button type="button" onclick="window.openManageLocationModal(document.getElementById('stageLocationSelect'))"
+                                class="px-3 py-2.5 bg-white hover:bg-indigo-50 border border-slate-200 hover:border-indigo-200 text-indigo-700 font-semibold text-xs rounded-lg transition whitespace-nowrap">
+                                + / Kelola
+                            </button>
+                        </div>
+                    </div>
+
                     <div class="flex flex-col sm:flex-row items-stretch gap-2 pt-1">
                         <button type="button" id="addItemBtn" onclick="addItemToCart()" disabled
                             class="flex-1 inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-sky-600 hover:bg-sky-700 disabled:bg-slate-200 disabled:text-slate-400 text-white font-medium text-xs rounded-lg transition shadow-sm">
@@ -234,13 +289,14 @@
                                 <th class="py-3 px-4">Obat</th>
                                 <th class="py-3 px-4">Satuan</th>
                                 <th class="py-3 px-4">Stok</th>
+                                <th id="cartLocationTh" class="py-3 px-4 hidden">Lokasi PMI</th>
                                 <th class="py-3 px-4 w-28">Qty</th>
                                 <th class="py-3 px-4 w-12 text-center"></th>
                             </tr>
                         </thead>
                         <tbody id="cartBody" class="divide-y divide-slate-100 text-slate-700">
                             <tr id="cartEmptyRow">
-                                <td colspan="6" class="py-10 text-center text-slate-400 text-xs">Belum ada item
+                                <td id="cartEmptyTd" colspan="6" class="py-10 text-center text-slate-400 text-xs">Belum ada item
                                     ditambahkan</td>
                             </tr>
                         </tbody>
@@ -323,8 +379,19 @@
         localStorage.setItem(SUBMISSION_KEY, submissionKey);
         let transferSubmitting = false;
         let cartItems = JSON.parse(localStorage.getItem(CART_KEY)) ||
-        []; // {batches_id, batchName, medName, unit, stock, qty, etalases_id, etalasesName, source_type}
+        []; // {batches_id, batchName, medName, unit, stock, qty, etalases_id, etalasesName, transfer_location_id, transferLocationName, source_type}
         let etalaseList = []; // {id, name}
+        let locationList = @json($transferLocations ?? []); // {id, name}
+        let lastHeaderLocationId = '';
+
+        function isPmiDestination() {
+            return String(document.getElementById('pharmacySelect')?.value || '') === '1';
+        }
+
+        function findLocationNameById(locId) {
+            const found = locationList.find(l => String(l.id) === String(locId));
+            return found ? found.name : '';
+        }
 
         // ── Search ────────────────────────────────────────────────────────
         function searchBatches(value) {
@@ -441,6 +508,21 @@
             const stagingCard = document.getElementById('stagingCard');
             stagingCard.classList.remove('hidden');
 
+            const stageLocContainer = document.getElementById('stageLocationContainer');
+            const stageLocSelect = document.getElementById('stageLocationSelect');
+            if (stageLocContainer && stageLocSelect) {
+                if (isPmiDestination()) {
+                    stageLocContainer.classList.remove('hidden');
+                    const headerLocId = document.getElementById('headerLocationSelect')?.value || '';
+                    if (headerLocId) {
+                        stageLocSelect.value = headerLocId;
+                    }
+                    window.syncEtalaseTriggerLabel?.(stageLocSelect);
+                } else {
+                    stageLocContainer.classList.add('hidden');
+                }
+            }
+
             document.getElementById('addItemBtn').disabled = true;
             document.getElementById('stageQty').focus();
         }
@@ -491,7 +573,28 @@
                 return;
             }
 
-            const existingIdx = cartItems.findIndex(c => String(c.batches_id) === String(stagedBatch.batches_id) && (c.source_type || 'gudang') === (stagedBatch.source_type || 'gudang'));
+            const pmiDest = isPmiDestination();
+            const stageLocEl = document.getElementById('stageLocationSelect');
+            const headerLocEl = document.getElementById('headerLocationSelect');
+            const selectedLocId = pmiDest
+                ? String((stageLocEl?.value || headerLocEl?.value || '')).trim()
+                : '';
+
+            if (pmiDest && !selectedLocId) {
+                if (typeof window.highlightInvalidField === 'function') {
+                    window.highlightInvalidField(stageLocEl || headerLocEl, 'Pilih lokasi tujuan PMI terlebih dahulu.');
+                } else {
+                    iziToast.warning({ message: 'Pilih lokasi tujuan PMI terlebih dahulu.' });
+                }
+                return;
+            }
+
+            const selectedLocName = selectedLocId ? findLocationNameById(selectedLocId) : '';
+            const existingIdx = cartItems.findIndex(c =>
+                String(c.batches_id) === String(stagedBatch.batches_id)
+                && (c.source_type || 'gudang') === (stagedBatch.source_type || 'gudang')
+                && (!pmiDest || String(c.transfer_location_id || '') === selectedLocId)
+            );
             if (existingIdx !== -1) {
                 const combinedQty = cartItems[existingIdx].qty + qty;
                 if (combinedQty > stagedBatch.stock) {
@@ -509,6 +612,8 @@
                     unit: stagedBatch.unit,
                     stock: stagedBatch.stock,
                     qty: qty,
+                    transfer_location_id: selectedLocId || null,
+                    transferLocationName: selectedLocName || '',
                     source_type: stagedBatch.source_type || 'gudang',
                 });
             }
@@ -524,11 +629,16 @@
 
         function renderCart() {
             const body = document.getElementById('cartBody');
+            const pmiDest = isPmiDestination();
+            const locTh = document.getElementById('cartLocationTh');
+            if (locTh) locTh.classList.toggle('hidden', !pmiDest);
+
             document.getElementById('cartCount').textContent = cartItems.length;
 
             if (cartItems.length === 0) {
                 body.innerHTML =
-                    `<tr id="cartEmptyRow"><td colspan="6" class="py-10 text-center text-slate-400 text-xs">Belum ada item ditambahkan</td></tr>`;
+                    `<tr id="cartEmptyRow"><td colspan="${pmiDest ? 7 : 6}" class="py-10 text-center text-slate-400 text-xs">Belum ada item ditambahkan</td></tr>`;
+                syncApplyAllLocationButton();
                 return;
             }
 
@@ -536,7 +646,6 @@
             cartItems.forEach((it, idx) => {
                 const tr = document.createElement('tr');
                 tr.className = 'hover:bg-slate-50/50 transition';
-                const isWarehouse = {{ isWarehousePharmacy() ? 'true' : 'false' }};
                 const srcBadgeColor = it.source_type === 'gudang'
                     ? 'bg-amber-50 text-amber-700 border-amber-200'
                     : 'bg-violet-50 text-violet-700 border-violet-200';
@@ -549,20 +658,71 @@
                     <td class="py-3 px-4 text-slate-600">${it.medName}</td>
                     <td class="py-3 px-4 text-slate-600">${it.unit}</td>
                     <td class="py-3 px-4"><span class="inline-flex items-center px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 font-mono text-[11px] font-semibold">${it.stock}</span></td>
-                    <td class="py-3 px-4">
-                        <input type="number" class="w-20 px-2 py-1 bg-white border border-slate-200 rounded text-xs font-mono text-slate-800 outline-none focus:border-sky-500" min="1" max="${it.stock}" value="${it.qty}" data-idx="${idx}" onchange="updateCartQty(this)">
-                    </td>
-                    <td class="py-3 px-4 text-center">
-                        <button type="button" class="text-slate-400 hover:text-rose-500 transition p-1" onclick="removeCartItem(${idx})" title="Hapus">
-                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                <polyline points="3 6 5 6 21 6" />
-                                <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
-                            </svg>
-                        </button>
-                    </td>
                 `;
+
+                if (pmiDest) {
+                    const locTd = document.createElement('td');
+                    locTd.className = 'py-3 px-4 min-w-[200px]';
+                    const wrap = document.createElement('div');
+                    wrap.className = 'flex items-center gap-1.5';
+
+                    const sel = document.createElement('select');
+                    sel.className = 'transfer-cart-location-select w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs text-slate-700 outline-none focus:border-sky-500';
+                    sel.dataset.idx = String(idx);
+                    sel.dataset.enterNext = 'row-qty';
+                    sel.title = 'Pilih lokasi PMI untuk item ini';
+
+                    const emptyOpt = document.createElement('option');
+                    emptyOpt.value = '';
+                    emptyOpt.textContent = '— Pilih Lokasi PMI —';
+                    sel.appendChild(emptyOpt);
+
+                    locationList.forEach(loc => {
+                        const opt = document.createElement('option');
+                        opt.value = String(loc.id);
+                        opt.textContent = loc.name;
+                        if (String(it.transfer_location_id || '') === String(loc.id)) {
+                            opt.selected = true;
+                        }
+                        sel.appendChild(opt);
+                    });
+
+                    sel.addEventListener('change', function () {
+                        updateCartLocation(this);
+                    });
+
+                    const manageBtn = document.createElement('button');
+                    manageBtn.type = 'button';
+                    manageBtn.title = 'Tambah / ubah / hapus lokasi PMI';
+                    manageBtn.textContent = '+';
+                    manageBtn.className = 'px-2 py-1.5 text-xs font-bold bg-white border border-slate-200 hover:bg-indigo-50 hover:border-indigo-200 text-indigo-700 rounded-lg transition shrink-0';
+                    manageBtn.onclick = () => window.openManageLocationModal?.(sel);
+
+                    wrap.append(sel, manageBtn);
+                    locTd.appendChild(wrap);
+                    tr.appendChild(locTd);
+                }
+
+                const qtyTd = document.createElement('td');
+                qtyTd.className = 'py-3 px-4';
+                qtyTd.innerHTML = `<input type="number" class="cart-qty-input w-20 px-2 py-1 bg-white border border-slate-200 rounded text-xs font-mono text-slate-800 outline-none focus:border-sky-500" min="1" max="${it.stock}" value="${it.qty}" data-idx="${idx}" onchange="updateCartQty(this)">`;
+
+                const delTd = document.createElement('td');
+                delTd.className = 'py-3 px-4 text-center';
+                delTd.innerHTML = `
+                    <button type="button" class="text-slate-400 hover:text-rose-500 transition p-1" onclick="removeCartItem(${idx})" title="Hapus">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <polyline points="3 6 5 6 21 6" />
+                            <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                        </svg>
+                    </button>`;
+
+                tr.append(qtyTd, delTd);
                 body.appendChild(tr);
             });
+
+            window.initEtalaseSearchableSelects?.(body);
+            syncApplyAllLocationButton();
         }
 
         function updateCartQty(input) {
@@ -592,6 +752,133 @@
             checkSubmit();
         }
 
+        function updateCartLocation(select) {
+            const idx = parseInt(select.dataset.idx);
+            if (!cartItems[idx]) return;
+            cartItems[idx].transfer_location_id = select.value || null;
+            cartItems[idx].transferLocationName = select.value ? (select.options[select.selectedIndex]?.textContent ?? '') : '';
+            saveCart();
+            syncApplyAllLocationButton();
+            checkSubmit();
+        }
+
+        function syncApplyAllLocationButton() {
+            const btn = document.getElementById('applyHeaderLocationAllBtn');
+            if (!btn) return;
+            const headerLocId = String(document.getElementById('headerLocationSelect')?.value || '');
+            const shouldShow = isPmiDestination()
+                && headerLocId !== ''
+                && cartItems.length > 0
+                && cartItems.some(it => String(it.transfer_location_id || '') !== headerLocId);
+            btn.classList.toggle('hidden', !shouldShow);
+        }
+
+        function onHeaderLocationChange() {
+            const headerLocId = String(document.getElementById('headerLocationSelect')?.value || '');
+            const headerLocName = headerLocId ? findLocationNameById(headerLocId) : '';
+
+            const stageLoc = document.getElementById('stageLocationSelect');
+            if (stageLoc && headerLocId) {
+                stageLoc.value = headerLocId;
+                window.syncEtalaseTriggerLabel?.(stageLoc);
+            }
+
+            if (headerLocId && cartItems.length > 0) {
+                let changed = false;
+                cartItems.forEach(it => {
+                    const curr = String(it.transfer_location_id || '');
+                    if (!curr || (lastHeaderLocationId && curr === lastHeaderLocationId)) {
+                        it.transfer_location_id = headerLocId;
+                        it.transferLocationName = headerLocName;
+                        changed = true;
+                    }
+                });
+                if (changed) {
+                    saveCart();
+                    renderCart();
+                } else {
+                    syncApplyAllLocationButton();
+                }
+            } else {
+                syncApplyAllLocationButton();
+            }
+
+            lastHeaderLocationId = headerLocId;
+            checkSubmit();
+        }
+
+        function applyHeaderLocationToAllCartItems() {
+            const headerLocId = String(document.getElementById('headerLocationSelect')?.value || '');
+            if (!headerLocId || !cartItems.length) return;
+            const headerLocName = findLocationNameById(headerLocId);
+            cartItems.forEach(it => {
+                it.transfer_location_id = headerLocId;
+                it.transferLocationName = headerLocName;
+            });
+            saveCart();
+            renderCart();
+            checkSubmit();
+            iziToast.success({ message: `Lokasi "${headerLocName}" diterapkan ke semua item.` });
+        }
+
+        function syncPmiLocationUI() {
+            const pmiDest = isPmiDestination();
+            const container = document.getElementById('pmiLocationContainer');
+            if (container) container.classList.toggle('hidden', !pmiDest);
+
+            const stageLocContainer = document.getElementById('stageLocationContainer');
+            if (stageLocContainer && stagedBatch) {
+                stageLocContainer.classList.toggle('hidden', !pmiDest);
+            }
+
+            if (pmiDest) {
+                const headerLocId = String(document.getElementById('headerLocationSelect')?.value || '');
+                if (headerLocId) {
+                    let updated = false;
+                    cartItems.forEach(it => {
+                        if (!it.transfer_location_id) {
+                            it.transfer_location_id = headerLocId;
+                            it.transferLocationName = findLocationNameById(headerLocId);
+                            updated = true;
+                        }
+                    });
+                    if (updated) saveCart();
+                }
+            }
+
+            window.initEtalaseSearchableSelects?.(document.getElementById('pmiLocationContainer'));
+            window.initEtalaseSearchableSelects?.(document.getElementById('stageLocationContainer'));
+            renderCart();
+            checkSubmit();
+        }
+
+        window.addEventListener('transfer-locations-updated', function (ev) {
+            const freshList = ev?.detail?.list;
+            if (Array.isArray(freshList)) {
+                locationList = freshList;
+                const validIds = new Set(locationList.map(l => String(l.id)));
+                let dirty = false;
+                cartItems.forEach(it => {
+                    if (it.transfer_location_id) {
+                        if (!validIds.has(String(it.transfer_location_id))) {
+                            it.transfer_location_id = null;
+                            it.transferLocationName = '';
+                            dirty = true;
+                        } else {
+                            const updatedName = findLocationNameById(it.transfer_location_id);
+                            if (updatedName && it.transferLocationName !== updatedName) {
+                                it.transferLocationName = updatedName;
+                                dirty = true;
+                            }
+                        }
+                    }
+                });
+                if (dirty) saveCart();
+                renderCart();
+                checkSubmit();
+            }
+        });
+
         function removeCartItem(idx) {
             cartItems.splice(idx, 1);
             saveCart();
@@ -614,9 +901,40 @@
         }
 
         // ── Keyboard nav / outside click ─────────────────────────────────
+        function focusAfterPharmacySelected() {
+            if (!document.getElementById('pharmacySelect')?.value) return;
+            setTimeout(() => {
+                if (isPmiDestination()) {
+                    const headerLocSel = document.getElementById('headerLocationSelect');
+                    const target = headerLocSel?._comboboxTrigger || headerLocSel;
+                    if (target) {
+                        target.focus();
+                        if (!headerLocSel.value && headerLocSel._comboboxTrigger) {
+                            headerLocSel._comboboxTrigger.click();
+                        }
+                        return;
+                    }
+                }
+                document.getElementById('searchInput')?.focus();
+            }, 20);
+        }
+
         $(document).ready(function() {
+            const pharmacySelectEl = document.getElementById('pharmacySelect');
             const searchInputEl = document.getElementById('searchInput');
             const stageQtyEl = document.getElementById('stageQty');
+            const cartBodyEl = document.getElementById('cartBody');
+
+            if (pharmacySelectEl) {
+                pharmacySelectEl.addEventListener('keydown', function(e) {
+                    if (e.key === 'Enter') {
+                        e.preventDefault();
+                        if (pharmacySelectEl.value) {
+                            focusAfterPharmacySelected();
+                        }
+                    }
+                });
+            }
 
             // Search input: Arrow/Enter for dropdown nav, Enter to jump to qty if batch staged & dropdown closed
             searchInputEl.addEventListener('keydown', function(e) {
@@ -633,32 +951,108 @@
                         e.preventDefault();
                         activeIdx = Math.max(activeIdx - 1, 0);
                         updateActive(rows);
-                    } else if (e.key === 'Enter' && activeIdx >= 0) {
+                    } else if (e.key === 'Enter') {
                         e.preventDefault();
-                        selectBatch(rows[activeIdx]);
+                        const chosenRow = activeIdx >= 0 ? rows[activeIdx] : rows[0];
+                        if (chosenRow) selectBatch(chosenRow);
                     } else if (e.key === 'Escape') {
                         hideDropdown();
                     }
                 } else if (e.key === 'Enter') {
                     e.preventDefault();
-                    // If batch already staged, jump to qty field
                     if (stagedBatch) {
                         stageQtyEl.focus();
                         stageQtyEl.select();
+                        return;
+                    }
+                    if (!searchInputEl.value.trim() && cartItems.length > 0) {
+                        const submitBtn = document.getElementById('submitBtn');
+                        if (submitBtn && !submitBtn.disabled) {
+                            submitBtn.focus();
+                        } else if (isPmiDestination()) {
+                            const emptyLocSel = [...document.querySelectorAll('.transfer-cart-location-select')].find(s => !s.value);
+                            if (emptyLocSel) {
+                                const trigger = emptyLocSel._comboboxTrigger || emptyLocSel;
+                                trigger.focus();
+                                if (emptyLocSel._comboboxTrigger) emptyLocSel._comboboxTrigger.click();
+                            }
+                        }
                     }
                 }
             });
 
-            // stageQty: Enter → trigger addItemToCart if valid
+            // stageQty: Enter → langsung pilih lokasi jika PMI & kosong, atau tambah ke daftar
             stageQtyEl.addEventListener('keydown', function(e) {
                 if (e.key === 'Enter') {
                     e.preventDefault();
+                    const qtyVal = parseInt(stageQtyEl.value) || 0;
+                    if (!stagedBatch || qtyVal <= 0) {
+                        stageQtyEl.focus();
+                        stageQtyEl.select();
+                        return;
+                    }
+                    if (isPmiDestination()) {
+                        const stageLocSel = document.getElementById('stageLocationSelect');
+                        if (stageLocSel && !stageLocSel.value) {
+                            const trigger = stageLocSel._comboboxTrigger || stageLocSel;
+                            trigger.focus();
+                            if (stageLocSel._comboboxTrigger) stageLocSel._comboboxTrigger.click();
+                            return;
+                        }
+                    }
                     const addBtn = document.getElementById('addItemBtn');
-                    if (!addBtn.disabled) {
+                    if (addBtn && !addBtn.disabled) {
                         addItemToCart();
+                    }
+                } else if (e.key === 'Escape') {
+                    e.preventDefault();
+                    clearStaging();
+                    searchInputEl.focus();
+                }
+            });
+
+            // Tabel item transfer: Enter di qty pindah ke baris berikutnya atau tombol Simpan Transfer
+            cartBodyEl?.addEventListener('keydown', function(e) {
+                if (e.key !== 'Enter') return;
+                const qtyInput = e.target.closest('.cart-qty-input');
+                if (!qtyInput) return;
+                e.preventDefault();
+                updateCartQty(qtyInput);
+                const allQty = [...cartBodyEl.querySelectorAll('.cart-qty-input')];
+                const pos = allQty.indexOf(qtyInput);
+                if (pos >= 0 && pos < allQty.length - 1) {
+                    allQty[pos + 1].focus();
+                    allQty[pos + 1].select();
+                } else {
+                    const submitBtn = document.getElementById('submitBtn');
+                    if (submitBtn && !submitBtn.disabled) {
+                        submitBtn.focus();
                     }
                 }
             });
+
+            // Shortcut Ctrl/Cmd + Enter untuk langsung submit transfer
+            document.addEventListener('keydown', function(e) {
+                if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+                    const submitBtn = document.getElementById('submitBtn');
+                    if (submitBtn && !submitBtn.disabled && !transferSubmitting) {
+                        e.preventDefault();
+                        submitTransfer();
+                    }
+                }
+            });
+
+            // Fokus awal halaman sesuai field pertama yang belum terisi
+            setTimeout(() => {
+                if (!pharmacySelectEl?.value) {
+                    pharmacySelectEl?.focus();
+                } else if (isPmiDestination() && !document.getElementById('headerLocationSelect')?.value) {
+                    const headerLocSel = document.getElementById('headerLocationSelect');
+                    (headerLocSel?._comboboxTrigger || headerLocSel)?.focus();
+                } else {
+                    searchInputEl?.focus();
+                }
+            }, 60);
 
             function updateActive(rows) {
                 rows.forEach(r => r.classList.remove('active'));
@@ -788,18 +1182,21 @@
                 });
         }
 
-        renderCart();
-        checkSubmit();
+        syncPmiLocationUI();
 
         // ── Submit ────────────────────────────────────────────────────────
         function onPharmacyChange() {
-            checkSubmit();
+            syncPmiLocationUI();
+            if (document.getElementById('pharmacySelect')?.value) {
+                focusAfterPharmacySelected();
+            }
         }
 
         function checkSubmit() {
             const pharmacy = document.getElementById('pharmacySelect').value;
+            const pmiDest = isPmiDestination();
             const valid = cartItems.length > 0 && pharmacy !== '' &&
-                cartItems.every(it => it.qty > 0 && it.qty <= it.stock);
+                cartItems.every(it => it.qty > 0 && it.qty <= it.stock && (!pmiDest || Boolean(it.transfer_location_id)));
             document.getElementById('submitBtn').disabled = !valid;
         }
 
@@ -810,6 +1207,13 @@
             if (!pharmacy || cartItems.length === 0) {
                 iziToast.warning({
                     message: 'Pilih tujuan apotek dan tambahkan minimal satu item.'
+                });
+                return;
+            }
+
+            if (isPmiDestination() && cartItems.some(it => !it.transfer_location_id)) {
+                iziToast.warning({
+                    message: 'Pilih lokasi tujuan PMI untuk setiap item sebelum menyimpan transfer.'
                 });
                 return;
             }
@@ -832,6 +1236,7 @@
                     batches_id: it.batches_id,
                     qty: it.qty,
                     etalases_id: it.etalases_id || null,
+                    transfer_location_id: isPmiDestination() ? (it.transfer_location_id || null) : null,
                     source_type: it.source_type || 'gudang',
                 })),
             };

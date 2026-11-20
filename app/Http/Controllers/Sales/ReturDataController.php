@@ -28,6 +28,7 @@ class ReturDataController extends Controller
                 ->leftJoin('medicine_transactions', 'medicine_transactions.transaction_code', '=', 'items_log.transaction_code')
                 ->leftJoin('patients', 'patients.id', '=', 'medicine_transactions.patient_id')
                 ->leftJoin('receiving', 'receiving.code', '=', 'items_log.transaction_code')
+                ->leftJoin('users as actor', 'actor.id', '=', 'items_log.user_id')
                 ->whereIn('items_log.status', [3, 4])
                 ->select([
                     'items_log.id',
@@ -38,6 +39,7 @@ class ReturDataController extends Controller
                     DB::raw('COALESCE(medicine_transactions.pharmacy_id, receiving.pharmacy_id) as pharmacy_id'),
                     'medicines.name  as medicine_name',
                     'patients.name   as patient_name',
+                    DB::raw("COALESCE(NULLIF(actor.name, ''), actor.username, '-') as actor_name"),
 
                     DB::raw("
                         CASE 
@@ -83,6 +85,7 @@ class ReturDataController extends Controller
                     $q->orWhere('transaction_code', 'like', "%{$search}%")
                         ->orWhere('medicine_name', 'like', "%{$search}%")
                         ->orWhere('patient_name', 'like', "%{$search}%")
+                        ->orWhere('actor_name', 'like', "%{$search}%")
                         ->orWhere('jenis', 'like', "%{$search}%");
                 });
             }

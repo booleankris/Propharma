@@ -15,7 +15,8 @@ class Retur extends Model
         'medicine_id',
         'qty_retur',
         'total_retur',
-        'status', 
+        'status',
+        'user_id',
     ];
 
     public function transaction()
@@ -26,5 +27,10 @@ class Retur extends Model
     public function medicine()
     {
         return $this->belongsTo(Medicines::class, 'medicine_id');
+    }
+
+    public function user()
+    {
+        return $this->belongsTo(User::class, 'user_id');
     }
 }

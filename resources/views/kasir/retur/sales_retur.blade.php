@@ -211,7 +211,8 @@
                         <div>
                             <span class="font-semibold text-blue-950">Aturan Retur:</span> Item obat dapat diretur
                             berkali-kali selama tidak melebihi sisa quantity yang dibeli. Item akan <strong>dikunci
-                                otomatis</strong> jika seluruh quantity-nya telah selesai diretur.
+                                otomatis</strong> jika seluruh quantity-nya telah selesai diretur. Setiap proses retur
+                            memerlukan <strong>verifikasi PIN</strong> (role Retur, General Manager, atau administrator).
                         </div>
                     </div>
 
@@ -429,6 +430,8 @@
             </div>
         </div>
     </section>
+
+    @include('kasir.retur.partials.pin_modal')
 @endsection
 
 @section('scripts')
@@ -813,8 +816,18 @@
                     }
                 },
                 dangerMode: willBeLocked,
-            }).then(function(confirmed) {
+            }).then(async function(confirmed) {
                 if (!confirmed) return;
+
+                const pinRes = await window.requestReturPin({
+                    title: 'Otorisasi PIN Retur',
+                    subtitle: 'Masukkan 4 digit PIN user role Retur, General Manager, atau administrator.',
+                    confirmMessage: `${medicine_name} (${qty_retur} item)${isCreditAccount ? ' • Potong Piutang' : ` • ${account_name}`}`,
+                });
+
+                if (!pinRes || !pinRes.pin) {
+                    return;
+                }
 
                 const btn = document.getElementById('submitBtn');
                 btn.disabled = true;
@@ -835,6 +848,7 @@
                         medicine_code,
                         old_qty,
                         account_id,
+                        pin: pinRes.pin,
                         _token: '{{ csrf_token() }}'
                     })
                     .then(response => {
