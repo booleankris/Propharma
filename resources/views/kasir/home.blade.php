@@ -748,6 +748,24 @@
                             <span class="text-xs font-bold text-slate-700 group-hover:text-rose-600">Laporan
                                 Penjualan</span>
                         </a>
+
+                        {{-- Mutasi Stok --}}
+                        <a onclick="openModal('transfersModal')"
+                            class="menu-tile group flex flex-col items-center gap-2 rounded-2xl border border-slate-200/70 bg-slate-50/60 p-4 text-center hover:bg-white hover:border-cyan-200 hover:shadow-md hover:shadow-cyan-500/5 cursor-pointer">
+                            <div
+                                class="flex h-11 w-11 items-center justify-center rounded-xl bg-cyan-100/80 text-cyan-600 transition-transform duration-200 group-hover:scale-110">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" viewBox="0 0 24 24"
+                                    fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"
+                                    stroke-linejoin="round">
+                                    <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+                                    <path d="M17 1l4 4l-4 4" />
+                                    <path d="M3 11v-2a4 4 0 0 1 4 -4h14" />
+                                    <path d="M7 23l-4 -4l4 -4" />
+                                    <path d="M21 13v2a4 4 0 0 1 -4 4h-14" />
+                                </svg>
+                            </div>
+                            <span class="text-xs font-bold text-slate-700 group-hover:text-cyan-600">Mutasi Stok</span>
+                        </a>
                     @else
                         {{-- Data Penjualan --}}
                         <a onclick="openModal('salesModal')"

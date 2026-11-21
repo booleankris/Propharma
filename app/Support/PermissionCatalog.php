@@ -180,7 +180,12 @@ class PermissionCatalog
                     'transfers.manage' => [
                         'label' => 'Mutasi Stok Antar Cabang & Etalase',
                         'description' => 'Buat mutasi keluar, request mutasi, terima/tolak mutasi masuk (wajib PIN), dan kelola etalase cabang.',
-                        'roles' => $nonOnlineRoles,
+                        'roles' => array_values(array_unique(array_merge($nonOnlineRoles, [
+                            'Online',
+                            'Online Grab',
+                            'Online Shopee',
+                            'Digital',
+                        ]))),
                     ],
                 ],
             ],
@@ -313,6 +318,7 @@ class PermissionCatalog
             ->all();
 
         if (count($existingNames) === count($definitions)) {
+            self::ensureOnlineRolesHaveTransfersPermission();
             return;
         }
 
@@ -339,6 +345,43 @@ class PermissionCatalog
         }
 
         app(PermissionRegistrar::class)->forgetCachedPermissions();
+        self::ensureOnlineRolesHaveTransfersPermission();
+    }
+
+    /**
+     * Pastikan role Online (Online, Online Grab, Online Shopee, Digital) mendapatkan
+     * permission transfers.manage secara otomatis pada environment yang sudah ter-seed sebelumnya.
+     */
+    protected static function ensureOnlineRolesHaveTransfersPermission(): void
+    {
+        $cacheKey = 'permission_catalog_online_transfers_v1';
+        if (\Illuminate\Support\Facades\Cache::get($cacheKey)) {
+            return;
+        }
+
+        $permission = Permission::where('name', 'transfers.manage')
+            ->where('guard_name', 'web')
+            ->first();
+        if (!$permission) {
+            return;
+        }
+
+        $onlineRoleNames = ['online', 'online grab', 'online shopee', 'digital'];
+        $roles = Role::where('guard_name', 'web')->get();
+        $changed = false;
+
+        foreach ($roles as $role) {
+            if (in_array(strtolower($role->name), $onlineRoleNames, true) && !$role->hasPermissionTo($permission)) {
+                $role->givePermissionTo($permission);
+                $changed = true;
+            }
+        }
+
+        if ($changed) {
+            app(PermissionRegistrar::class)->forgetCachedPermissions();
+        }
+
+        \Illuminate\Support\Facades\Cache::forever($cacheKey, true);
     }
 
     /**
