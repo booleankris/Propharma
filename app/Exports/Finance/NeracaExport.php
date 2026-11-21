@@ -132,7 +132,7 @@ class NeracaExport implements FromArray, WithStyles, WithColumnWidths, WithTitle
             $harta['label'] ?? 'HARTA',
             $harta['awal'] ?? 0,
             $harta['akhir'] ?? 0,
-            '-',
+            $harta['selisih'] ?? 0,
         ];
 
         // KEWAJIBAN
@@ -144,7 +144,7 @@ class NeracaExport implements FromArray, WithStyles, WithColumnWidths, WithTitle
             $kewajiban['label'] ?? 'KEWAJIBAN',
             $kewajiban['awal'] ?? 0,
             $kewajiban['akhir'] ?? 0,
-            '-',
+            $kewajiban['selisih'] ?? 0,
         ];
 
         // SALDO

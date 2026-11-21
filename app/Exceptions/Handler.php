@@ -63,6 +63,27 @@ class Handler extends ExceptionHandler
     {
         // Tangani Page Expired (419 / CSRF Token Mismatch) secara halus
         if ($e instanceof TokenMismatchException) {
+            // Jika user sebenarnya masih login, jangan arahkan ke /login (yang akan bounce ke /home).
+            // Arahkan kembali ke halaman aktif agar token CSRF diperbarui tanpa membuang user ke /home.
+            if (auth()->check()) {
+                $targetUrl = $request->headers->get('referer')
+                    ?: ($request->is('finance*') ? route('finance.kasBank') : url()->previous());
+
+                if ($request->inertia()) {
+                    return redirect()->to($targetUrl)->withErrors([
+                        '_token' => 'Sesi formulir telah diperbarui. Silakan klik Simpan sekali lagi.',
+                    ]);
+                }
+
+                if ($request->expectsJson() || $request->ajax()) {
+                    return response()->json([
+                        'message' => 'Sesi formulir telah diperbarui. Silakan coba lagi.',
+                        'csrf_refreshed' => true,
+                    ], 419);
+                }
+
+                return redirect()->to($targetUrl)->with('warning', 'Sesi formulir telah diperbarui. Silakan kirim ulang.');
+            }
 
             // 1. Tangani request Inertia terlebih dahulu
             if ($request->inertia()) {

@@ -7,74 +7,87 @@ use App\Models\FinancePayment;
 use App\Models\MedicineTransactions;
 use App\Models\ReceivingDetails;
 use App\Services\ConsignmentService;
+use App\Support\FinanceAccountBalanceResolver;
 use App\Support\FinanceShift;
 use App\Support\LiphTransactionScope;
 use App\Support\ReceivingInvoiceTotals;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 class NeracaReportService
 {
     /**
      * Build Neraca (Balance Sheet) data comparing beginning and ending of period.
      */
-    public function build(array $pharmacyIds, string $startDate, string $endDate): array
+    public function build(array $pharmacyIds, string $startDate, string $endDate, ?int $accountPharmacyId = null): array
     {
-        $pharmacyId = (int) ($pharmacyIds[0] ?? 1);
+        $pharmacyId = $accountPharmacyId && $accountPharmacyId > 0
+            ? $accountPharmacyId
+            : ((function_exists('getActivePharmacyId') && (int) getActivePharmacyId() > 0)
+                ? (int) getActivePharmacyId()
+                : (int) ($pharmacyIds[0] ?? 1));
         $dayBeforeStart = Carbon::parse($startDate)->subDay()->toDateString();
+        $todayDate = now()->toDateString();
         $todayOperationalDate = FinanceShift::operationalDate(now());
         $periodEnd = max($startDate, min($endDate, $todayOperationalDate));
 
-        // 1. Kas & Bank accounts of the pharmacy
+        if ($pharmacyId > 0) {
+            FinanceAccount::ensureBranchDefaultAccounts($pharmacyId);
+        }
+
+        // 1. Kas & Bank accounts of the active pharmacy
         $accounts = FinanceAccount::where('category', 'Kas & Bank')
             ->where('pharmacy_id', $pharmacyId)
             ->where(fn ($query) => $query->where('is_active', true)->orWhere('balance', '!=', 0))
-            ->orderByRaw("CASE WHEN account_type = 'kas_apotek' THEN 0 ELSE 1 END")
+            ->orderByRaw("CASE WHEN account_type = 'kas_apotek' OR code = '1-10001' THEN 0 ELSE 1 END")
             ->orderBy('code')
             ->get(['id', 'name', 'code', 'account_type', 'balance']);
 
-        // Default standard bank names to present if not already present
-        $standardBanks = ['BANK BPD', 'BANK BNI', 'BANK MANDIRI', 'BANK BRI', 'BANK BCA'];
+        $preferredBankOrder = ['BANK BNI', 'BANK MANDIRI', 'BANK BRI', 'BANK BCA', 'BANK BTN', 'BANK BPD'];
+        $accountIds = $accounts->pluck('id')->all();
+        $accountsWithOpening = !empty($accountIds)
+            ? FinancePayment::where('payment_type', 'SALDO AWAL')
+                ->whereIn('account_id', $accountIds)
+                ->pluck('account_id')
+                ->all()
+            : [];
 
         $kasRows = [];
         $bankRows = [];
-        $existingBankNames = [];
+        $hasEstimatedOpening = false;
 
         foreach ($accounts as $account) {
-            $opening = FinancePayment::where('payment_type', 'SALDO AWAL')->where('account_id', $account->id)->first();
-            $openingDate = $opening?->payment_date?->toDateString();
+            $openingBalance = FinanceAccountBalanceResolver::resolveOpeningBalanceAtStartDate($account, $startDate, $todayDate);
+            $closingBalance = FinanceAccountBalanceResolver::resolveClosingBalanceAsOf($account, $periodEnd, $todayDate);
 
-            $openingBalance = 0.0;
-            if ($opening && $openingDate <= $startDate) {
-                $openingBalance = $openingDate === $startDate
-                    ? (float) $opening->amount
-                    : $this->calculateAccountBalance($account->id, $opening, $dayBeforeStart);
-            }
-
-            $closingBalance = 0.0;
-            if ($opening && $openingDate <= $periodEnd) {
-                $closingBalance = $this->calculateAccountBalance($account->id, $opening, $periodEnd);
-            } elseif ($periodEnd === now()->toDateString()) {
-                $closingBalance = (float) $account->balance;
+            if (
+                !in_array($account->id, $accountsWithOpening, true)
+                && (abs($openingBalance) >= 0.01 || abs($closingBalance) >= 0.01)
+            ) {
+                $hasEstimatedOpening = true;
             }
 
             $name = strtoupper(trim((string) $account->name));
-            if ($account->account_type === 'kas_apotek') {
+            $isKas = $account->account_type === 'kas_apotek' || $account->code === '1-10001';
+            if ($isKas) {
                 $kasRows[] = [
                     'label' => 'KAS',
                     'awal' => $openingBalance,
                     'akhir' => $closingBalance,
-                    'selisih' => $closingBalance - $openingBalance,
+                    'selisih' => round($closingBalance - $openingBalance, 2),
                 ];
             } else {
                 // Normalize label (e.g. Rekening BCA -> BANK BCA)
-                $label = str_starts_with($name, 'REKENING ') ? 'BANK ' . substr($name, 9) : (str_starts_with($name, 'BANK ') ? $name : 'BANK ' . $name);
-                $existingBankNames[] = $label;
+                $label = str_starts_with($name, 'REKENING ')
+                    ? 'BANK ' . substr($name, 9)
+                    : (str_starts_with($name, 'BANK ') ? $name : 'BANK ' . $name);
                 $bankRows[] = [
                     'label' => $label,
+                    'code' => (string) ($account->code ?? ''),
                     'awal' => $openingBalance,
                     'akhir' => $closingBalance,
-                    'selisih' => $closingBalance - $openingBalance,
+                    'selisih' => round($closingBalance - $openingBalance, 2),
                 ];
             }
         }
@@ -84,26 +97,21 @@ class NeracaReportService
             $kasRows[] = ['label' => 'KAS', 'awal' => 0.0, 'akhir' => 0.0, 'selisih' => 0.0];
         }
 
-        // Ensure standard banks from template (BPD, BNI, Mandiri, BRI, BCA) are present
-        foreach ($standardBanks as $stdBank) {
-            if (!in_array($stdBank, $existingBankNames, true)) {
-                $bankRows[] = [
-                    'label' => $stdBank,
-                    'awal' => 0.0,
-                    'akhir' => 0.0,
-                    'selisih' => 0.0,
-                ];
-            }
-        }
-
-        // Sort banks to match template order: BPD, BNI, MANDIRI, BRI, BCA, others
-        usort($bankRows, function ($a, $b) use ($standardBanks) {
-            $posA = array_search($a['label'], $standardBanks, true);
-            $posB = array_search($b['label'], $standardBanks, true);
+        // Sort actual branch banks in consistent template order without injecting nonexistent ghost banks
+        usort($bankRows, function ($a, $b) use ($preferredBankOrder) {
+            $posA = array_search($a['label'], $preferredBankOrder, true);
+            $posB = array_search($b['label'], $preferredBankOrder, true);
             $posA = $posA === false ? 999 : $posA;
             $posB = $posB === false ? 999 : $posB;
-            return $posA <=> $posB;
+            if ($posA !== $posB) {
+                return $posA <=> $posB;
+            }
+            return strcmp((string) ($a['code'] ?? ''), (string) ($b['code'] ?? ''));
         });
+        $bankRows = array_map(function ($row) {
+            unset($row['code']);
+            return $row;
+        }, $bankRows);
 
         // 2. Piutang Dagang (Penjualan Kredit yang belum lunas)
         $piutangAwal = $this->receivableBalanceAtDate($pharmacyIds, $dayBeforeStart);
@@ -133,6 +141,7 @@ class NeracaReportService
             'awal' => $hutangAwal,
             'akhir' => $hutangAkhir,
             'selisih' => $hutangAwal - $hutangAkhir,
+            'is_liability' => true,
         ];
 
         // 5. Laba Tanpa Stok: (Kas + Bank + Piutang) - Hutang
@@ -221,6 +230,7 @@ class NeracaReportService
             'endDate' => $endDate,
             'dayBeforeStart' => $dayBeforeStart,
             'periodEnd' => $periodEnd,
+            'hasEstimatedOpening' => $hasEstimatedOpening,
             'items' => $numberedItems,
             'laba_tanpa_stok' => $labaTanpaStok,
             'persediaan' => $persediaanItem,
@@ -233,36 +243,7 @@ class NeracaReportService
 
     private function calculateAccountBalance(int $accountId, FinancePayment $opening, string $asOfDate): float
     {
-        $openingDate = $opening->payment_date?->format('Y-m-d');
-        if (!$openingDate || $openingDate > $asOfDate) return 0;
-
-        $payments = FinancePayment::where('account_id', $accountId)
-            ->where('id', '!=', $opening->id)
-            ->whereDate('payment_date', '>=', $openingDate)
-            ->whereDate('payment_date', '<=', $asOfDate)
-            ->get(['payment_type', 'amount', 'transfer_account_id']);
-
-        $balance = (float) $opening->amount;
-        foreach ($payments as $payment) {
-            if (in_array($payment->payment_type, ['PIUTANG', 'PENDAPATAN', 'PENJUALAN TUNAI', 'PENJUALAN NON TUNAI'], true)) {
-                $balance += (float) $payment->amount;
-            } elseif (in_array($payment->payment_type, ['KREDIT', 'CASH', 'KONSINYASI', 'BIAYA', 'SETOR', 'TARIK TUNAI'], true)) {
-                $balance -= (float) $payment->amount;
-            } elseif ($payment->payment_type === 'PENYESUAIAN SALDO') {
-                if ($payment->reference_number === 'OPNAME-OUT') {
-                    $balance -= (float) $payment->amount;
-                } else {
-                    $balance += (float) $payment->amount;
-                }
-            }
-        }
-        $balance += (float) FinancePayment::whereIn('payment_type', ['SETOR', 'TARIK TUNAI'])
-            ->where('transfer_account_id', $accountId)
-            ->whereDate('payment_date', '>=', $openingDate)
-            ->whereDate('payment_date', '<=', $asOfDate)
-            ->sum('amount');
-
-        return $balance;
+        return FinanceAccountBalanceResolver::calculateFromOpening($accountId, $opening, $asOfDate);
     }
 
     private function receivableBalanceAtDate(array $pharmacyIds, string $asOfDate): float
@@ -272,6 +253,8 @@ class NeracaReportService
             ->withSum(['payments as finance_paid' => fn ($query) => $query
                 ->where('payment_type', 'PIUTANG')
                 ->whereDate('payment_date', '<=', $asOfDate)], 'amount')
+            ->withSum(['payments as finance_paid_total' => fn ($query) => $query
+                ->where('payment_type', 'PIUTANG')], 'amount')
             ->whereIn('pharmacy_id', $pharmacyIds)
             ->whereIn('transaction_type', ['KREDIT', 'RESEP KREDIT', 'RETUR KREDIT'])
             ->where(function ($period) use ($asOfDate) {
@@ -281,7 +264,7 @@ class NeracaReportService
                     });
             })
             ->tap(fn ($query) => LiphTransactionScope::applySalesStatus($query))
-            ->get(['id', 'debtor_id', 'transaction_type', 'subtotal', 'paid']);
+            ->get(['id', 'debtor_id', 'transaction_type', 'subtotal', 'discount', 'paid']);
 
         $balancesByDebtor = [];
         $returnsByDebtor = [];
@@ -289,7 +272,7 @@ class NeracaReportService
         foreach ($transactions as $transaction) {
             $debtorKey = (string) ((int) ($transaction->debtor_id ?? 0));
 
-            if ($transaction->transaction_type === 'RETUR KREDIT') {
+            if (strtoupper(trim((string) $transaction->transaction_type)) === 'RETUR KREDIT') {
                 $returnsByDebtor[$debtorKey] = ($returnsByDebtor[$debtorKey] ?? 0)
                     + abs((float) ($transaction->subtotal ?? 0));
                 continue;
@@ -298,15 +281,16 @@ class NeracaReportService
             $total = (float) ($transaction->subtotal ?? 0);
             if ($total <= 0) {
                 $total = (float) $transaction->transactions->sum(
-                    fn ($item) => $item->final_price ?: $item->total_price
+                    fn ($item) => (float) ($item->final_price ?: $item->total_price)
                 );
+                $total = max(0, $total - (float) ($transaction->discount ?? 0));
             }
 
             $total = max(0, $total);
-            $paid = min($total, max(
-                (float) ($transaction->finance_paid ?? 0),
-                (float) ($transaction->paid ?? 0)
-            ));
+            // Pisahkan pembayaran historis (legacy paid sebelum tabel finance_payments) agar pelunasan
+            // yang baru terjadi setelah $asOfDate tidak ikut melunasi saldo piutang per tanggal $asOfDate.
+            $legacyPaid = max(0, (float) ($transaction->paid ?? 0) - (float) ($transaction->finance_paid_total ?? 0));
+            $paid = min($total, max(0, (float) ($transaction->finance_paid ?? 0) + $legacyPaid));
             $balancesByDebtor[$debtorKey] = ($balancesByDebtor[$debtorKey] ?? 0) + max(0, $total - $paid);
         }
 
@@ -316,7 +300,7 @@ class NeracaReportService
             }
         }
 
-        return (float) array_sum($balancesByDebtor);
+        return round((float) array_sum($balancesByDebtor), 2);
     }
 
     private function payableBalanceAtDate(array $pharmacyIds, string $asOfDate): float
@@ -326,30 +310,29 @@ class NeracaReportService
             $pharmacyIds[] = 9;
         }
 
-        // Ambil retur pembelian (barang yang diretur ke supplier) yang tercatat sampai tanggal cutoff
+        // Ambil retur pembelian yang sudah berstatus "sudah_potong" hingga tanggal cutoff (konsisten dengan PayablesReceivablesService)
         $returnsByDetailId = [];
         $returnsByInvoiceNo = [];
 
-        $returnItems = DB::table('purchase_return_items as pri')
-            ->join('purchase_returns as pr', 'pr.id', '=', 'pri.purchase_return_id')
-            ->where('pr.status', '!=', 'dibatalkan')
-            ->whereIn('pr.pharmacy_id', $pharmacyIds)
-            ->where(function ($dateQ) use ($asOfDate) {
-                $dateQ->whereDate('pr.created_at', '<=', $asOfDate)
-                    ->orWhereDate('pri.status_date', '<=', $asOfDate)
-                    ->orWhereDate('pri.deduction_date', '<=', $asOfDate);
-            })
-            ->select('pr.receiving_id', 'pr.invoice_number', 'pri.subtotal')
-            ->get();
+        if (Schema::hasTable('purchase_returns') && Schema::hasTable('purchase_return_items')) {
+            $returnItems = DB::table('purchase_return_items as pri')
+                ->join('purchase_returns as pr', 'pr.id', '=', 'pri.purchase_return_id')
+                ->where('pr.status', '!=', 'dibatalkan')
+                ->where('pri.status', 'sudah_potong')
+                ->whereIn('pr.pharmacy_id', $pharmacyIds)
+                ->whereRaw('COALESCE(pri.deduction_date, pri.status_date, DATE(pr.created_at)) <= ?', [$asOfDate])
+                ->select('pr.receiving_id', 'pr.invoice_number', 'pri.subtotal')
+                ->get();
 
-        foreach ($returnItems as $item) {
-            $amt = (float) ($item->subtotal ?? 0);
-            if ($item->receiving_id) {
-                $returnsByDetailId[$item->receiving_id] = ($returnsByDetailId[$item->receiving_id] ?? 0) + $amt;
-            }
-            if ($item->invoice_number) {
-                $invKey = strtoupper(trim((string) $item->invoice_number));
-                $returnsByInvoiceNo[$invKey] = ($returnsByInvoiceNo[$invKey] ?? 0) + $amt;
+            foreach ($returnItems as $item) {
+                $amt = (float) ($item->subtotal ?? 0);
+                if ($item->receiving_id) {
+                    $returnsByDetailId[$item->receiving_id] = ($returnsByDetailId[$item->receiving_id] ?? 0) + $amt;
+                }
+                if ($item->invoice_number) {
+                    $invKey = strtoupper(trim((string) $item->invoice_number));
+                    $returnsByInvoiceNo[$invKey] = ($returnsByInvoiceNo[$invKey] ?? 0) + $amt;
+                }
             }
         }
 
@@ -372,15 +355,6 @@ class NeracaReportService
 
         $balance = 0.0;
         foreach ($details as $detail) {
-            $subtotal = 0.0;
-            foreach ($detail->receiving_items as $item) {
-                $lineTotal = (float) ($item->total ?? 0);
-                if ($lineTotal <= 0) {
-                    $lineTotal = (float) ($item->raw_price ?? 0) * (float) ($item->qty_received ?? 0);
-                }
-                $subtotal += $lineTotal;
-            }
-
             $ppnType = strtoupper(trim((string) ($detail->invoice_ppn ?? $detail->creditor?->ppn_type ?? 'TANPA')));
             $invoiceTotal = ReceivingInvoiceTotals::calculate($detail->receiving_items, $ppnType)['total'];
 
@@ -394,13 +368,15 @@ class NeracaReportService
             // Pembayaran kas/bank & pembayaran retur
             $paidCashBank = (float) $detail->payments->where('payment_type', '!=', 'RETUR')->sum('amount');
             $paidRetur = (float) $detail->payments->where('payment_type', 'RETUR')->sum('amount');
-            $totalReturDeduction = max($paidRetur, $returFromPr);
+            $totalReturDeduction = round(max($paidRetur, $returFromPr), 2);
+            $netTotal = round(max(0, $invoiceTotal - $totalReturDeduction), 2);
+            $paidApplied = round(min($netTotal, $paidCashBank), 2);
 
-            // Sisa hutang faktur = nilai faktur - pembayaran - potongan retur barang
-            $balance += max(0, $invoiceTotal - $paidCashBank - $totalReturDeduction);
+            // Sisa hutang faktur = (nilai faktur - potongan retur) - pembayaran kas/bank
+            $balance += max(0, $netTotal - $paidApplied);
         }
 
-        return $balance;
+        return round($balance, 2);
     }
 
     /**
@@ -440,7 +416,13 @@ class NeracaReportService
                 ->value('total_val');
         }
 
-        $currentTotalValuation = $counterValuation + $storageValuation;
+        $currentTotalValuation = round($counterValuation + $storageValuation, 2);
+
+        // Jika tanggal cutoff adalah hari ini (atau di masa depan), gunakan langsung snapshot stok aktual
+        $todayOperationalDate = FinanceShift::operationalDate(now());
+        if ($asOfDate >= $todayOperationalDate) {
+            return max(0.0, $currentTotalValuation);
+        }
 
         // Reconcile backwards from today to $asOfDate using items_log movements (exclude consignment)
         $trackedPharmacies = $canSeeWarehouse ? array_unique([$counterPharmacyId, $warehouseId]) : [$counterPharmacyId];
@@ -456,8 +438,8 @@ class NeracaReportService
         $deltaSinceCutoff = (float) $deltaQuery
             ->selectRaw('SUM(
                 CASE 
-                    WHEN il.status IN (1, 4) THEN -il.qty * COALESCE(NULLIF(m.raw_price, 0), 0)
-                    WHEN il.status IN (2, 3) THEN il.qty * COALESCE(NULLIF(m.raw_price, 0), 0)
+                    WHEN il.status IN (1, 4, 9) THEN -ABS(il.qty) * COALESCE(NULLIF(m.raw_price, 0), 0)
+                    WHEN il.status IN (2, 3) THEN ABS(il.qty) * COALESCE(NULLIF(m.raw_price, 0), 0)
                     WHEN il.status = 5 THEN 
                         CASE 
                             WHEN il.total IS NOT NULL AND TRIM(il.total) REGEXP "^[+-]?[0-9]+([.][0-9]+)?$" 
@@ -467,13 +449,12 @@ class NeracaReportService
                     WHEN il.status IN (6, 7) THEN 
                         (CAST(il.qty_after AS DECIMAL(15,2)) - CAST(il.qty_before AS DECIMAL(15,2))) * COALESCE(NULLIF(m.raw_price, 0), 0)
                     WHEN il.status = 8 THEN il.qty * COALESCE(NULLIF(m.raw_price, 0), 0)
-                    WHEN il.status = 9 THEN -il.qty * COALESCE(NULLIF(m.raw_price, 0), 0)
                     ELSE 0
                 END
             ) as delta_val')
             ->value('delta_val');
 
-        return max(0, $currentTotalValuation - $deltaSinceCutoff);
+        return round(max(0.0, $currentTotalValuation - $deltaSinceCutoff), 2);
     }
 }
 

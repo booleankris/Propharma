@@ -129,7 +129,8 @@ class KasBankExport implements FromArray, WithStyles, WithColumnWidths, WithTitl
             ->whereHas('account', function ($q) {
                 $q
                     ->where('category', 'Kas & Bank')
-                    ->where('pharmacy_id', $this->activePharmacyId);
+                    ->where('pharmacy_id', $this->activePharmacyId)
+                    ->where('is_active', true);
             })
             ->where(function ($q) {
                 $q
@@ -188,16 +189,10 @@ class KasBankExport implements FromArray, WithStyles, WithColumnWidths, WithTitl
             });
         }
 
-        // Direction Filter
+        // Direction Filter (kecualikan PENYESUAIAN SALDO agar selaras dengan kartu Kas & Bank)
         if ($filterDirection === 'IN') {
             $query->where(function ($q) use ($filterAccountId) {
-                $q
-                    ->whereIn('payment_type', ['PIUTANG', 'PENDAPATAN', 'PENJUALAN TUNAI', 'PENJUALAN NON TUNAI'])
-                    ->orWhere(function ($sub) {
-                        $sub
-                            ->where('payment_type', 'PENYESUAIAN SALDO')
-                            ->where('reference_number', '!=', 'OPNAME-OUT');
-                    });
+                $q->whereIn('payment_type', ['PIUTANG', 'PENDAPATAN', 'PENJUALAN TUNAI', 'PENJUALAN NON TUNAI']);
                 if ($filterAccountId && $filterAccountId !== 'all') {
                     $q->orWhere(function ($sub) use ($filterAccountId) {
                         $sub
@@ -208,13 +203,7 @@ class KasBankExport implements FromArray, WithStyles, WithColumnWidths, WithTitl
             });
         } elseif ($filterDirection === 'OUT') {
             $query->where(function ($q) use ($filterAccountId) {
-                $q
-                    ->whereIn('payment_type', ['KREDIT', 'CASH', 'KONSINYASI', 'BIAYA', 'RETUR PENJUALAN'])
-                    ->orWhere(function ($sub) {
-                        $sub
-                            ->where('payment_type', 'PENYESUAIAN SALDO')
-                            ->where('reference_number', '=', 'OPNAME-OUT');
-                    });
+                $q->whereIn('payment_type', ['KREDIT', 'CASH', 'KONSINYASI', 'BIAYA', 'RETUR PENJUALAN']);
                 if ($filterAccountId && $filterAccountId !== 'all') {
                     $q->orWhere(function ($sub) use ($filterAccountId) {
                         $sub
@@ -300,8 +289,9 @@ class KasBankExport implements FromArray, WithStyles, WithColumnWidths, WithTitl
         $totalKeluar = 0.0;
 
         foreach ($expandedRows as $item) {
-            $masuk = $item['direction'] === 'IN' ? (float) $item['amount'] : 0.0;
-            $keluar = $item['direction'] === 'OUT' ? (float) $item['amount'] : 0.0;
+            $isPenyesuaian = ($item['category_type'] ?? null) === 'PENYESUAIAN SALDO';
+            $masuk = (!$isPenyesuaian && $item['direction'] === 'IN') ? (float) $item['amount'] : 0.0;
+            $keluar = (!$isPenyesuaian && $item['direction'] === 'OUT') ? (float) $item['amount'] : 0.0;
             $totalMasuk += $masuk;
             $totalKeluar += $keluar;
 
@@ -506,6 +496,7 @@ class KasBankExport implements FromArray, WithStyles, WithColumnWidths, WithTitl
             'date' => Carbon::parse($p->payment_date)->format('d/m/Y'),
             'amount' => (float) $p->amount,
             'direction' => $direction,
+            'category_type' => $p->payment_type,
             'category_label' => $catLabel,
             'document_no' => $noDokumen,
             'party' => $pihakTerkait,

@@ -24,6 +24,10 @@ export default function Neraca({ data = {}, monthLabel = '' }) {
     const endDate = data.endDate || '';
     const dayBeforeStart = data.dayBeforeStart || '';
     const periodEnd = data.periodEnd || '';
+    const hasEstimatedOpening = Boolean(data.hasEstimatedOpening);
+    const hartaSelisih = Number(harta.selisih || 0);
+    const kewajibanSelisih = Number(kewajiban.selisih || 0);
+    const saldoSelisih = Number(saldo.selisih || 0);
 
     const formatDateIndo = (dStr) => {
         if (!dStr) return '';
@@ -43,7 +47,8 @@ export default function Neraca({ data = {}, monthLabel = '' }) {
             <div className="flex flex-wrap items-center gap-2 rounded-xl border border-blue-200 bg-blue-50/60 px-4 py-3 text-xs text-blue-900 shadow-sm">
                 <CircleHelp className="h-4 w-4 shrink-0 text-blue-600" />
                 <span>
-                    <strong>Neraca Posisi Keuangan:</strong> Saldo AWAL per cutoff {formatDateIndo(dayBeforeStart)} dan Saldo AKHIR per {formatDateIndo(periodEnd)}. Nilai persediaan dihitung otomatis dari snapshot stok fisik dan pergerakan mutasi transfer/inflow/outflow.
+                    <strong>Neraca Posisi Keuangan:</strong> Saldo AWAL per cutoff {formatDateIndo(dayBeforeStart)} dan Saldo AKHIR per {formatDateIndo(periodEnd)}.
+                    {hasEstimatedOpening ? ' Rekening Kas/Bank yang belum memiliki Saldo Awal resmi dihitung mundur otomatis dari Saldo Buku aktual dikurangi mutasi berjalan.' : ''} Nilai persediaan dihitung otomatis dari snapshot stok fisik dan pergerakan mutasi stok.
                 </span>
             </div>
 
@@ -78,7 +83,12 @@ export default function Neraca({ data = {}, monthLabel = '' }) {
                                             {item.no ?? idx + 1}
                                         </td>
                                         <td className="border border-slate-200 px-4 py-2.5 text-slate-800 font-semibold">
-                                            {item.label}
+                                            <span>{item.label}</span>
+                                            {item.is_liability && (
+                                                <span className="ml-2 text-[10px] font-normal text-slate-400">
+                                                    (Selisih = Awal − Akhir)
+                                                </span>
+                                            )}
                                         </td>
                                         <td className="border border-slate-200 px-4 py-2.5 text-right tabular-nums text-slate-700">
                                             {formatNeracaNumber(item.awal)}
@@ -171,8 +181,12 @@ export default function Neraca({ data = {}, monthLabel = '' }) {
                                 <td className="border border-slate-200 px-4 py-2.5 text-right tabular-nums">
                                     {formatNeracaNumber(harta.akhir)}
                                 </td>
-                                <td className="border border-slate-200 px-4 py-2.5 text-right tabular-nums text-slate-400">
-                                    -
+                                <td
+                                    className={`border border-slate-200 px-4 py-2.5 text-right tabular-nums ${
+                                        hartaSelisih < 0 ? 'text-rose-600' : hartaSelisih > 0 ? 'text-emerald-700' : 'text-slate-400'
+                                    }`}
+                                >
+                                    {formatNeracaNumber(harta.selisih)}
                                 </td>
                             </tr>
 
@@ -188,8 +202,12 @@ export default function Neraca({ data = {}, monthLabel = '' }) {
                                 <td className="border border-slate-200 px-4 py-2.5 text-right tabular-nums">
                                     {formatNeracaNumber(kewajiban.akhir)}
                                 </td>
-                                <td className="border border-slate-200 px-4 py-2.5 text-right tabular-nums text-slate-400">
-                                    -
+                                <td
+                                    className={`border border-slate-200 px-4 py-2.5 text-right tabular-nums ${
+                                        kewajibanSelisih > 0 ? 'text-rose-600' : kewajibanSelisih < 0 ? 'text-emerald-700' : 'text-slate-400'
+                                    }`}
+                                >
+                                    {formatNeracaNumber(kewajiban.selisih)}
                                 </td>
                             </tr>
 
@@ -205,7 +223,11 @@ export default function Neraca({ data = {}, monthLabel = '' }) {
                                 <td className="border border-slate-300 px-4 py-3 text-right tabular-nums">
                                     {formatNeracaNumber(saldo.akhir)}
                                 </td>
-                                <td className="border border-slate-300 px-4 py-3 text-right tabular-nums text-emerald-700">
+                                <td
+                                    className={`border border-slate-300 px-4 py-3 text-right tabular-nums ${
+                                        saldoSelisih < 0 ? 'text-rose-600' : saldoSelisih > 0 ? 'text-emerald-700' : 'text-slate-600'
+                                    }`}
+                                >
                                     {formatNeracaNumber(saldo.selisih)}
                                 </td>
                             </tr>

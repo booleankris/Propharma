@@ -31,6 +31,7 @@ use App\Services\Finance\KinerjaOmzetService;
 use App\Services\Finance\MonitoringPenjualanService;
 use App\Services\Finance\NeracaReportService;
 use App\Services\ConsignmentService;
+use App\Support\FinanceAccountBalanceResolver;
 use App\Support\FinanceShift;
 use App\Support\LiphTransactionScope;
 use App\Support\ReceivingInvoiceTotals;
@@ -304,7 +305,7 @@ class FinanceController extends Controller
             return Excel::download(new CashflowExport($reportDays), $fileName);
         }
         $kinerjaDays = $kinerjaOmzet->build($pharmacyIds, $startDate, $endDate);
-        $neracaData = $neracaReport->build($pharmacyIds, $startDate, $endDate);
+        $neracaData = $neracaReport->build($pharmacyIds, $startDate, $endDate, (int) getActivePharmacyId());
         $drawerAccount = $this->branchKasBankAccountsQuery()->where('account_type', 'kas_apotek')->first();
         $openingBalance = $drawerAccount
             ? FinancePayment::where('payment_type', 'SALDO AWAL')->where('account_id', $drawerAccount->id)->first()
@@ -459,7 +460,7 @@ class FinanceController extends Controller
         $start = \Carbon\Carbon::createFromDate($year, $month, 1)->startOfMonth();
         $end = $start->copy()->endOfMonth();
         $pharmacyIds = $this->getTargetPharmacyIds();
-        $data = $neracaReport->build($pharmacyIds, $start->toDateString(), $end->toDateString());
+        $data = $neracaReport->build($pharmacyIds, $start->toDateString(), $end->toDateString(), (int) getActivePharmacyId());
         $activePharmacy = Pharmacies::find(getActivePharmacyId()) ?? Pharmacies::find(1);
 
         return Excel::download(
@@ -675,14 +676,23 @@ class FinanceController extends Controller
             ]);
 
         $monthlyOpeningBalances = [];
+        $latestOpnames = [];
         foreach ($accounts as $account) {
-            $opening = FinancePayment::where('payment_type', 'SALDO AWAL')->where('account_id', $account->id)->first();
-            if (!$opening) {
-                $monthlyOpeningBalances[$account->id] = 0;
-            } elseif ($opening->payment_date?->format('Y-m-d') >= $filterStart && $opening->payment_date?->format('Y-m-d') <= $filterEnd) {
-                $monthlyOpeningBalances[$account->id] = (float) $opening->amount;
-            } else {
-                $monthlyOpeningBalances[$account->id] = $this->calculateBalanceFromOpening($account->id, $opening, $previousMonthEnd);
+            $monthlyOpeningBalances[$account->id] = FinanceAccountBalanceResolver::resolveOpeningBalanceForPeriod(
+                $account->id,
+                $filterStart,
+                $filterEnd
+            );
+
+            $latestAdj = FinanceAccountBalanceResolver::latestOpnameOnOrBefore($account->id, now()->toDateString());
+            if ($latestAdj) {
+                $latestOpnames[$account->id] = [
+                    'id' => $latestAdj->id,
+                    'account_id' => $account->id,
+                    'real_balance' => (float) $latestAdj->real_balance,
+                    'adjustment_date' => $latestAdj->adjustment_date?->format('Y-m-d'),
+                    'notes' => $latestAdj->notes,
+                ];
             }
         }
 
@@ -704,6 +714,7 @@ class FinanceController extends Controller
             'stats' => $stats,
             'openingBalances' => $openingBalances,
             'monthlyOpeningBalances' => $monthlyOpeningBalances,
+            'latestOpnames' => $latestOpnames,
             'adjustmentLogs' => $adjustmentLogs,
             'selectedMonth' => $selectedMonth,
             'selectedYear' => $selectedYear,
@@ -755,40 +766,132 @@ class FinanceController extends Controller
         ]);
     }
 
+    /**
+     * Hitung mundur estimasi Saldo Awal per tanggal target dari hasil Opname terakhir (atau saldo buku saat ini).
+     * Rumus: Saldo Awal = Saldo Akhir Acuan - Total Masuk + Total Keluar.
+     */
+    public function estimateSaldoAwal(Request $request)
+    {
+        $validated = $request->validate([
+            'target_date' => 'required|date|before_or_equal:today',
+            'anchor_mode' => 'nullable|in:auto,book',
+        ]);
+
+        $targetDate = $validated['target_date'];
+        $anchorMode = $validated['anchor_mode'] ?? 'auto';
+
+        $accounts = $this->branchKasBankAccountsQuery()
+            ->where('is_active', true)
+            ->orderByRaw("CASE WHEN account_type = 'kas_apotek' THEN 0 ELSE 1 END")
+            ->orderBy('code')
+            ->get(['id', 'code', 'name', 'account_type', 'balance']);
+
+        $estimates = $accounts->map(
+            fn (FinanceAccount $account) => FinanceAccountBalanceResolver::estimateOpeningForAccount($account, $targetDate, $anchorMode)
+        )->values();
+
+        return response()->json([
+            'target_date' => $targetDate,
+            'anchor_mode' => $anchorMode,
+            'estimates' => $estimates,
+        ]);
+    }
+
     public function storeSaldoAwal(Request $request)
     {
         $validated = $request->validate([
-            'account_id' => 'required|exists:finance_accounts,id',
+            'account_id' => 'required_without:items|nullable|exists:finance_accounts,id',
             'payment_date' => 'required|date|before_or_equal:today',
-            'amount' => 'required|numeric|min:0',
+            'amount' => 'required_without:items|nullable|numeric|min:0',
             'notes' => 'nullable|string|max:500',
+            'clear_prior_opname_payments' => 'nullable|boolean',
+            'clear_until_date' => 'nullable|date',
+            'items' => 'nullable|array|min:1',
+            'items.*.account_id' => 'required_with:items|exists:finance_accounts,id',
+            'items.*.amount' => 'required_with:items|numeric|min:0',
+            'items.*.notes' => 'nullable|string|max:500',
+            'items.*.clear_until_date' => 'nullable|date',
         ]);
 
-        $account = $this->branchKasBankAccountsQuery()->findOrFail($validated['account_id']);
-        DB::transaction(function () use ($validated, $account) {
-            $lockedAccount = FinanceAccount::whereKey($account->id)->lockForUpdate()->firstOrFail();
-            $opening = FinancePayment::where('payment_type', 'SALDO AWAL')->where('account_id', $lockedAccount->id)->lockForUpdate()->first();
-            $payload = [
-                'account_id' => $lockedAccount->id,
-                'payment_type' => 'SALDO AWAL',
-                'payment_date' => $validated['payment_date'],
+        $clearOpnamePayments = (bool) ($validated['clear_prior_opname_payments'] ?? false);
+        $defaultClearUntil = $validated['clear_until_date'] ?? now()->toDateString();
+
+        $entries = !empty($validated['items'])
+            ? $validated['items']
+            : [[
+                'account_id' => $validated['account_id'],
                 'amount' => $validated['amount'],
                 'notes' => $validated['notes'] ?? null,
-                'created_by' => Auth::id(),
-                'pharmacy_id' => null,
-            ];
-            if ($opening)
-                $opening->update($payload);
-            else
-                $opening = FinancePayment::create($payload);
+                'clear_until_date' => $defaultClearUntil,
+            ]];
 
-            $lockedAccount->update([
-                'balance' => $this->calculateBalanceFromOpening($lockedAccount->id, $opening, now()->toDateString()),
-            ]);
+        $allowedAccountIds = array_map('intval', $this->branchKasBankAccountsQuery(false)->pluck('id')->all());
+        $savedCount = 0;
+
+        DB::transaction(function () use ($entries, $validated, $allowedAccountIds, $clearOpnamePayments, $defaultClearUntil, &$savedCount) {
+            foreach ($entries as $entry) {
+                $accountId = (int) $entry['account_id'];
+                if (!in_array($accountId, $allowedAccountIds, true)) {
+                    continue;
+                }
+
+                $lockedAccount = FinanceAccount::whereKey($accountId)->lockForUpdate()->firstOrFail();
+
+                if ($clearOpnamePayments) {
+                    $untilDate = max($validated['payment_date'], $entry['clear_until_date'] ?? $defaultClearUntil);
+                    FinancePayment::where('account_id', $lockedAccount->id)
+                        ->where('payment_type', 'PENYESUAIAN SALDO')
+                        ->whereDate('payment_date', '>=', $validated['payment_date'])
+                        ->whereDate('payment_date', '<=', $untilDate)
+                        ->delete();
+                }
+
+                $opening = FinancePayment::where('payment_type', 'SALDO AWAL')
+                    ->where('account_id', $lockedAccount->id)
+                    ->lockForUpdate()
+                    ->first();
+
+                $payload = [
+                    'account_id' => $lockedAccount->id,
+                    'payment_type' => 'SALDO AWAL',
+                    'payment_date' => $validated['payment_date'],
+                    'amount' => round((float) $entry['amount'], 2),
+                    'notes' => $entry['notes'] ?? ($validated['notes'] ?? null),
+                    'created_by' => Auth::id(),
+                    'pharmacy_id' => $lockedAccount->pharmacy_id ?: null,
+                ];
+
+                if ($opening) {
+                    $opening->update($payload);
+                } else {
+                    $opening = FinancePayment::create($payload);
+                }
+
+                $lockedAccount->update([
+                    'balance' => $this->calculateBalanceFromOpening($lockedAccount->id, $opening, now()->toDateString()),
+                ]);
+                $savedCount++;
+            }
+
             $this->clearStatsCache();
         });
 
-        return back()->with('success', 'Saldo awal akun berhasil disimpan. Nilai ini tidak dihitung sebagai pendapatan.');
+        $referer = (string) $request->headers->get('referer', '');
+        $redirectTarget = str_contains($referer, '/finance/kas-bank')
+            ? $referer
+            : route('finance.kasBank');
+
+        if ($savedCount === 0) {
+            return redirect()->to($redirectTarget)->withErrors([
+                'account_id' => 'Tidak ada rekening cabang aktif yang cocok untuk disimpan. Pastikan cabang aktif sudah sesuai lalu coba lagi.',
+            ]);
+        }
+
+        $msg = $savedCount > 1
+            ? "Saldo awal berhasil disimpan untuk {$savedCount} rekening Kas & Bank dan saldo buku telah diselaraskan."
+            : 'Saldo awal akun berhasil disimpan. Nilai ini tidak dihitung sebagai pendapatan.';
+
+        return redirect()->to($redirectTarget)->with('success', $msg);
     }
 
     /**
@@ -800,6 +903,7 @@ class FinanceController extends Controller
             'account_id' => 'required_without:adjustments|nullable|exists:finance_accounts,id',
             'real_balance' => 'required_without:adjustments|nullable',
             'adjustment_date' => 'nullable|date|before_or_equal:today',
+            'as_opening_balance' => 'nullable|boolean',
             'notes' => 'nullable|string|max:500',
             'adjustments' => 'nullable|array|min:1',
             'adjustments.*.account_id' => 'required_with:adjustments|exists:finance_accounts,id',
@@ -813,6 +917,7 @@ class FinanceController extends Controller
         $adjustmentDate = !empty($validated['adjustment_date'])
             ? $validated['adjustment_date']
             : now()->toDateString();
+        $asOpeningBalance = (bool) ($validated['as_opening_balance'] ?? false);
 
         $items = [];
         if (!empty($validated['adjustments'])) {
@@ -832,7 +937,7 @@ class FinanceController extends Controller
         $processedCount = 0;
         $totalDifference = 0.0;
 
-        DB::transaction(function () use ($items, $pharmacyId, $adjustmentDate, &$processedCount, &$totalDifference) {
+        DB::transaction(function () use ($items, $pharmacyId, $adjustmentDate, $asOpeningBalance, &$processedCount, &$totalDifference) {
             foreach ($items as $item) {
                 $accId = (int) $item['account_id'];
                 $account = FinanceAccount::whereKey($accId)
@@ -845,58 +950,111 @@ class FinanceController extends Controller
                 }
 
                 // Normalisasi nominal jika berformat rupiah string atau angka
-                $rawReal = (string) ($item['real_balance'] ?? '');
-                $cleanReal = str_replace(['Rp', ' ', '.'], '', $rawReal);
-                $cleanReal = str_replace(',', '.', $cleanReal);
-                $realBalance = round(max(0, (float) $cleanReal), 2);
+                if (is_int($item['real_balance']) || is_float($item['real_balance']) || is_numeric($item['real_balance'])) {
+                    $realBalance = round(max(0, (float) $item['real_balance']), 2);
+                } else {
+                    $rawReal = (string) ($item['real_balance'] ?? '');
+                    $cleanReal = str_replace(['Rp', ' ', '.'], '', $rawReal);
+                    $cleanReal = str_replace(',', '.', $cleanReal);
+                    $realBalance = round(max(0, (float) $cleanReal), 2);
+                }
 
                 $systemBalance = (float) $account->balance;
                 $diff = round($realBalance - $systemBalance, 2);
                 $itemNotes = trim((string) ($item['notes'] ?? ''));
 
-                // 1. Update Saldo Akun ke Saldo Riil saat ini
-                $account->update([
-                    'balance' => $realBalance,
-                ]);
+                if ($asOpeningBalance) {
+                    // Mode Cut-off Saldo Awal: simpan sebagai SALDO AWAL pada adjustment_date
+                    // dan hitung ulang saldo berjalan sampai hari ini tanpa membuat PENYESUAIAN SALDO.
+                    FinancePayment::where('account_id', $account->id)
+                        ->where('payment_type', 'PENYESUAIAN SALDO')
+                        ->whereDate('payment_date', $adjustmentDate)
+                        ->delete();
 
-                // 2. Catat Mutasi Kas & Bank jika ada selisih
-                $payment = null;
-                if (abs($diff) >= 0.01) {
-                    $directionLabel = $diff > 0 ? '+' : '-';
-                    $fmtSys = number_format($systemBalance, 0, ',', '.');
-                    $fmtReal = number_format($realBalance, 0, ',', '.');
-                    $fmtDiff = number_format(abs($diff), 0, ',', '.');
+                    $opening = FinancePayment::where('payment_type', 'SALDO AWAL')
+                        ->where('account_id', $account->id)
+                        ->lockForUpdate()
+                        ->first();
 
-                    $paymentNotes = 'Opname Kas & Bank: Rp ' . $fmtSys . ' -> Rp ' . $fmtReal . ' (' . $directionLabel . 'Rp ' . $fmtDiff . ')';
-                    if ($itemNotes !== '') {
-                        $paymentNotes .= ' | Catatan: ' . $itemNotes;
-                    }
-
-                    $payment = FinancePayment::create([
+                    $openingNotes = 'Cut-off Saldo Awal dari Opname Kas & Bank' . ($itemNotes !== '' ? ' | ' . $itemNotes : '');
+                    $openingPayload = [
                         'pharmacy_id' => $account->pharmacy_id ?: ($pharmacyId > 0 ? $pharmacyId : null),
                         'account_id' => $account->id,
-                        'payment_type' => 'PENYESUAIAN SALDO',
+                        'payment_type' => 'SALDO AWAL',
                         'payment_date' => $adjustmentDate,
-                        'amount' => abs($diff),
-                        'reference_number' => $diff >= 0 ? 'OPNAME-IN' : 'OPNAME-OUT',
-                        'notes' => $paymentNotes,
+                        'amount' => $realBalance,
+                        'notes' => $openingNotes,
+                        'created_by' => Auth::id(),
+                    ];
+
+                    if ($opening) {
+                        $opening->update($openingPayload);
+                    } else {
+                        $opening = FinancePayment::create($openingPayload);
+                    }
+
+                    $recalculatedBalance = $this->calculateBalanceFromOpening($account->id, $opening, now()->toDateString());
+                    $account->update([
+                        'balance' => $recalculatedBalance,
+                    ]);
+
+                    FinanceBalanceAdjustment::create([
+                        'pharmacy_id' => $account->pharmacy_id ?: ($pharmacyId > 0 ? $pharmacyId : null),
+                        'account_id' => $account->id,
+                        'system_balance' => $systemBalance,
+                        'real_balance' => $realBalance,
+                        'difference' => $diff,
+                        'adjustment_date' => $adjustmentDate,
+                        'adjusted_at' => now(),
+                        'notes' => '[Cut-off Saldo Awal] ' . ($itemNotes !== '' ? $itemNotes : 'Ditetapkan sebagai Saldo Awal per ' . $adjustmentDate),
+                        'finance_payment_id' => $opening->id,
+                        'created_by' => Auth::id(),
+                    ]);
+                } else {
+                    // 1. Update Saldo Akun ke Saldo Riil saat ini
+                    $account->update([
+                        'balance' => $realBalance,
+                    ]);
+
+                    // 2. Catat Mutasi Kas & Bank jika ada selisih
+                    $payment = null;
+                    if (abs($diff) >= 0.01) {
+                        $directionLabel = $diff > 0 ? '+' : '-';
+                        $fmtSys = number_format($systemBalance, 0, ',', '.');
+                        $fmtReal = number_format($realBalance, 0, ',', '.');
+                        $fmtDiff = number_format(abs($diff), 0, ',', '.');
+
+                        $paymentNotes = 'Opname Kas & Bank: Rp ' . $fmtSys . ' -> Rp ' . $fmtReal . ' (' . $directionLabel . 'Rp ' . $fmtDiff . ')';
+                        if ($itemNotes !== '') {
+                            $paymentNotes .= ' | Catatan: ' . $itemNotes;
+                        }
+
+                        $payment = FinancePayment::create([
+                            'pharmacy_id' => $account->pharmacy_id ?: ($pharmacyId > 0 ? $pharmacyId : null),
+                            'account_id' => $account->id,
+                            'payment_type' => 'PENYESUAIAN SALDO',
+                            'payment_date' => $adjustmentDate,
+                            'amount' => abs($diff),
+                            'reference_number' => $diff >= 0 ? 'OPNAME-IN' : 'OPNAME-OUT',
+                            'notes' => $paymentNotes,
+                            'created_by' => Auth::id(),
+                        ]);
+                    }
+
+                    // 3. Catat di Audit Log Lengkap (FinanceBalanceAdjustment)
+                    FinanceBalanceAdjustment::create([
+                        'pharmacy_id' => $account->pharmacy_id ?: ($pharmacyId > 0 ? $pharmacyId : null),
+                        'account_id' => $account->id,
+                        'system_balance' => $systemBalance,
+                        'real_balance' => $realBalance,
+                        'difference' => $diff,
+                        'adjustment_date' => $adjustmentDate,
+                        'adjusted_at' => now(),
+                        'notes' => $itemNotes !== '' ? $itemNotes : null,
+                        'finance_payment_id' => $payment?->id,
                         'created_by' => Auth::id(),
                     ]);
                 }
-
-                // 3. Catat di Audit Log Lengkap (FinanceBalanceAdjustment)
-                FinanceBalanceAdjustment::create([
-                    'pharmacy_id' => $account->pharmacy_id ?: ($pharmacyId > 0 ? $pharmacyId : null),
-                    'account_id' => $account->id,
-                    'system_balance' => $systemBalance,
-                    'real_balance' => $realBalance,
-                    'difference' => $diff,
-                    'adjustment_date' => $adjustmentDate,
-                    'adjusted_at' => now(),
-                    'notes' => $itemNotes !== '' ? $itemNotes : null,
-                    'finance_payment_id' => $payment?->id,
-                    'created_by' => Auth::id(),
-                ]);
 
                 $processedCount++;
                 $totalDifference += $diff;
@@ -905,11 +1063,22 @@ class FinanceController extends Controller
             $this->clearStatsCache();
         });
 
-        $msg = $processedCount === 1
-            ? 'Saldo riil berhasil disesuaikan dan tercatat di riwayat log opname.'
-            : "Berhasil menyesuaikan {$processedCount} rekening kas & bank ke saldo riil. Riwayat lengkap tercatat di log opname.";
+        if ($asOpeningBalance) {
+            $msg = $processedCount === 1
+                ? "Saldo riil berhasil ditetapkan sebagai Saldo Awal per {$adjustmentDate} dan tercatat di log opname."
+                : "Berhasil menetapkan Saldo Awal untuk {$processedCount} rekening Kas & Bank per {$adjustmentDate}.";
+        } else {
+            $msg = $processedCount === 1
+                ? 'Saldo riil berhasil disesuaikan dan tercatat di riwayat log opname.'
+                : "Berhasil menyesuaikan {$processedCount} rekening kas & bank ke saldo riil. Riwayat lengkap tercatat di log opname.";
+        }
 
-        return back()->with('success', $msg);
+        $referer = (string) $request->headers->get('referer', '');
+        $redirectTarget = str_contains($referer, '/finance/kas-bank')
+            ? $referer
+            : route('finance.kasBank');
+
+        return redirect()->to($redirectTarget)->with('success', $msg);
     }
 
     /**
@@ -1360,36 +1529,7 @@ class FinanceController extends Controller
 
     private function calculateBalanceFromOpening(int $accountId, FinancePayment $opening, string $asOfDate): float
     {
-        $openingDate = $opening->payment_date?->format('Y-m-d');
-        if (!$openingDate || $openingDate > $asOfDate)
-            return 0;
-
-        $payments = FinancePayment::where('account_id', $accountId)
-            ->where('id', '!=', $opening->id)
-            ->whereDate('payment_date', '>=', $openingDate)
-            ->whereDate('payment_date', '<=', $asOfDate)
-            ->get(['payment_type', 'amount', 'transfer_account_id']);
-
-        $balance = (float) $opening->amount;
-        foreach ($payments as $payment) {
-            if (in_array($payment->payment_type, ['PIUTANG', 'PENDAPATAN', 'PENJUALAN TUNAI', 'PENJUALAN NON TUNAI'], true))
-                $balance += (float) $payment->amount;
-            elseif (in_array($payment->payment_type, ['KREDIT', 'CASH', 'KONSINYASI', 'BIAYA', 'SETOR', 'TARIK TUNAI', 'RETUR PENJUALAN'], true))
-                $balance -= (float) $payment->amount;
-            elseif ($payment->payment_type === 'PENYESUAIAN SALDO') {
-                if ($payment->reference_number === 'OPNAME-OUT') {
-                    $balance -= (float) $payment->amount;
-                } else {
-                    $balance += (float) $payment->amount;
-                }
-            }
-        }
-        $balance += (float) FinancePayment::whereIn('payment_type', ['SETOR', 'TARIK TUNAI'])
-            ->where('transfer_account_id', $accountId)
-            ->whereDate('payment_date', '>=', $openingDate)
-            ->whereDate('payment_date', '<=', $asOfDate)
-            ->sum('amount');
-        return $balance;
+        return FinanceAccountBalanceResolver::calculateFromOpening($accountId, $opening, $asOfDate);
     }
 
     /**
@@ -1956,20 +2096,8 @@ class FinanceController extends Controller
         $openingAccountRows = [];
         $closingAccountRows = [];
         foreach ($accounts as $account) {
-            $opening = FinancePayment::where('payment_type', 'SALDO AWAL')->where('account_id', $account->id)->first();
-            $openingDate = $opening?->payment_date?->toDateString();
-            $openingBalance = 0.0;
-            if ($opening && $openingDate <= $startDate) {
-                $openingBalance = $openingDate === $startDate
-                    ? (float) $opening->amount
-                    : $this->calculateBalanceFromOpening($account->id, $opening, $dayBeforeStart);
-            }
-            $closingBalance = 0.0;
-            if ($opening && $openingDate <= $periodEnd) {
-                $closingBalance = $this->calculateBalanceFromOpening($account->id, $opening, $periodEnd);
-            } elseif ($periodEnd === now()->toDateString()) {
-                $closingBalance = (float) $account->balance;
-            }
+            $openingBalance = FinanceAccountBalanceResolver::resolveOpeningBalanceAtStartDate($account, $startDate);
+            $closingBalance = FinanceAccountBalanceResolver::resolveClosingBalanceAsOf($account, $periodEnd, now()->toDateString());
             $row = [
                 'id' => $account->id,
                 'name' => $account->name,
@@ -2460,41 +2588,8 @@ class FinanceController extends Controller
             ->whereHas('account', function ($q) {
                 $q->where('category', 'Kas & Bank');
                 $q->where('pharmacy_id', getActivePharmacyId());
-            })
-            ->where(function ($query) use ($targetPharmacyIds) {
-                $query
-                    ->whereHas('receiving', function ($q) use ($targetPharmacyIds) {
-                        $q->whereIn('pharmacy_id', $targetPharmacyIds);
-                    })
-                    ->orWhereHas('transaction', function ($q) use ($targetPharmacyIds) {
-                        $q->whereIn('pharmacy_id', $targetPharmacyIds);
-                    })
-                    ->orWhere(function ($q) use ($targetPharmacyIds) {
-                        $q
-                            ->where('payment_type', 'BIAYA')
-                            ->where(function ($sub) use ($targetPharmacyIds) {
-                                $sub
-                                    ->whereIn('pharmacy_id', $targetPharmacyIds)
-                                    ->orWhereNull('pharmacy_id');
-                            });
-                    })
-                    ->orWhere(function ($q) use ($targetPharmacyIds) {
-                        $q->where('payment_type', 'PENDAPATAN')->whereIn('pharmacy_id', $targetPharmacyIds);
-                    })
-                    ->orWhere(function ($q) use ($targetPharmacyIds) {
-                        $q->where('payment_type', 'SETOR')->whereIn('pharmacy_id', $targetPharmacyIds);
-                    })
-                    ->orWhere(function ($q) use ($targetPharmacyIds) {
-                        $q->where('payment_type', 'TARIK TUNAI')->whereIn('pharmacy_id', $targetPharmacyIds);
-                    })
-                    ->orWhere(function ($q) use ($targetPharmacyIds) {
-                        $q
-                            ->whereIn('payment_type', ['PENJUALAN TUNAI', 'PENJUALAN NON TUNAI', 'RETUR PENJUALAN'])
-                            ->whereIn('pharmacy_id', $targetPharmacyIds);
-                    })
-                    ->orWhere('payment_type', 'SALDO AWAL')
-                    ->orWhere('payment_type', 'PENYESUAIAN SALDO');
             });
+        $this->applyMutasiBranchScope($query, $targetPharmacyIds);
 
         if ($startDate && $endDate) {
             $query->whereBetween('payment_date', [$startDate, $endDate]);
@@ -2683,6 +2778,48 @@ class FinanceController extends Controller
     }
 
     /**
+     * Helper: Filter cabang tunggal untuk seluruh query Mutasi & Ringkasan Kas & Bank
+     * agar angka pada kartu rekening selalu konsisten 100% dengan tabel mutasi di bawahnya.
+     */
+    protected function applyMutasiBranchScope($query, array $targetPharmacyIds)
+    {
+        return $query->where(function ($q) use ($targetPharmacyIds) {
+            $q
+                ->whereHas('receiving', function ($sub) use ($targetPharmacyIds) {
+                    $sub->whereIn('pharmacy_id', $targetPharmacyIds);
+                })
+                ->orWhereHas('transaction', function ($sub) use ($targetPharmacyIds) {
+                    $sub->whereIn('pharmacy_id', $targetPharmacyIds);
+                })
+                ->orWhere(function ($sub) use ($targetPharmacyIds) {
+                    $sub
+                        ->where('payment_type', 'BIAYA')
+                        ->where(function ($sub2) use ($targetPharmacyIds) {
+                            $sub2
+                                ->whereIn('pharmacy_id', $targetPharmacyIds)
+                                ->orWhereNull('pharmacy_id');
+                        });
+                })
+                ->orWhere(function ($sub) use ($targetPharmacyIds) {
+                    $sub->where('payment_type', 'PENDAPATAN')->whereIn('pharmacy_id', $targetPharmacyIds);
+                })
+                ->orWhere(function ($sub) use ($targetPharmacyIds) {
+                    $sub->where('payment_type', 'SETOR')->whereIn('pharmacy_id', $targetPharmacyIds);
+                })
+                ->orWhere(function ($sub) use ($targetPharmacyIds) {
+                    $sub->where('payment_type', 'TARIK TUNAI')->whereIn('pharmacy_id', $targetPharmacyIds);
+                })
+                ->orWhere(function ($sub) use ($targetPharmacyIds) {
+                    $sub
+                        ->whereIn('payment_type', ['PENJUALAN TUNAI', 'PENJUALAN NON TUNAI', 'RETUR PENJUALAN'])
+                        ->whereIn('pharmacy_id', $targetPharmacyIds);
+                })
+                ->orWhere('payment_type', 'SALDO AWAL')
+                ->orWhere('payment_type', 'PENYESUAIAN SALDO');
+        });
+    }
+
+    /**
      * Helper: Hitung ringkasan bulanan Kas & Bank via SQL agregasi (sangat cepat, hemat RAM).
      */
     protected function getMonthlyKasBankSummary($accounts, $monthStart, $monthEnd, array $targetPharmacyIds): array
@@ -2697,6 +2834,7 @@ class FinanceController extends Controller
                 'name' => $acc->name,
                 'code' => $acc->code,
                 'category' => $acc->category,
+                'account_type' => $acc->account_type ?: ($acc->code === '1-10001' ? 'kas_apotek' : 'bank'),
                 'balance' => (float) $acc->balance,
                 'account_number' => $acc->account_number,
                 'inflow' => 0.0,
@@ -2719,13 +2857,13 @@ class FinanceController extends Controller
         }
 
         // 1. Inflows: PIUTANG, PENDAPATAN, PENJUALAN TUNAI, PENJUALAN NON TUNAI
-        $regularInflows = DB::table('finance_payments')
+        $regularInflowsQuery = FinancePayment::query()
             ->select('account_id', DB::raw('SUM(amount) as total_amount'), DB::raw('COUNT(*) as total_count'))
             ->whereIn('account_id', $accountIds)
             ->whereIn('payment_type', ['PIUTANG', 'PENDAPATAN', 'PENJUALAN TUNAI', 'PENJUALAN NON TUNAI'])
-            ->whereBetween('payment_date', [$monthStart, $monthEnd])
-            ->groupBy('account_id')
-            ->get();
+            ->whereBetween('payment_date', [$monthStart, $monthEnd]);
+        $this->applyMutasiBranchScope($regularInflowsQuery, $targetPharmacyIds);
+        $regularInflows = $regularInflowsQuery->groupBy('account_id')->get();
 
         foreach ($regularInflows as $row) {
             if (isset($accountStats[$row->account_id])) {
@@ -2735,13 +2873,13 @@ class FinanceController extends Controller
         }
 
         // 2. Outflows: KREDIT, CASH, KONSINYASI, BIAYA, RETUR PENJUALAN
-        $regularOutflows = DB::table('finance_payments')
+        $regularOutflowsQuery = FinancePayment::query()
             ->select('account_id', DB::raw('SUM(amount) as total_amount'), DB::raw('COUNT(*) as total_count'))
             ->whereIn('account_id', $accountIds)
             ->whereIn('payment_type', ['KREDIT', 'CASH', 'KONSINYASI', 'BIAYA', 'RETUR PENJUALAN'])
-            ->whereBetween('payment_date', [$monthStart, $monthEnd])
-            ->groupBy('account_id')
-            ->get();
+            ->whereBetween('payment_date', [$monthStart, $monthEnd]);
+        $this->applyMutasiBranchScope($regularOutflowsQuery, $targetPharmacyIds);
+        $regularOutflows = $regularOutflowsQuery->groupBy('account_id')->get();
 
         foreach ($regularOutflows as $row) {
             if (isset($accountStats[$row->account_id])) {
@@ -2750,49 +2888,29 @@ class FinanceController extends Controller
             }
         }
 
-        // 3. Penyesuaian Saldo (Opname in / out)
-        $adjustments = DB::table('finance_payments')
-            ->select('account_id', 'reference_number', DB::raw('SUM(amount) as total_amount'), DB::raw('COUNT(*) as total_count'))
-            ->whereIn('account_id', $accountIds)
-            ->where('payment_type', 'PENYESUAIAN SALDO')
-            ->whereBetween('payment_date', [$monthStart, $monthEnd])
-            ->groupBy('account_id', 'reference_number')
-            ->get();
-
-        foreach ($adjustments as $row) {
-            if (isset($accountStats[$row->account_id])) {
-                if ($row->reference_number === 'OPNAME-OUT') {
-                    $accountStats[$row->account_id]['outflow'] += (float) $row->total_amount;
-                } else {
-                    $accountStats[$row->account_id]['inflow'] += (float) $row->total_amount;
-                }
-                $accountStats[$row->account_id]['txCount'] += (int) $row->total_count;
-            }
-        }
-
-        // 4. Saldo Awal count
-        $openingCounts = DB::table('finance_payments')
+        // 3. Penyesuaian Saldo (Opname) & Saldo Awal: dikecualikan dari Masuk/Keluar operasional, hanya dihitung pada jumlah mutasi
+        $nonOperationalCountsQuery = FinancePayment::query()
             ->select('account_id', DB::raw('COUNT(*) as total_count'))
             ->whereIn('account_id', $accountIds)
-            ->where('payment_type', 'SALDO AWAL')
-            ->whereBetween('payment_date', [$monthStart, $monthEnd])
-            ->groupBy('account_id')
-            ->get();
+            ->whereIn('payment_type', ['PENYESUAIAN SALDO', 'SALDO AWAL'])
+            ->whereBetween('payment_date', [$monthStart, $monthEnd]);
+        $this->applyMutasiBranchScope($nonOperationalCountsQuery, $targetPharmacyIds);
+        $nonOperationalCounts = $nonOperationalCountsQuery->groupBy('account_id')->get();
 
-        foreach ($openingCounts as $row) {
+        foreach ($nonOperationalCounts as $row) {
             if (isset($accountStats[$row->account_id])) {
                 $accountStats[$row->account_id]['txCount'] += (int) $row->total_count;
             }
         }
 
-        // 5. Transfers: SETOR & TARIK TUNAI
-        $transfersOut = DB::table('finance_payments')
+        // 4. Transfers: SETOR & TARIK TUNAI
+        $transfersOutQuery = FinancePayment::query()
             ->select('account_id', DB::raw('SUM(amount) as total_amount'), DB::raw('COUNT(*) as total_count'))
             ->whereIn('account_id', $accountIds)
             ->whereIn('payment_type', ['SETOR', 'TARIK TUNAI'])
-            ->whereBetween('payment_date', [$monthStart, $monthEnd])
-            ->groupBy('account_id')
-            ->get();
+            ->whereBetween('payment_date', [$monthStart, $monthEnd]);
+        $this->applyMutasiBranchScope($transfersOutQuery, $targetPharmacyIds);
+        $transfersOut = $transfersOutQuery->groupBy('account_id')->get();
 
         foreach ($transfersOut as $row) {
             if (isset($accountStats[$row->account_id])) {
@@ -2801,13 +2919,13 @@ class FinanceController extends Controller
             }
         }
 
-        $transfersIn = DB::table('finance_payments')
+        $transfersInQuery = FinancePayment::query()
             ->select('transfer_account_id as account_id', DB::raw('SUM(amount) as total_amount'), DB::raw('COUNT(*) as total_count'))
             ->whereIn('transfer_account_id', $accountIds)
             ->whereIn('payment_type', ['SETOR', 'TARIK TUNAI'])
-            ->whereBetween('payment_date', [$monthStart, $monthEnd])
-            ->groupBy('transfer_account_id')
-            ->get();
+            ->whereBetween('payment_date', [$monthStart, $monthEnd]);
+        $this->applyMutasiBranchScope($transfersInQuery, $targetPharmacyIds);
+        $transfersIn = $transfersInQuery->groupBy('transfer_account_id')->get();
 
         foreach ($transfersIn as $row) {
             if (isset($accountStats[$row->account_id])) {
@@ -2880,41 +2998,9 @@ class FinanceController extends Controller
             ->whereHas('account', function ($q) {
                 $q->where('category', 'Kas & Bank');
                 $q->where('pharmacy_id', getActivePharmacyId());
-            })
-            ->where(function ($q) use ($targetPharmacyIds) {
-                $q
-                    ->whereHas('receiving', function ($sub) use ($targetPharmacyIds) {
-                        $sub->whereIn('pharmacy_id', $targetPharmacyIds);
-                    })
-                    ->orWhereHas('transaction', function ($sub) use ($targetPharmacyIds) {
-                        $sub->whereIn('pharmacy_id', $targetPharmacyIds);
-                    })
-                    ->orWhere(function ($sub) use ($targetPharmacyIds) {
-                        $sub
-                            ->where('payment_type', 'BIAYA')
-                            ->where(function ($sub2) use ($targetPharmacyIds) {
-                                $sub2
-                                    ->whereIn('pharmacy_id', $targetPharmacyIds)
-                                    ->orWhereNull('pharmacy_id');
-                            });
-                    })
-                    ->orWhere(function ($sub) use ($targetPharmacyIds) {
-                        $sub->where('payment_type', 'PENDAPATAN')->whereIn('pharmacy_id', $targetPharmacyIds);
-                    })
-                    ->orWhere(function ($sub) use ($targetPharmacyIds) {
-                        $sub->where('payment_type', 'SETOR')->whereIn('pharmacy_id', $targetPharmacyIds);
-                    })
-                    ->orWhere(function ($sub) use ($targetPharmacyIds) {
-                        $sub->where('payment_type', 'TARIK TUNAI')->whereIn('pharmacy_id', $targetPharmacyIds);
-                    })
-                    ->orWhere(function ($sub) use ($targetPharmacyIds) {
-                        $sub
-                            ->whereIn('payment_type', ['PENJUALAN TUNAI', 'PENJUALAN NON TUNAI', 'RETUR PENJUALAN'])
-                            ->whereIn('pharmacy_id', $targetPharmacyIds);
-                    })
-                    ->orWhere('payment_type', 'SALDO AWAL')
-                    ->orWhere('payment_type', 'PENYESUAIAN SALDO');
+                $q->where('is_active', true);
             });
+        $this->applyMutasiBranchScope($query, $targetPharmacyIds);
 
         // Date range
         $startDate = $request->query('start_date');
@@ -2939,16 +3025,10 @@ class FinanceController extends Controller
             });
         }
 
-        // Direction filter
+        // Direction filter (kecualikan PENYESUAIAN SALDO agar konsisten dengan Masuk/Keluar pada kartu rekening)
         if ($filterDirection === 'IN') {
             $query->where(function ($q) use ($filterAccountId) {
-                $q
-                    ->whereIn('payment_type', ['PIUTANG', 'PENDAPATAN', 'PENJUALAN TUNAI', 'PENJUALAN NON TUNAI'])
-                    ->orWhere(function ($sub) {
-                        $sub
-                            ->where('payment_type', 'PENYESUAIAN SALDO')
-                            ->where('reference_number', '!=', 'OPNAME-OUT');
-                    });
+                $q->whereIn('payment_type', ['PIUTANG', 'PENDAPATAN', 'PENJUALAN TUNAI', 'PENJUALAN NON TUNAI']);
                 if ($filterAccountId) {
                     $q->orWhere(function ($sub) use ($filterAccountId) {
                         $sub
@@ -2959,13 +3039,7 @@ class FinanceController extends Controller
             });
         } elseif ($filterDirection === 'OUT') {
             $query->where(function ($q) use ($filterAccountId) {
-                $q
-                    ->whereIn('payment_type', ['KREDIT', 'CASH', 'KONSINYASI', 'BIAYA', 'RETUR PENJUALAN'])
-                    ->orWhere(function ($sub) {
-                        $sub
-                            ->where('payment_type', 'PENYESUAIAN SALDO')
-                            ->where('reference_number', '=', 'OPNAME-OUT');
-                    });
+                $q->whereIn('payment_type', ['KREDIT', 'CASH', 'KONSINYASI', 'BIAYA', 'RETUR PENJUALAN']);
                 if ($filterAccountId) {
                     $q->orWhere(function ($sub) use ($filterAccountId) {
                         $sub
