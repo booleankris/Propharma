@@ -123,7 +123,7 @@ class KinerjaOmzetExport implements FromArray, WithEvents, WithStyles, WithTitle
                 $day['purchases']['discountOffSd'] ?? 0,
                 $day['purchases']['total'] ?? 0,
                 $day['purchases']['sd'] ?? 0,
-                $this->number($day['sales']['total_sd'] ?? 0) - $this->number($day['purchases']['sd'] ?? 0) + $this->number($day['purchases']['discountOff'] ?? 0),
+                $this->number($day['sales']['total_sd'] ?? 0) - $this->number($day['purchases']['sd'] ?? 0),
                 ($this->number($day['sales']['total_sd'] ?? 0) != 0) ? $this->number($day['purchases']['sd'] ?? 0) / $this->number($day['sales']['total_sd']) * 100 : 0,
             ];
             foreach ($purchaseValues as $index => $value)
@@ -163,7 +163,7 @@ class KinerjaOmzetExport implements FromArray, WithEvents, WithStyles, WithTitle
         $total[$totalOmzetSdIndex] = $this->number($lastDay['sales']['total_sd'] ?? 0);
         $total[$this->purchaseStart + 5] = $this->number($lastDay['purchases']['discountOffSd'] ?? 0);
         $total[$this->purchaseStart + 7] = $this->number($lastDay['purchases']['sd'] ?? 0);
-        $total[$this->purchaseStart + 8] = $this->number($lastDay['sales']['total_sd'] ?? 0) - $this->number($lastDay['purchases']['sd'] ?? 0) + $this->number($lastDay['purchases']['discountOff'] ?? 0);
+        $total[$this->purchaseStart + 8] = $this->number($lastDay['sales']['total_sd'] ?? 0) - $this->number($lastDay['purchases']['sd'] ?? 0);
         $total[$this->purchaseStart + 9] = $this->number($lastDay['sales']['total_sd'] ?? 0) != 0 ? $this->number($lastDay['purchases']['sd'] ?? 0) / $this->number($lastDay['sales']['total_sd']) * 100 : 0;
 
         $total[$this->purchaseStart + 10] = array_sum(array_map(fn ($d) => $this->number($d['other_income'] ?? 0), $this->data['days']));

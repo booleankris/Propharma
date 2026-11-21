@@ -10,6 +10,7 @@ use App\Models\Receiving;
 use App\Support\FinanceShift;
 use App\Support\LiphTransactionScope;
 use Carbon\CarbonPeriod;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Carbon;
 
@@ -318,16 +319,17 @@ class KinerjaOmzetService
             $day['sales']['total_sd'] = $omzetRunningTotal;
             $day['sales']['exVat'] = $day['sales']['cashBankExVat'] + $day['sales']['creditExVat'];
             $day['sales']['ppn'] = $day['sales']['cashBankPpn'] + $day['sales']['creditPpn'];
-            // Total Pembelian = Kredit (PBF) + Tunai (CASH) + Konsinyasi - Retur - Diskon Off
-            $day['purchases']['total'] = $day['purchases']['pbf'] + $day['purchases']['consignment'] + $day['purchases']['cash'] - $day['purchases']['return'] - $day['purchases']['discountOff'];
+            // Total Pembelian Netto (identik dengan Halaman Ringkasan) = Kredit (PBF) + Tunai (CASH) + Konsinyasi - Retur
+            // Diskon Off dipisahkan dan masuk komponen Pendapatan (tidak mengurangi Pembelian Netto).
+            $day['purchases']['total'] = $day['purchases']['pbf'] + $day['purchases']['consignment'] + $day['purchases']['cash'] - $day['purchases']['return'];
             $purchaseRunningTotal += (float) $day['purchases']['total'];
             $day['purchases']['sd'] = $purchaseRunningTotal;
             $discountOffRunningTotal += (float) $day['purchases']['discountOff'];
             $day['purchases']['discountOffSd'] = $discountOffRunningTotal;
             $day['purchases']['exVat'] = $day['purchases']['total'] - $day['purchases']['ppn'];
 
-            // Margin = Total Omzet S/D - Total Pembelian S/D + Diskon Off (harian)
-            $day['margin'] = (float) $day['sales']['total_sd'] - (float) $day['purchases']['sd'] + (float) $day['purchases']['discountOff'];
+            // Margin S/D = Total Omzet S/D - Total Pembelian Netto S/D
+            $day['margin'] = (float) $day['sales']['total_sd'] - (float) $day['purchases']['sd'];
             $day['margin_sd'] = $day['margin'];
 
             $incomeRunningTotal += (float) ($day['other_income'] ?? 0);
@@ -336,11 +338,131 @@ class KinerjaOmzetService
             $expenseRunningTotal += (float) ($day['expense'] ?? 0);
             $day['expense_sd'] = $expenseRunningTotal;
 
-            // Rugi Laba S/D = Margin S/D + Pendapatan Lain-lain S/D - Biaya S/D
-            $day['profit_loss_sd'] = $day['margin_sd'] + $day['other_income_sd'] - $day['expense_sd'];
+            // Laba / Rugi S/D mengikuti rumus Halaman Ringkasan:
+            // Penjualan S/D - Pembelian Netto S/D - Biaya S/D + (Pendapatan Lain-lain S/D + Diskon Off S/D)
+            $day['profit_loss_sd'] = $day['margin_sd'] - $day['expense_sd'] + $day['other_income_sd'] + $day['purchases']['discountOffSd'];
         }
         unset($day);
 
         return ['days' => array_values($days), 'debtors' => $debtorRows];
+    }
+
+    /**
+     * Ringkas total Penjualan, Pembelian Netto, Biaya, Pendapatan, dan Laba dari array harian KinerjaOmzet.
+     * Sumber rumus tunggal (Single Source of Truth) untuk Halaman Ringkasan, Kinerja Omzet, dan Neraca:
+     * Laba = Penjualan - Pembelian Netto - Biaya + (Pendapatan Lain-lain + Diskon Off).
+     */
+    public static function summarizeDays(array $days): array
+    {
+        $penjualanTotal = 0.0;
+        $penjualanTunaiBank = 0.0;
+        $penjualanKredit = 0.0;
+
+        $pembelianBruto = 0.0;
+        $pembelianPbf = 0.0;
+        $pembelianCash = 0.0;
+        $pembelianKonsinyasi = 0.0;
+        $pembelianRetur = 0.0;
+
+        $biayaTotal = 0.0;
+        $pendapatanLainTotal = 0.0;
+        $diskonOffTotal = 0.0;
+
+        foreach ($days as $day) {
+            $penjualanTotal += (float) ($day['sales']['total'] ?? 0);
+            $penjualanTunaiBank += (float) ($day['sales']['cashBankTotal'] ?? 0);
+            $penjualanKredit += (float) ($day['sales']['creditTotal'] ?? 0);
+
+            $pbf = (float) ($day['purchases']['pbf'] ?? 0);
+            $cash = (float) ($day['purchases']['cash'] ?? 0);
+            $cons = (float) ($day['purchases']['consignment'] ?? 0);
+            $ret = (float) ($day['purchases']['return'] ?? 0);
+
+            $pembelianPbf += $pbf;
+            $pembelianCash += $cash;
+            $pembelianKonsinyasi += $cons;
+            $pembelianBruto += ($pbf + $cash + $cons);
+            $pembelianRetur += $ret;
+
+            $biayaTotal += (float) ($day['expense'] ?? 0);
+            $pendapatanLainTotal += (float) ($day['other_income'] ?? 0);
+            $diskonOffTotal += (float) ($day['purchases']['discountOff'] ?? 0);
+        }
+
+        $pembelianNetto = $pembelianBruto - $pembelianRetur;
+        $pendapatanTotal = $pendapatanLainTotal + $diskonOffTotal;
+        $labaTotal = $penjualanTotal - $pembelianNetto - $biayaTotal + $pendapatanTotal;
+
+        return [
+            'penjualan' => round($penjualanTotal, 2),
+            'penjualan_tunai_bank' => round($penjualanTunaiBank, 2),
+            'penjualan_kredit' => round($penjualanKredit, 2),
+            'pembelian' => round($pembelianNetto, 2),
+            'pembelian_bruto' => round($pembelianBruto, 2),
+            'pembelian_retur' => round($pembelianRetur, 2),
+            'pembelian_pbf' => round($pembelianPbf, 2),
+            'pembelian_cash' => round($pembelianCash, 2),
+            'pembelian_konsinyasi' => round($pembelianKonsinyasi, 2),
+            'biaya' => round($biayaTotal, 2),
+            'pendapatan' => round($pendapatanTotal, 2),
+            'pendapatan_lain' => round($pendapatanLainTotal, 2),
+            'diskon_off' => round($diskonOffTotal, 2),
+            'laba' => round($labaTotal, 2),
+        ];
+    }
+
+    /**
+     * Hitung akumulasi (Year-To-Date) bulan 1 s/d (selectedMonth - 1) menggunakan cache bulanan yang sama
+     * dengan Halaman Ringkasan Keuangan.
+     */
+    public static function summarizeYtdBeforeMonth(array $pharmacyIds, int $selectedYear, int $selectedMonth): array
+    {
+        $totals = [
+            'penjualan' => 0.0,
+            'pembelian' => 0.0,
+            'biaya' => 0.0,
+            'pendapatan' => 0.0,
+            'laba' => 0.0,
+        ];
+
+        if ($selectedMonth <= 1) {
+            return $totals;
+        }
+
+        for ($m = 1; $m < $selectedMonth; $m++) {
+            $cacheKey = 'finance_monthly_sum_v2_' . implode('_', $pharmacyIds) . "_{$selectedYear}_{$m}";
+            $pastTotals = Cache::remember($cacheKey, 86400, function () use ($pharmacyIds, $selectedYear, $m) {
+                $mStart = sprintf('%04d-%02d-01', $selectedYear, $m);
+                $mEnd = Carbon::createFromDate($selectedYear, $m, 1)->endOfMonth()->toDateString();
+                $service = new self();
+                $summary = self::summarizeDays($service->build($pharmacyIds, $mStart, $mEnd)['days'] ?? []);
+
+                return [
+                    'penjualan' => $summary['penjualan'],
+                    'pembelian' => $summary['pembelian'],
+                    'biaya' => $summary['biaya'],
+                    'pendapatan' => $summary['pendapatan'],
+                    'laba' => $summary['laba'],
+                ];
+            });
+
+            $totals['penjualan'] += (float) ($pastTotals['penjualan'] ?? 0);
+            $totals['pembelian'] += (float) ($pastTotals['pembelian'] ?? 0);
+            $totals['biaya'] += (float) ($pastTotals['biaya'] ?? 0);
+            $totals['pendapatan'] += (float) ($pastTotals['pendapatan'] ?? 0);
+        }
+
+        $totals['laba'] = round(
+            $totals['penjualan'] - $totals['pembelian'] - $totals['biaya'] + $totals['pendapatan'],
+            2
+        );
+
+        return [
+            'penjualan' => round($totals['penjualan'], 2),
+            'pembelian' => round($totals['pembelian'], 2),
+            'biaya' => round($totals['biaya'], 2),
+            'pendapatan' => round($totals['pendapatan'], 2),
+            'laba' => $totals['laba'],
+        ];
     }
 }

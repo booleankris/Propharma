@@ -111,7 +111,10 @@ export default function Neraca({ data = {}, monthLabel = '' }) {
                             <tr className="bg-yellow-300 font-extrabold text-slate-900 border-y-2 border-yellow-400">
                                 <td className="border border-yellow-400 px-4 py-3 text-center"></td>
                                 <td className="border border-yellow-400 px-4 py-3 tracking-wide">
-                                    {labaTanpaStok.label || 'LABA TANPA STOK'}
+                                    <div>{labaTanpaStok.label || 'LABA TANPA STOK'}</div>
+                                    <div className="mt-0.5 text-[10px] font-semibold normal-case text-slate-700/80">
+                                        Rumus Ringkasan (Penjualan − Pembelian − Biaya + Pendapatan) · Selisih = Bulan Berjalan
+                                    </div>
                                 </td>
                                 <td className="border border-yellow-400 px-4 py-3 text-right tabular-nums">
                                     {formatNeracaNumber(labaTanpaStok.awal)}
@@ -151,7 +154,10 @@ export default function Neraca({ data = {}, monthLabel = '' }) {
                             <tr className="bg-yellow-300 font-extrabold text-slate-900 border-y-2 border-yellow-400">
                                 <td className="border border-yellow-400 px-4 py-3 text-center"></td>
                                 <td className="border border-yellow-400 px-4 py-3 tracking-wide">
-                                    {labaDenganStok.label || 'LABA DENGAN STOK'}
+                                    <div>{labaDenganStok.label || 'LABA DENGAN STOK'}</div>
+                                    <div className="mt-0.5 text-[10px] font-semibold normal-case text-slate-700/80">
+                                        Laba Tanpa Stok + Persediaan (Selisih = Laba Bulan Berjalan + Perubahan Stok)
+                                    </div>
                                 </td>
                                 <td className="border border-yellow-400 px-4 py-3 text-right tabular-nums">
                                     {formatNeracaNumber(labaDenganStok.awal)}

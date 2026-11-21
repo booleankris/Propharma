@@ -27,7 +27,7 @@ export default function KinerjaOmzet({ days = [], debtors = [] }) {
         result.other_income_sd = numeric(days[days.length - 1]?.other_income_sd);
         result.expense_sd = numeric(days[days.length - 1]?.expense_sd);
         result.profit_loss_sd = numeric(days[days.length - 1]?.profit_loss_sd);
-        result.margin = result.sales_total_sd - result.purchase_sd + numeric(days[days.length - 1]?.purchases?.discountOff);
+        result.margin = result.sales_total_sd - result.purchase_sd;
         return result;
     }, [days, debtors]);
 
@@ -85,7 +85,7 @@ export default function KinerjaOmzet({ days = [], debtors = [] }) {
                             <td className={`${cell} bg-cyan-50/70 font-semibold text-slate-700`}>{money(day.sales?.total_sd)}</td>
                             <td className={cell}>{money(day.purchases?.pbf)}</td><td className={cell}>{money(day.purchases?.consignment)}</td><td className={`${cell} bg-yellow-100`}>{money(day.purchases?.return)}</td><td className={cell}>{money(day.purchases?.cash)}</td>
                             <td className={`${cell} bg-indigo-100`}>{money(day.purchases?.discountOff)}</td><td className={`${cell} bg-indigo-50`}>{money(day.purchases?.discountOffSd)}</td><td className={`${cell} bg-blue-100 font-semibold`}>{money(day.purchases?.total)}</td><td className={`${cell} bg-cyan-50/70 font-semibold text-slate-700`}>{money(day.purchases?.sd)}</td>
-                            <td className={`${cell} bg-blue-100 font-semibold`}>{money(numeric(day.sales?.total_sd) - numeric(day.purchases?.sd) + numeric(day.purchases?.discountOff))}</td><td className={cell}>{dailyHpp.toFixed(1)}%</td>
+                            <td className={`${cell} bg-blue-100 font-semibold`}>{money(numeric(day.sales?.total_sd) - numeric(day.purchases?.sd))}</td><td className={cell}>{dailyHpp.toFixed(1)}%</td>
                             <td className={cell}>{money(day.other_income)}</td>
                             <td className={`${cell} bg-cyan-50/70 font-semibold text-slate-700`}>{money(day.other_income_sd)}</td>
                             <td className={cell}>{money(day.expense)}</td>

@@ -20,7 +20,7 @@ class NeracaReportService
     /**
      * Build Neraca (Balance Sheet) data comparing beginning and ending of period.
      */
-    public function build(array $pharmacyIds, string $startDate, string $endDate, ?int $accountPharmacyId = null): array
+    public function build(array $pharmacyIds, string $startDate, string $endDate, ?int $accountPharmacyId = null, ?array $kinerjaDays = null): array
     {
         $pharmacyId = $accountPharmacyId && $accountPharmacyId > 0
             ? $accountPharmacyId
@@ -144,7 +144,7 @@ class NeracaReportService
             'is_liability' => true,
         ];
 
-        // 5. Laba Tanpa Stok: (Kas + Bank + Piutang) - Hutang
+        // 5. Total Aset Lancar (Kas + Bank + Piutang) untuk perhitungan Harta & Saldo Ekuitas
         $totalAsetLancarAwal = array_sum(array_column($kasRows, 'awal'))
             + array_sum(array_column($bankRows, 'awal'))
             + $piutangAwal;
@@ -152,33 +152,51 @@ class NeracaReportService
             + array_sum(array_column($bankRows, 'akhir'))
             + $piutangAkhir;
 
-        $labaTanpaStokAwal = $totalAsetLancarAwal - $hutangAwal;
-        $labaTanpaStokAkhir = $totalAsetLancarAkhir - $hutangAkhir;
+        // 5b. Laba Tanpa Stok mengikuti rumus Halaman Ringkasan Keuangan (bulan berjalan):
+        // Laba = Penjualan - Pembelian Netto - Biaya + (Pendapatan Lain-lain + Diskon Off)
+        // AWAL = Akumulasi Laba YTD s/d bulan sebelumnya; AKHIR = Akumulasi Laba YTD s/d bulan berjalan;
+        // SELISIH = Laba Bulan Berjalan (100% identik dengan kartu Laba di Halaman Ringkasan).
+        $periodCarbon = Carbon::parse($startDate);
+        $daysForProfit = $kinerjaDays !== null
+            ? $kinerjaDays
+            : ((new KinerjaOmzetService())->build($pharmacyIds, $startDate, $endDate)['days'] ?? []);
+        $periodProfitSummary = KinerjaOmzetService::summarizeDays($daysForProfit);
+        $ytdBeforeSummary = KinerjaOmzetService::summarizeYtdBeforeMonth(
+            $pharmacyIds,
+            (int) $periodCarbon->year,
+            (int) $periodCarbon->month
+        );
+
+        $labaBulanBerjalan = (float) $periodProfitSummary['laba'];
+        $labaTanpaStokAwal = (float) $ytdBeforeSummary['laba'];
+        $labaTanpaStokAkhir = round($labaTanpaStokAwal + $labaBulanBerjalan, 2);
         $labaTanpaStok = [
             'label' => 'LABA TANPA STOK',
             'awal' => $labaTanpaStokAwal,
             'akhir' => $labaTanpaStokAkhir,
-            'selisih' => $labaTanpaStokAkhir - $labaTanpaStokAwal,
+            'selisih' => round($labaBulanBerjalan, 2),
         ];
 
         // 6. Persediaan: Nilai total stok (Stok * raw_price)
         $persediaanAwal = $this->inventoryValuationAtDate($pharmacyIds, $dayBeforeStart);
         $persediaanAkhir = $this->inventoryValuationAtDate($pharmacyIds, $periodEnd);
+        $persediaanSelisih = round($persediaanAkhir - $persediaanAwal, 2);
         $persediaanRow = [
             'label' => 'PERSEDIAAN',
             'awal' => $persediaanAwal,
             'akhir' => $persediaanAkhir,
-            'selisih' => $persediaanAkhir - $persediaanAwal,
+            'selisih' => $persediaanSelisih,
         ];
 
         // 7. Laba Dengan Stok: Laba Tanpa Stok + Persediaan
-        $labaDenganStokAwal = $labaTanpaStokAwal + $persediaanAwal;
-        $labaDenganStokAkhir = $labaTanpaStokAkhir + $persediaanAkhir;
+        // SELISIH = Laba Bulan Berjalan (Ringkasan) + Perubahan Persediaan Bulan Berjalan
+        $labaDenganStokAwal = round($labaTanpaStokAwal + $persediaanAwal, 2);
+        $labaDenganStokAkhir = round($labaTanpaStokAkhir + $persediaanAkhir, 2);
         $labaDenganStok = [
             'label' => 'LABA DENGAN STOK',
             'awal' => $labaDenganStokAwal,
             'akhir' => $labaDenganStokAkhir,
-            'selisih' => $labaDenganStokAkhir - $labaDenganStokAwal,
+            'selisih' => round($labaBulanBerjalan + $persediaanSelisih, 2),
         ];
 
         // 8. Harta (Wealth / Total Aktiva): Kas + Bank + Piutang + Persediaan
@@ -199,7 +217,7 @@ class NeracaReportService
             'selisih' => $hutangAkhir - $hutangAwal,
         ];
 
-        // 10. Saldo (Ekuitas): Harta - Kewajiban (= Laba Dengan Stok)
+        // 10. Saldo (Ekuitas): Harta - Kewajiban
         $saldoAwal = $hartaAwal - $hutangAwal;
         $saldoAkhir = $hartaAkhir - $hutangAkhir;
         $saldo = [
@@ -231,6 +249,7 @@ class NeracaReportService
             'dayBeforeStart' => $dayBeforeStart,
             'periodEnd' => $periodEnd,
             'hasEstimatedOpening' => $hasEstimatedOpening,
+            'laba_ringkasan' => $periodProfitSummary,
             'items' => $numberedItems,
             'laba_tanpa_stok' => $labaTanpaStok,
             'persediaan' => $persediaanItem,
