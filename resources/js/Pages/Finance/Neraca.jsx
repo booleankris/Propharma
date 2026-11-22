@@ -1,10 +1,10 @@
 import React from 'react';
 import { CircleHelp } from 'lucide-react';
 
-function formatNeracaNumber(val) {
-    if (val === '-' || val === null || val === undefined) return '-';
+function formatNeracaNumber(val, showZero = false) {
+    if (val === '-' || val === null || val === undefined) return showZero ? '0' : '-';
     const num = Number(val || 0);
-    if (Math.abs(num) < 0.01) return '-';
+    if (Math.abs(num) < 0.01) return showZero ? '0' : '-';
     const isNegative = num < 0;
     const absVal = Math.round(Math.abs(num));
     const formatted = new Intl.NumberFormat('id-ID').format(absVal);
@@ -83,12 +83,7 @@ export default function Neraca({ data = {}, monthLabel = '' }) {
                                             {item.no ?? idx + 1}
                                         </td>
                                         <td className="border border-slate-200 px-4 py-2.5 text-slate-800 font-semibold">
-                                            <span>{item.label}</span>
-                                            {item.is_liability && (
-                                                <span className="ml-2 text-[10px] font-normal text-slate-400">
-                                                    (Selisih = Awal − Akhir)
-                                                </span>
-                                            )}
+                                            {item.label}
                                         </td>
                                         <td className="border border-slate-200 px-4 py-2.5 text-right tabular-nums text-slate-700">
                                             {formatNeracaNumber(item.awal)}
@@ -113,17 +108,17 @@ export default function Neraca({ data = {}, monthLabel = '' }) {
                                 <td className="border border-yellow-400 px-4 py-3 tracking-wide">
                                     <div>{labaTanpaStok.label || 'LABA TANPA STOK'}</div>
                                     <div className="mt-0.5 text-[10px] font-semibold normal-case text-slate-700/80">
-                                        Rumus Ringkasan (Penjualan − Pembelian − Biaya + Pendapatan) · Selisih = Bulan Berjalan
+                                        (Kas + Bank + Piutang) − Hutang Dagang
                                     </div>
                                 </td>
                                 <td className="border border-yellow-400 px-4 py-3 text-right tabular-nums">
-                                    {formatNeracaNumber(labaTanpaStok.awal)}
+                                    {formatNeracaNumber(labaTanpaStok.awal, true)}
                                 </td>
                                 <td className="border border-yellow-400 px-4 py-3 text-right tabular-nums">
-                                    {formatNeracaNumber(labaTanpaStok.akhir)}
+                                    {formatNeracaNumber(labaTanpaStok.akhir, true)}
                                 </td>
                                 <td className="border border-yellow-400 px-4 py-3 text-right tabular-nums">
-                                    {formatNeracaNumber(labaTanpaStok.selisih)}
+                                    {formatNeracaNumber(labaTanpaStok.selisih, true)}
                                 </td>
                             </tr>
 
@@ -156,17 +151,17 @@ export default function Neraca({ data = {}, monthLabel = '' }) {
                                 <td className="border border-yellow-400 px-4 py-3 tracking-wide">
                                     <div>{labaDenganStok.label || 'LABA DENGAN STOK'}</div>
                                     <div className="mt-0.5 text-[10px] font-semibold normal-case text-slate-700/80">
-                                        Laba Tanpa Stok + Persediaan (Selisih = Laba Bulan Berjalan + Perubahan Stok)
+                                        Laba Tanpa Stok + Persediaan
                                     </div>
                                 </td>
                                 <td className="border border-yellow-400 px-4 py-3 text-right tabular-nums">
-                                    {formatNeracaNumber(labaDenganStok.awal)}
+                                    {formatNeracaNumber(labaDenganStok.awal, true)}
                                 </td>
                                 <td className="border border-yellow-400 px-4 py-3 text-right tabular-nums">
-                                    {formatNeracaNumber(labaDenganStok.akhir)}
+                                    {formatNeracaNumber(labaDenganStok.akhir, true)}
                                 </td>
                                 <td className="border border-yellow-400 px-4 py-3 text-right tabular-nums">
-                                    {formatNeracaNumber(labaDenganStok.selisih)}
+                                    {formatNeracaNumber(labaDenganStok.selisih, true)}
                                 </td>
                             </tr>
 

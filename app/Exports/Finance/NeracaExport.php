@@ -221,10 +221,12 @@ class NeracaExport implements FromArray, WithStyles, WithColumnWidths, WithTitle
             $sheet->getStyle("A{$bRow}:E{$bRow}")->getFont()->setBold(true);
         }
 
-        // 7. Number format: #,##0;(#,##0);"-"
+        // 7. Number format: #,##0;(#,##0);"-" (baris Laba menampilkan 0, bukan "-")
         $numFormat = '#,##0;(#,##0);"-"';
+        $labaNumFormat = '#,##0;(#,##0);0';
         for ($r = $dataStartRow; $r <= $this->lastRow; $r++) {
-            $sheet->getStyle("C{$r}:E{$r}")->getNumberFormat()->setFormatCode($numFormat);
+            $fmt = in_array($r, $this->yellowRows, true) ? $labaNumFormat : $numFormat;
+            $sheet->getStyle("C{$r}:E{$r}")->getNumberFormat()->setFormatCode($fmt);
         }
 
         return [];
