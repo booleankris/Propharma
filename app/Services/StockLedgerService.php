@@ -210,9 +210,12 @@ class StockLedgerService
             ->where(function ($q) use ($targetPharmacyIds) {
                 $q->where(function ($sub) use ($targetPharmacyIds) {
                     $sub->where('status', 2)
-                        ->whereHas('receiving', function ($r) use ($targetPharmacyIds) {
-                            $r->whereIn('pharmacy_id', $targetPharmacyIds)
-                                ->whereIn('status', [1, 2, 3, 4]);
+                        ->where(function ($buyQ) use ($targetPharmacyIds) {
+                            $buyQ->whereHas('batches', function ($b) use ($targetPharmacyIds) {
+                                $b->whereIn('pharmacy_id', $targetPharmacyIds);
+                            })->orWhereHas('receiving', function ($r) use ($targetPharmacyIds) {
+                                $r->whereIn('pharmacy_id', $targetPharmacyIds);
+                            });
                         });
                 })
                 ->orWhere(function ($sub) use ($targetPharmacyIds) {

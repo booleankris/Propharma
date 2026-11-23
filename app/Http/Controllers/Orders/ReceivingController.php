@@ -3489,13 +3489,23 @@ class ReceivingController extends Controller
                 DB::rollBack();
                 return response()->json(['success' => false, 'message' => 'BPBA/PBF tidak sesuai atau jumlah/satuan melampaui pesanan konsolidasi. Muat ulang penerimaan.'], 422);
             }
-            $details = ReceivingDetails::firstOrNew(
-                [
+            $details = ReceivingDetails::where('invoice_number', $request->invoice_number)
+                ->where('creditor_code', $request->creditor_code)
+                ->where(function ($q) use ($request, $sourceOrder) {
+                    $q->where('receiving_id', $request->receiving_id)
+                        ->orWhereHas('receiving_items.order_items', function ($oq) use ($sourceOrder) {
+                            $oq->where('order_id', $sourceOrder->id);
+                        });
+                })
+                ->first();
+
+            if (!$details) {
+                $details = new ReceivingDetails([
                     'receiving_id' => $request->receiving_id,
                     'invoice_number' => $request->invoice_number,
                     'creditor_code' => $request->creditor_code,
-                ]
-            );
+                ]);
+            }
             $creditorPpn = Creditor::where('code', $request->creditor_code)->value('ppn_type');
             $invoicePpn = $details->exists && filled($details->invoice_ppn)
                 ? strtoupper(trim((string) $details->invoice_ppn))
@@ -3792,7 +3802,7 @@ class ReceivingController extends Controller
             $receivingItems = ReceivingItems::whereNull('batches_id')
                 ->whereHas('order_items', fn($q) => $q->where('order_id', $order->id))
                 ->lockForUpdate()
-                ->with(['order_items.medicines', 'receiving_details'])
+                ->with(['order_items.medicines', 'receiving_details.receiving'])
                 ->get();
 
             if ($receivingItems->isEmpty()) {
@@ -3905,8 +3915,9 @@ class ReceivingController extends Controller
                 }
 
                 if ($actualStockQty > 0) {
+                    $itemRecCode = $item->receiving_details?->receiving?->code ?: $recCode;
                     $itemsLogInserts[] = [
-                        'transaction_code' => $recCode,
+                        'transaction_code' => $itemRecCode,
                         'code' => $logPrefix . str_pad($currentLogNum + $index, 4, '0', STR_PAD_LEFT),
                         'type' => 'OR',
                         'medicine_id' => $medicineId,

@@ -51,6 +51,11 @@ class ItemsLog extends Model
         return $this->belongsTo(Receiving::class, 'transaction_code', 'code');
     }
 
+    public function batch_receiving_items()
+    {
+        return $this->hasMany(ReceivingItems::class, 'batches_id', 'batches_id');
+    }
+
     public function purchaseReturn()
     {
         return $this->belongsTo(PurchaseReturn::class, 'transaction_code', 'return_no');
@@ -69,19 +74,6 @@ class ItemsLog extends Model
      */
     protected function resolveReceivingMatch(): array
     {
-        $receiving = $this->relationLoaded('receiving') ? $this->getRelation('receiving') : $this->receiving;
-        if (!$receiving) {
-            return ['detail' => null, 'item' => null];
-        }
-
-        $details = $receiving->relationLoaded('receiving_details')
-            ? $receiving->getRelation('receiving_details')
-            : $receiving->receiving_details;
-
-        if (!$details || $details->isEmpty()) {
-            return ['detail' => null, 'item' => null];
-        }
-
         $batchId = $this->batches_id ? (int) $this->batches_id : null;
         $medId = $this->medicine_id ? (int) $this->medicine_id : null;
         $targetQty = abs((float) $this->qty);
@@ -90,44 +82,86 @@ class ItemsLog extends Model
         $bestItem = null;
         $bestScore = 0;
 
-        foreach ($details as $detail) {
-            $items = $detail->relationLoaded('receiving_items')
-                ? $detail->getRelation('receiving_items')
-                : $detail->receiving_items;
-
-            if (!$items) {
-                continue;
+        $scoreCandidate = function (ReceivingItems $ri, ?ReceivingDetails $detail) use (
+            $batchId,
+            $medId,
+            $targetQty,
+            &$bestScore,
+            &$bestDetail,
+            &$bestItem
+        ): void {
+            if (!$detail) {
+                return;
             }
 
-            foreach ($items as $ri) {
-                $batchMatch = $batchId !== null && (int) $ri->batches_id === $batchId;
-                $orderItem = $ri->relationLoaded('order_items') ? $ri->getRelation('order_items') : $ri->order_items;
-                $medMatch = $medId !== null && (int) ($orderItem?->medicine_id) === $medId;
-                $stockQty = (float) $ri->qty_received * max(1, (int) ($ri->stock_unit_factor ?? 1));
-                $qtyMatch = $targetQty > 0 && abs($stockQty - $targetQty) < 0.001;
+            $batchMatch = $batchId !== null && (int) $ri->batches_id === $batchId;
+            $orderItem = $ri->relationLoaded('order_items') ? $ri->getRelation('order_items') : $ri->order_items;
+            $medMatch = $medId !== null && (int) ($orderItem?->medicine_id) === $medId;
+            $stockQty = (float) $ri->qty_received * max(1, (int) ($ri->stock_unit_factor ?? 1));
+            $qtyMatch = $targetQty > 0 && abs($stockQty - $targetQty) < 0.001;
 
-                $score = 0;
-                if ($batchMatch && $medMatch && $qtyMatch) {
-                    $score = 6;
-                } elseif ($batchMatch && $medMatch) {
-                    $score = 5;
-                } elseif ($batchMatch) {
-                    $score = 4;
-                } elseif ($medMatch && $qtyMatch) {
-                    $score = 2;
-                } elseif ($medMatch) {
-                    $score = 1;
-                }
+            $score = 0;
+            if ($batchMatch && $medMatch && $qtyMatch) {
+                $score = 6;
+            } elseif ($batchMatch && $medMatch) {
+                $score = 5;
+            } elseif ($batchMatch) {
+                $score = 4;
+            } elseif ($medMatch && $qtyMatch) {
+                $score = 2;
+            } elseif ($medMatch) {
+                $score = 1;
+            }
 
-                if ($score > $bestScore) {
-                    $bestScore = $score;
-                    $bestDetail = $detail;
-                    $bestItem = $ri;
+            if ($score > $bestScore) {
+                $bestScore = $score;
+                $bestDetail = $detail;
+                $bestItem = $ri;
+            }
+        };
+
+        $receiving = $this->relationLoaded('receiving') ? $this->getRelation('receiving') : $this->receiving;
+        $details = null;
+        if ($receiving) {
+            $details = $receiving->relationLoaded('receiving_details')
+                ? $receiving->getRelation('receiving_details')
+                : $receiving->receiving_details;
+
+            if ($details && $details->isNotEmpty()) {
+                foreach ($details as $detail) {
+                    $items = $detail->relationLoaded('receiving_items')
+                        ? $detail->getRelation('receiving_items')
+                        : $detail->receiving_items;
+
+                    if (!$items) {
+                        continue;
+                    }
+
+                    foreach ($items as $ri) {
+                        $scoreCandidate($ri, $detail);
+                    }
                 }
             }
         }
 
-        if ($bestDetail === null) {
+        // Fallback via batches_id -> receiving_items -> receiving_details jika header receiving
+        // pada transaction_code tidak memuat detail faktur yang sesuai.
+        if ($bestScore < 4 && $batchId !== null) {
+            $batchItems = $this->relationLoaded('batch_receiving_items')
+                ? $this->getRelation('batch_receiving_items')
+                : $this->batch_receiving_items()->with(['receiving_details.creditor', 'order_items.creditors'])->get();
+
+            if ($batchItems && $batchItems->isNotEmpty()) {
+                foreach ($batchItems as $ri) {
+                    $detail = $ri->relationLoaded('receiving_details')
+                        ? $ri->getRelation('receiving_details')
+                        : $ri->receiving_details;
+                    $scoreCandidate($ri, $detail);
+                }
+            }
+        }
+
+        if ($bestDetail === null && $details && $details->isNotEmpty()) {
             $bestDetail = $details->first();
         }
 

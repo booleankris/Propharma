@@ -55,7 +55,15 @@ class Receiving extends Model
             ->where('status', 0)
             ->when(!empty($pharmacyIds), fn ($q) => $q->whereIn('pharmacy_id', $pharmacyIds))
             ->when(!empty($receivingIds), fn ($q) => $q->whereIn('id', $receivingIds))
-            ->whereHas('receiving_details.receiving_items', fn ($q) => $q->whereNotNull('batches_id'))
+            ->where(function ($q) {
+                $q->whereHas('receiving_details.receiving_items', fn ($ri) => $ri->whereNotNull('batches_id'))
+                    ->orWhereExists(function ($sub) {
+                        $sub->selectRaw('1')
+                            ->from('items_log')
+                            ->whereColumn('items_log.transaction_code', 'receiving.code')
+                            ->where('items_log.status', 2);
+                    });
+            })
             ->update(['status' => 2]);
 
         Order::syncStatusWithReceiving($pharmacyIds);

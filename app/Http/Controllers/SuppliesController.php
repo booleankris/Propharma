@@ -156,9 +156,12 @@ class SuppliesController extends Controller
                 // 1. Pembelian (Status 2)
                 $q->where(function ($sub) use ($targetPharmacyIds) {
                     $sub->where('status', 2)
-                        ->whereHas('receiving', function ($r) use ($targetPharmacyIds) {
-                            $r->whereIn('pharmacy_id', $targetPharmacyIds)
-                                ->whereIn('status', [1, 2, 3, 4]);
+                        ->where(function ($buyQ) use ($targetPharmacyIds) {
+                            $buyQ->whereHas('batches', function ($b) use ($targetPharmacyIds) {
+                                $b->whereIn('pharmacy_id', $targetPharmacyIds);
+                            })->orWhereHas('receiving', function ($r) use ($targetPharmacyIds) {
+                                $r->whereIn('pharmacy_id', $targetPharmacyIds);
+                            });
                         });
                 })
                 // 2. Retur Beli (Status 4)
@@ -263,6 +266,8 @@ class SuppliesController extends Controller
                 'batches',                              // Fetch batches for batch name display
                 'receiving.receiving_details.creditor', // Fetch creditor through receiving details
                 'receiving.receiving_details.receiving_items.order_items.creditors',
+                'batch_receiving_items.receiving_details.creditor',
+                'batch_receiving_items.order_items.creditors',
                 'purchaseReturn.creditor',              // Fetch creditor for purchase returns (RET-*)
                 'medicine_transaction.user',            // Fetch cashier user through transactions
                 'users'                                 // Fetch user for creator display
@@ -572,6 +577,8 @@ class SuppliesController extends Controller
                 'users',
                 'receiving.receiving_details.creditor',
                 'receiving.receiving_details.receiving_items.order_items.creditors',
+                'batch_receiving_items.receiving_details.creditor',
+                'batch_receiving_items.order_items.creditors',
                 'purchaseReturn.creditor',
             ]);
 
