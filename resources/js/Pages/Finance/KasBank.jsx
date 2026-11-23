@@ -31,6 +31,9 @@ import {
     Calendar,
     ChevronLeft,
     ChevronRight,
+    ChevronDown,
+    MoreVertical,
+    ArrowLeftRight,
     FileSpreadsheet,
     Calculator,
     RefreshCw,
@@ -211,6 +214,30 @@ export default function KasBank({
         }, 450);
         return () => clearTimeout(timer);
     }, [mutasiSearchQuery]);
+
+    // State Dropdown Toolbar (Opsi 1: pengelompokan aksi)
+    const [openToolbarMenu, setOpenToolbarMenu] = useState(null); // null | 'transfer' | 'opname' | 'more'
+    const toolbarMenuRef = useRef(null);
+
+    useEffect(() => {
+        if (!openToolbarMenu) return;
+        const handleOutsideClick = (event) => {
+            if (toolbarMenuRef.current && !toolbarMenuRef.current.contains(event.target)) {
+                setOpenToolbarMenu(null);
+            }
+        };
+        const handleKeyDown = (event) => {
+            if (event.key === 'Escape') {
+                setOpenToolbarMenu(null);
+            }
+        };
+        document.addEventListener('mousedown', handleOutsideClick);
+        document.addEventListener('keydown', handleKeyDown);
+        return () => {
+            document.removeEventListener('mousedown', handleOutsideClick);
+            document.removeEventListener('keydown', handleKeyDown);
+        };
+    }, [openToolbarMenu]);
 
     // State Account Modal (Khusus Kas & Bank)
     const [isAccountModalOpen, setIsAccountModalOpen] = useState(false);
@@ -875,7 +902,7 @@ export default function KasBank({
                         </p>
                     </div>
 
-                    <div className="flex flex-wrap items-center gap-2">
+                    <div ref={toolbarMenuRef} className="flex flex-wrap items-center gap-2">
                         {/* Filter Periode Bulan & Tahun (Otomatis Reset Tiap Awal Bulan) */}
                         <div className="flex items-center gap-1 bg-slate-50 p-1 rounded-xl border border-slate-200">
                             <button
@@ -923,86 +950,225 @@ export default function KasBank({
                             </button>
                         </div>
 
+                        {/* Dropdown 1: Mutasi Internal (Setor & Tarik Tunai) */}
+                        <div className="relative">
+                            <button
+                                type="button"
+                                aria-haspopup="menu"
+                                aria-expanded={openToolbarMenu === 'transfer'}
+                                onClick={() => setOpenToolbarMenu(openToolbarMenu === 'transfer' ? null : 'transfer')}
+                                className={`inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold rounded-xl border transition shadow-xs ${openToolbarMenu === 'transfer'
+                                    ? 'bg-emerald-100 text-emerald-900 border-emerald-300'
+                                    : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
+                                    }`}
+                            >
+                                <ArrowLeftRight className="w-4 h-4 text-emerald-600" />
+                                <span>Transfer Kas/Bank</span>
+                                <ChevronDown className={`w-3.5 h-3.5 text-slate-400 transition-transform ${openToolbarMenu === 'transfer' ? 'rotate-180' : ''}`} />
+                            </button>
+
+                            {openToolbarMenu === 'transfer' && (
+                                <div role="menu" className="absolute right-0 z-30 mt-1.5 w-64 rounded-xl border border-slate-200 bg-white p-1.5 shadow-lg">
+                                    <button
+                                        type="button"
+                                        role="menuitem"
+                                        onClick={() => {
+                                            setOpenToolbarMenu(null);
+                                            const destination = kasBankAccounts.find((account) => account.account_type === 'bank');
+                                            setDepositForm({ transfer_account_id: destination?.id || '', payment_date: localToday(), amount: '', reference_number: '', notes: 'Setoran tunai kasir ke rekening bank' });
+                                            setIsDepositModalOpen(true);
+                                        }}
+                                        className="flex w-full items-start gap-2.5 rounded-lg px-3 py-2 text-left hover:bg-emerald-50/70 transition"
+                                    >
+                                        <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-emerald-100 text-emerald-700">
+                                            <ArrowUpRight className="w-4 h-4" />
+                                        </span>
+                                        <div>
+                                            <div className="text-xs font-semibold text-slate-800">Setor Kas ke Bank</div>
+                                            <div className="text-[10px] text-slate-500">Pindahkan tunai kasir ke rekening bank</div>
+                                        </div>
+                                    </button>
+                                    <button
+                                        type="button"
+                                        role="menuitem"
+                                        onClick={() => {
+                                            setOpenToolbarMenu(null);
+                                            openWithdrawModal(null);
+                                        }}
+                                        className="flex w-full items-start gap-2.5 rounded-lg px-3 py-2 text-left hover:bg-amber-50/70 transition"
+                                    >
+                                        <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-amber-100 text-amber-700">
+                                            <ArrowDownLeft className="w-4 h-4" />
+                                        </span>
+                                        <div>
+                                            <div className="text-xs font-semibold text-slate-800">Tarik Tunai ke Kas</div>
+                                            <div className="text-[10px] text-slate-500">Ambil dana rekening bank ke kas apotek</div>
+                                        </div>
+                                    </button>
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Dropdown 2: Opname & Saldo */}
+                        <div className="relative">
+                            <button
+                                type="button"
+                                aria-haspopup="menu"
+                                aria-expanded={openToolbarMenu === 'opname'}
+                                onClick={() => setOpenToolbarMenu(openToolbarMenu === 'opname' ? null : 'opname')}
+                                className={`inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold rounded-xl border transition shadow-xs ${openToolbarMenu === 'opname'
+                                    ? 'bg-blue-100 text-blue-900 border-blue-300'
+                                    : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
+                                    }`}
+                            >
+                                <SlidersHorizontal className="w-4 h-4 text-blue-600" />
+                                <span>Opname &amp; Saldo</span>
+                                <ChevronDown className={`w-3.5 h-3.5 text-slate-400 transition-transform ${openToolbarMenu === 'opname' ? 'rotate-180' : ''}`} />
+                            </button>
+
+                            {openToolbarMenu === 'opname' && (
+                                <div role="menu" className="absolute right-0 z-30 mt-1.5 w-72 rounded-xl border border-slate-200 bg-white p-1.5 shadow-lg">
+                                    <button
+                                        type="button"
+                                        role="menuitem"
+                                        onClick={() => {
+                                            setOpenToolbarMenu(null);
+                                            openOpnameModal(null);
+                                        }}
+                                        className="flex w-full items-start gap-2.5 rounded-lg px-3 py-2 text-left hover:bg-emerald-50/70 transition"
+                                    >
+                                        <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-emerald-100 text-emerald-700">
+                                            <SlidersHorizontal className="w-4 h-4" />
+                                        </span>
+                                        <div>
+                                            <div className="text-xs font-semibold text-slate-800">Sesuaikan Saldo Riil (Opname)</div>
+                                            <div className="text-[10px] text-slate-500">Cocokkan saldo buku dengan fisik / m-Banking</div>
+                                        </div>
+                                    </button>
+                                    <button
+                                        type="button"
+                                        role="menuitem"
+                                        onClick={() => {
+                                            setOpenToolbarMenu(null);
+                                            openOpeningModal('estimate');
+                                        }}
+                                        className="flex w-full items-start gap-2.5 rounded-lg px-3 py-2 text-left hover:bg-blue-50/70 transition"
+                                    >
+                                        <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-blue-100 text-blue-700">
+                                            <Wallet className="w-4 h-4" />
+                                        </span>
+                                        <div>
+                                            <div className="text-xs font-semibold text-slate-800">Atur Saldo Awal</div>
+                                            <div className="text-[10px] text-slate-500">Hitung mundur dari opname atau input manual</div>
+                                        </div>
+                                    </button>
+                                    <div className="my-1 border-t border-slate-100" />
+                                    <button
+                                        type="button"
+                                        role="menuitem"
+                                        onClick={() => {
+                                            setOpenToolbarMenu(null);
+                                            setIsHistoryModalOpen(true);
+                                        }}
+                                        className="flex w-full items-center justify-between gap-2 rounded-lg px-3 py-2 text-left hover:bg-slate-50 transition"
+                                    >
+                                        <span className="flex items-center gap-2.5">
+                                            <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-indigo-100 text-indigo-700">
+                                                <History className="w-4 h-4" />
+                                            </span>
+                                            <span className="text-xs font-semibold text-slate-800">Log Opname</span>
+                                        </span>
+                                        <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-bold text-slate-600">
+                                            {adjustmentLogs.length}
+                                        </span>
+                                    </button>
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Tombol Aksi Utama */}
                         <button
                             type="button"
-                            onClick={() => openOpeningModal('estimate')}
-                            className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold text-blue-800 bg-blue-100/80 border border-blue-300 rounded-xl hover:bg-blue-200/80 transition shadow-xs"
-                        >
-                            <Wallet className="w-4 h-4 text-blue-700" />
-                            <span>Atur Saldo Awal</span>
-                        </button>
-                        <button
-                            type="button"
-                            onClick={() => openOpnameModal(null)}
-                            className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold text-emerald-800 bg-emerald-100/80 border border-emerald-300 rounded-xl hover:bg-emerald-200/80 transition shadow-xs"
-                        >
-                            <SlidersHorizontal className="w-4 h-4 text-emerald-700" />
-                            <span>Sesuaikan Saldo Riil (Opname)</span>
-                        </button>
-                        <button
-                            type="button"
-                            onClick={() => setIsHistoryModalOpen(true)}
-                            className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold text-slate-700 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 transition shadow-xs"
-                        >
-                            <History className="w-4 h-4 text-indigo-600" />
-                            <span>Log Opname ({adjustmentLogs.length})</span>
-                        </button>
-                        <button
-                            type="button"
-                            onClick={() => {
-                                setBackfillForm({ from_date: '', to_date: localToday() });
-                                setIsBackfillModalOpen(true);
-                            }}
-                            className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold text-indigo-700 bg-indigo-50 border border-indigo-200 rounded-xl hover:bg-indigo-100 transition shadow-xs"
-                        >
-                            <History className="w-4 h-4" />
-                            <span>Catat Penjualan Lama</span>
-                        </button>
-                        <button
-                            type="button"
-                            onClick={() => {
-                                setBackfillNonCashForm({ from_date: '', to_date: localToday() });
-                                setIsBackfillNonCashModalOpen(true);
-                            }}
-                            className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold text-violet-700 bg-violet-50 border border-violet-200 rounded-xl hover:bg-violet-100 transition shadow-xs"
-                        >
-                            <History className="w-4 h-4" />
-                            <span>Catat Non-Tunai Lama</span>
-                        </button>
-                        <button
-                            type="button"
-                            onClick={() => {
-                                const destination = kasBankAccounts.find((account) => account.account_type === 'bank');
-                                setDepositForm({ transfer_account_id: destination?.id || '', payment_date: localToday(), amount: '', reference_number: '', notes: 'Setoran tunai kasir ke rekening bank' });
-                                setIsDepositModalOpen(true);
-                            }}
-                            className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-xl hover:bg-emerald-100 transition shadow-xs"
-                        >
-                            <ArrowUpRight className="w-4 h-4" />
-                            <span>Setor Kas ke Bank</span>
-                        </button>
-                        <button
-                            type="button"
-                            onClick={() => openWithdrawModal(null)}
-                            className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold text-amber-700 bg-amber-50 border border-amber-200 rounded-xl hover:bg-amber-100 transition shadow-xs"
-                        >
-                            <ArrowDownLeft className="w-4 h-4" />
-                            <span>Tarik Tunai ke Kas</span>
-                        </button>
-                        <Link
-                            href="/finance/accounts"
-                            className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold text-slate-700 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 hover:text-blue-600 transition shadow-xs"
-                        >
-                            <Layers className="w-4 h-4 text-blue-600" />
-                            <span>Bagan Akun (COA)</span>
-                        </Link>
-                        <button
                             onClick={openAccountModal}
                             className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-semibold text-white bg-blue-600 rounded-xl hover:bg-blue-700 transition shadow-sm"
                         >
                             <Plus className="w-4 h-4" />
                             <span>Tambah Kas / Bank</span>
                         </button>
+
+                        {/* Dropdown 3: Utilitas / Lainnya */}
+                        <div className="relative">
+                            <button
+                                type="button"
+                                aria-haspopup="menu"
+                                aria-expanded={openToolbarMenu === 'more'}
+                                aria-label="Menu lainnya"
+                                title="Utilitas & Lainnya"
+                                onClick={() => setOpenToolbarMenu(openToolbarMenu === 'more' ? null : 'more')}
+                                className={`inline-flex items-center justify-center p-2 rounded-xl border transition shadow-xs ${openToolbarMenu === 'more'
+                                    ? 'bg-slate-100 text-slate-900 border-slate-300'
+                                    : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50 hover:text-slate-900'
+                                    }`}
+                            >
+                                <MoreVertical className="w-4 h-4" />
+                            </button>
+
+                            {openToolbarMenu === 'more' && (
+                                <div role="menu" className="absolute right-0 z-30 mt-1.5 w-64 rounded-xl border border-slate-200 bg-white p-1.5 shadow-lg">
+                                    <div className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                                        Utilitas Sinkronisasi
+                                    </div>
+                                    <button
+                                        type="button"
+                                        role="menuitem"
+                                        onClick={() => {
+                                            setOpenToolbarMenu(null);
+                                            setBackfillForm({ from_date: '', to_date: localToday() });
+                                            setIsBackfillModalOpen(true);
+                                        }}
+                                        className="flex w-full items-start gap-2.5 rounded-lg px-3 py-2 text-left hover:bg-indigo-50/70 transition"
+                                    >
+                                        <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-indigo-100 text-indigo-700">
+                                            <History className="w-4 h-4" />
+                                        </span>
+                                        <div>
+                                            <div className="text-xs font-semibold text-slate-800">Catat Penjualan Lama</div>
+                                            <div className="text-[10px] text-slate-500">Sinkron penjualan tunai belum tercatat</div>
+                                        </div>
+                                    </button>
+                                    <button
+                                        type="button"
+                                        role="menuitem"
+                                        onClick={() => {
+                                            setOpenToolbarMenu(null);
+                                            setBackfillNonCashForm({ from_date: '', to_date: localToday() });
+                                            setIsBackfillNonCashModalOpen(true);
+                                        }}
+                                        className="flex w-full items-start gap-2.5 rounded-lg px-3 py-2 text-left hover:bg-violet-50/70 transition"
+                                    >
+                                        <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-violet-100 text-violet-700">
+                                            <History className="w-4 h-4" />
+                                        </span>
+                                        <div>
+                                            <div className="text-xs font-semibold text-slate-800">Catat Non-Tunai Lama</div>
+                                            <div className="text-[10px] text-slate-500">Sinkron QRIS, Debit &amp; Transfer lama</div>
+                                        </div>
+                                    </button>
+                                    <div className="my-1 border-t border-slate-100" />
+                                    <Link
+                                        href="/finance/accounts"
+                                        role="menuitem"
+                                        onClick={() => setOpenToolbarMenu(null)}
+                                        className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left hover:bg-slate-50 transition"
+                                    >
+                                        <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-blue-600">
+                                            <Layers className="w-4 h-4" />
+                                        </span>
+                                        <span className="text-xs font-semibold text-slate-800">Bagan Akun (COA)</span>
+                                    </Link>
+                                </div>
+                            )}
+                        </div>
                     </div>
                 </div>
 
@@ -1100,31 +1266,6 @@ export default function KasBank({
                             </div>
 
                             <div className="flex flex-wrap items-center gap-2">
-                                <button
-                                    type="button"
-                                    onClick={() => openOpeningModal('estimate')}
-                                    className="px-3 py-1.5 text-xs font-semibold rounded-xl border border-blue-300 bg-blue-50 text-blue-800 transition hover:bg-blue-100 flex items-center gap-1.5 shadow-2xs"
-                                >
-                                    <Wallet className="w-3.5 h-3.5 text-blue-600" />
-                                    <span>Atur Saldo Awal</span>
-                                </button>
-                                <button
-                                    type="button"
-                                    onClick={() => openOpnameModal(null)}
-                                    className="px-3 py-1.5 text-xs font-semibold rounded-xl border border-emerald-300 bg-emerald-50 text-emerald-800 transition hover:bg-emerald-100 flex items-center gap-1.5 shadow-2xs"
-                                >
-                                    <SlidersHorizontal className="w-3.5 h-3.5 text-emerald-600" />
-                                    <span>Sesuaikan Saldo Riil</span>
-                                </button>
-                                <button
-                                    type="button"
-                                    onClick={() => setIsHistoryModalOpen(true)}
-                                    className="px-3 py-1.5 text-xs font-semibold rounded-xl border border-slate-200 bg-white text-slate-700 transition hover:bg-slate-50 flex items-center gap-1.5 shadow-2xs"
-                                >
-                                    <History className="w-3.5 h-3.5 text-indigo-600" />
-                                    <span>Log Opname ({adjustmentLogs.length})</span>
-                                </button>
-
                                 <button
                                     type="button"
                                     onClick={() => {

@@ -305,7 +305,7 @@ class FinanceController extends Controller
             return Excel::download(new CashflowExport($reportDays), $fileName);
         }
         $kinerjaDays = $kinerjaOmzet->build($pharmacyIds, $startDate, $endDate);
-        $neracaData = $neracaReport->build($pharmacyIds, $startDate, $endDate, (int) getActivePharmacyId(), $kinerjaDays['days'] ?? null);
+        $neracaData = $neracaReport->build($pharmacyIds, $startDate, $endDate, (int) getActivePharmacyId());
         $drawerAccount = $this->branchKasBankAccountsQuery()->where('account_type', 'kas_apotek')->first();
         $openingBalance = $drawerAccount
             ? FinancePayment::where('payment_type', 'SALDO AWAL')->where('account_id', $drawerAccount->id)->first()
@@ -3427,22 +3427,52 @@ class FinanceController extends Controller
 
         $kinerjaService = new KinerjaOmzetService();
         $kinerja = $kinerjaService->build($pharmacyIds, $startDate, $endDate);
-        $summary = KinerjaOmzetService::summarizeDays($kinerja['days'] ?? []);
+        $days = $kinerja['days'] ?? [];
 
-        $penjualanTotal = (float) $summary['penjualan'];
-        $penjualanTunaiBank = (float) $summary['penjualan_tunai_bank'];
-        $penjualanKredit = (float) $summary['penjualan_kredit'];
-        $pembelianNetto = (float) $summary['pembelian'];
-        $pembelianBruto = (float) $summary['pembelian_bruto'];
-        $pembelianRetur = (float) $summary['pembelian_retur'];
-        $pembelianPbf = (float) $summary['pembelian_pbf'];
-        $pembelianCash = (float) $summary['pembelian_cash'];
-        $pembelianKonsinyasi = (float) $summary['pembelian_konsinyasi'];
-        $biayaTotal = (float) $summary['biaya'];
-        $pendapatanLainTotal = (float) $summary['pendapatan_lain'];
-        $diskonOffTotal = (float) $summary['diskon_off'];
-        $pendapatanTotal = (float) $summary['pendapatan'];
-        $labaTotal = (float) $summary['laba'];
+        $penjualanTotal = 0.0;
+        $penjualanTunaiBank = 0.0;
+        $penjualanKredit = 0.0;
+
+        $pembelianBruto = 0.0;
+        $pembelianPbf = 0.0;
+        $pembelianCash = 0.0;
+        $pembelianKonsinyasi = 0.0;
+        $pembelianRetur = 0.0;
+
+        $biayaTotal = 0.0;
+        $pendapatanLainTotal = 0.0;
+        $diskonOffTotal = 0.0;
+
+        foreach ($days as $day) {
+            $penjualanTotal += (float) ($day['sales']['total'] ?? 0);
+            $penjualanTunaiBank += (float) ($day['sales']['cashBankTotal'] ?? 0);
+            $penjualanKredit += (float) ($day['sales']['creditTotal'] ?? 0);
+
+            $pbf = (float) ($day['purchases']['pbf'] ?? 0);
+            $cash = (float) ($day['purchases']['cash'] ?? 0);
+            $cons = (float) ($day['purchases']['consignment'] ?? 0);
+            $ret = (float) ($day['purchases']['return'] ?? 0);
+
+            $pembelianPbf += $pbf;
+            $pembelianCash += $cash;
+            $pembelianKonsinyasi += $cons;
+            $pembelianBruto += ($pbf + $cash + $cons);
+            $pembelianRetur += $ret;
+
+            $biayaTotal += (float) ($day['expense'] ?? 0);
+            $pendapatanLainTotal += (float) ($day['other_income'] ?? 0);
+            $diskonOffTotal += (float) ($day['purchases']['discountOff'] ?? 0);
+        }
+
+        // Pembelian sesuai Laporan Pembelian Faktur dikurangi Retur Pembelian
+        // (Diskon Off dipisahkan dan dihitung di dalam kartu Pendapatan)
+        $pembelianNetto = $pembelianBruto - $pembelianRetur;
+
+        // Pendapatan = Pendapatan Lain-lain + Diskon Off
+        $pendapatanTotal = $pendapatanLainTotal + $diskonOffTotal;
+
+        // Laba = Penjualan - Pembelian - Biaya + Pendapatan
+        $labaTotal = $penjualanTotal - $pembelianNetto - $biayaTotal + $pendapatanTotal;
 
         $marginPersen = $penjualanTotal > 0
             ? round(($labaTotal / $penjualanTotal) * 100, 1)
@@ -3454,11 +3484,27 @@ class FinanceController extends Controller
             : 0.0;
 
         // Hitung Akumulasi (Year-To-Date dari awal tahun buku s/d periode yang dipilih)
-        $ytdBefore = KinerjaOmzetService::summarizeYtdBeforeMonth($pharmacyIds, $selectedYear, $selectedMonth);
-        $penjualanAkumulasi = $penjualanTotal + (float) $ytdBefore['penjualan'];
-        $pembelianAkumulasi = $pembelianNetto + (float) $ytdBefore['pembelian'];
-        $biayaAkumulasi = $biayaTotal + (float) $ytdBefore['biaya'];
-        $pendapatanAkumulasi = $pendapatanTotal + (float) $ytdBefore['pendapatan'];
+        $penjualanAkumulasi = $penjualanTotal;
+        $pembelianAkumulasi = $pembelianNetto;
+        $biayaAkumulasi = $biayaTotal;
+        $pendapatanAkumulasi = $pendapatanTotal;
+
+        if ($selectedMonth > 1) {
+            for ($m = 1; $m < $selectedMonth; $m++) {
+                $cacheKey = 'finance_monthly_sum_v2_' . implode('_', $pharmacyIds) . "_{$selectedYear}_{$m}";
+                $pastTotals = Cache::remember($cacheKey, 86400, function () use ($pharmacyIds, $selectedYear, $m) {
+                    $mStart = sprintf('%04d-%02d-01', $selectedYear, $m);
+                    $mEnd = \Carbon\Carbon::createFromDate($selectedYear, $m, 1)->endOfMonth()->toDateString();
+                    return $this->computePeriodTotals($pharmacyIds, $mStart, $mEnd);
+                });
+
+                $penjualanAkumulasi += (float) ($pastTotals['penjualan'] ?? 0);
+                $pembelianAkumulasi += (float) ($pastTotals['pembelian'] ?? 0);
+                $biayaAkgumulasi += (float) ($pastTotals['biaya'] ?? 0);
+                $pendapatanAkumulasi += (float) ($pastTotals['pendapatan'] ?? 0);
+            }
+        }
+
         $labaAkumulasi = $penjualanAkumulasi - $pembelianAkumulasi - $biayaAkumulasi + $pendapatanAkumulasi;
         $hppPersenAkumulasi = $penjualanAkumulasi > 0
             ? round(($pembelianAkumulasi / $penjualanAkumulasi) * 100, 1)
@@ -3515,14 +3561,40 @@ class FinanceController extends Controller
     {
         $kinerjaService = new KinerjaOmzetService();
         $kinerja = $kinerjaService->build($pharmacyIds, $startDate, $endDate);
-        $summary = KinerjaOmzetService::summarizeDays($kinerja['days'] ?? []);
+        $days = $kinerja['days'] ?? [];
+
+        $penjualanTotal = 0.0;
+        $pembelianBruto = 0.0;
+        $pembelianRetur = 0.0;
+        $biayaTotal = 0.0;
+        $pendapatanLainTotal = 0.0;
+        $diskonOffTotal = 0.0;
+
+        foreach ($days as $day) {
+            $penjualanTotal += (float) ($day['sales']['total'] ?? 0);
+            $pbf = (float) ($day['purchases']['pbf'] ?? 0);
+            $cash = (float) ($day['purchases']['cash'] ?? 0);
+            $cons = (float) ($day['purchases']['consignment'] ?? 0);
+            $ret = (float) ($day['purchases']['return'] ?? 0);
+
+            $pembelianBruto += ($pbf + $cash + $cons);
+            $pembelianRetur += $ret;
+
+            $biayaTotal += (float) ($day['expense'] ?? 0);
+            $pendapatanLainTotal += (float) ($day['other_income'] ?? 0);
+            $diskonOffTotal += (float) ($day['purchases']['discountOff'] ?? 0);
+        }
+
+        $pembelianNetto = $pembelianBruto - $pembelianRetur;
+        $pendapatanTotal = $pendapatanLainTotal + $diskonOffTotal;
+        $labaTotal = $penjualanTotal - $pembelianNetto - $biayaTotal + $pendapatanTotal;
 
         return [
-            'penjualan' => $summary['penjualan'],
-            'pembelian' => $summary['pembelian'],
-            'biaya' => $summary['biaya'],
-            'pendapatan' => $summary['pendapatan'],
-            'laba' => $summary['laba'],
+            'penjualan' => round($penjualanTotal, 2),
+            'pembelian' => round($pembelianNetto, 2),
+            'biaya' => round($biayaTotal, 2),
+            'pendapatan' => round($pendapatanTotal, 2),
+            'laba' => round($labaTotal, 2),
         ];
     }
 
