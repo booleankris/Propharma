@@ -853,6 +853,9 @@ class SalesController extends Controller
                     'user_id' => auth()->id(),
                     'debtor_id' => $request->filled('debtor_id') ? $request->get('debtor_id') : ($parentTransaction?->debtor_id ?? null),
                     'transaction_type' => $fallbackType,
+                    'service_invoice_type' => strtoupper((string) $fallbackType) === 'JASA'
+                        ? $this->normalizeServiceInvoiceType($parentTransaction?->service_invoice_type)
+                        : null,
                     'transaction_code' => null,
                     'subtotal' => null,
                     'discount' => null,
@@ -880,8 +883,12 @@ class SalesController extends Controller
                 }
             }
 
+            $effectiveTransactionType = strtoupper((string) $parentTransaction->transaction_type) === 'JASA'
+                ? $this->normalizeServiceInvoiceType($parentTransaction->service_invoice_type)
+                : strtoupper((string) $parentTransaction->transaction_type);
+
             $isRecipe = (int) $request->get('racikstatus') === 1;
-            if ($isRecipe && !in_array($parentTransaction->transaction_type, ['RESEP TUNAI', 'KREDIT'], true)) {
+            if ($isRecipe && !in_array($effectiveTransactionType, ['RESEP TUNAI', 'KREDIT'], true)) {
                 abort(422, 'Racikan hanya dapat ditambahkan pada resep tunai atau kredit.');
             }
 
@@ -1292,7 +1299,9 @@ class SalesController extends Controller
                     'success' => true,
                     'transaction_id' => $transaction->id,
                     'transaction_type' => $transaction->transaction_type,
-                    'is_recipe' => in_array($transaction->transaction_type, ['RESEP TUNAI', 'KREDIT', 'RESEP KREDIT'], true),
+                    'is_recipe' => in_array($transaction->transaction_type, ['RESEP TUNAI', 'KREDIT', 'RESEP KREDIT'], true)
+                        || (strtoupper((string) $transaction->transaction_type) === 'JASA'
+                            && $this->normalizeServiceInvoiceType($transaction->service_invoice_type) === 'RESEP TUNAI'),
                     'print_url' => route('sales.print', $transaction->id),
                     'print_resep_url' => route('salesrecipe.print', $transaction->id),
                     'commands' => $this->buildEscPos($transaction),
@@ -1619,7 +1628,9 @@ class SalesController extends Controller
                 'success' => true,
                 'transaction_id' => $transaction->id,
                 'transaction_type' => $transaction->transaction_type,
-                'is_recipe' => in_array($transaction->transaction_type, ['RESEP TUNAI', 'KREDIT', 'RESEP KREDIT'], true),
+                'is_recipe' => in_array($transaction->transaction_type, ['RESEP TUNAI', 'KREDIT', 'RESEP KREDIT'], true)
+                    || (strtoupper((string) $transaction->transaction_type) === 'JASA'
+                        && $this->normalizeServiceInvoiceType($transaction->service_invoice_type) === 'RESEP TUNAI'),
                 'print_url' => route('sales.print', $transaction->id),
                 'print_resep_url' => route('salesrecipe.print', $transaction->id),
                 'commands' => $this->buildEscPos($txWithItems),

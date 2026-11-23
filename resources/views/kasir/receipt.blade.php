@@ -127,7 +127,7 @@
             <td class="info-colon">:</td>
             <td class="info-value">{{ $transaction->patients->phone ?? '-' }}</td>
         </tr>
-        @if (in_array($transaction->transaction_type, ['RESEP TUNAI', 'KREDIT']))
+        @if (in_array($transaction->transaction_type, ['RESEP TUNAI', 'KREDIT']) || (strtoupper((string) $transaction->transaction_type) === 'JASA' && strtoupper((string) $transaction->service_invoice_type) === 'RESEP TUNAI'))
             <tr>
                 <td class="info-label">Dokter</td>
                 <td class="info-colon">:</td>
