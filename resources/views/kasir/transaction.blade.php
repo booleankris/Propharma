@@ -5757,42 +5757,63 @@
             );
 
             const transaction_items =
-                response.data.itemTransaction;
+                Array.isArray(response.data.itemTransaction) ? response.data.itemTransaction : [];
 
             const transaction =
-                response.data.transaction;
+                response.data.transaction || null;
+
+            const transactionHeader =
+                response.data.transaction_header || (transaction && transaction.transactions) || null;
 
             if (response.data.cart_sync) {
                 syncCartFromServer(response.data.cart_sync, 0);
             }
 
-            // FILL HEADER
+            // FILL HEADER (aman untuk transaksi JASA tanpa item obat)
             document.getElementById('receipt').textContent =
-                transaction.transactions.transaction_code;
+                (transactionHeader && transactionHeader.transaction_code) || '-';
 
             document.getElementById('type').textContent =
-                transaction.transactions.transaction_type;
+                (transactionHeader && transactionHeader.transaction_type) || currenttransaction || '-';
 
             document.getElementById('cashier').textContent =
-                transaction.user.name;
+                (transaction && transaction.user && transaction.user.name) ||
+                (transactionHeader && transactionHeader.user && transactionHeader.user.name) ||
+                @json(auth()->user()->name ?? 'Kasir');
 
             document.getElementById('customer').textContent =
                 'Client';
 
             // CLEAR ITEMS
-            document.getElementById('invoiceItems').innerHTML = '';
+            const invoiceItemsEl = document.getElementById('invoiceItems');
+            invoiceItemsEl.innerHTML = '';
 
             // FILL ITEMS
             transaction_items.forEach(item => {
-
-                document.getElementById('invoiceItems').innerHTML += `
-                <tr>
-                    <td>${item.medicine.name}</td>
-                    <td>${item.quantity}</td>
-                    <td>${formatRupiah(item.total_price)}</td>
-                </tr>
-            `;
+                const tr = document.createElement('tr');
+                const tdName = document.createElement('td');
+                tdName.textContent = (item.medicine && item.medicine.name) || '-';
+                const tdQty = document.createElement('td');
+                tdQty.textContent = item.quantity;
+                const tdPrice = document.createElement('td');
+                tdPrice.textContent = formatRupiah(item.total_price);
+                tr.append(tdName, tdQty, tdPrice);
+                invoiceItemsEl.appendChild(tr);
             });
+
+            // FILL JASA (bila transaksi bertipe JASA)
+            const syncedService = response.data.cart_sync && response.data.cart_sync.service;
+            if (syncedService && syncedService.name) {
+                const tr = document.createElement('tr');
+                const tdName = document.createElement('td');
+                tdName.textContent = syncedService.name;
+                const tdQty = document.createElement('td');
+                tdQty.textContent = '1';
+                const tdPrice = document.createElement('td');
+                tdPrice.textContent = formatRupiah(syncedService.price || 0);
+                tr.append(tdName, tdQty, tdPrice);
+                invoiceItemsEl.appendChild(tr);
+            }
 
             // TOTAL
             document.getElementById('invoiceTotal').innerHTML = `

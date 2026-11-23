@@ -1690,6 +1690,24 @@ class SalesController extends Controller
             $cmds[] = $left . $right . "\n";
         }
 
+        // Jasa (khusus transaksi tipe JASA): tampil di struk & menambah total.
+        $service = TransactionService::where('medicine_transaction_id', $tx->id)->first();
+        $serviceAmount = (float) ($service->price ?? 0);
+        if ($service) {
+            $cmds[] = mb_substr((string) $service->service_name, 0, $width) . "\n";
+            $left = str_pad(
+                '1 x ' . number_format($serviceAmount, 0, ',', '.'),
+                $width - 12
+            );
+            $right = str_pad(
+                number_format($serviceAmount, 0, ',', '.'),
+                12,
+                ' ',
+                STR_PAD_LEFT
+            );
+            $cmds[] = $left . $right . "\n";
+        }
+
         $cmds[] = str_repeat('-', $width) . "\n";
 
         // ── Totals ───────────────────────────────────────────────────
@@ -1698,9 +1716,9 @@ class SalesController extends Controller
             str_pad(number_format($value, 0, ',', '.'), 12, ' ', STR_PAD_LEFT) . "\n";
 
         // Sub Total
-        $totalRawTotal = $tx->transactions->sum('raw_total');
+        $totalRawTotal = $tx->transactions->sum('raw_total') + $serviceAmount;
         $totaldiscount = $tx->discount ?? 0;
-        $payment = $totalRawTotal - $totaldiscount;
+        $payment = max(0, $totalRawTotal - $totaldiscount);
 
         $cmds[] = $row('Sub Total', $totalRawTotal);
         $cmds[] = $row('Discount', -$totaldiscount);
@@ -1737,12 +1755,22 @@ class SalesController extends Controller
             ->where('status', 0)
             ->orderBy('id', 'asc')
             ->get();
+        $parentTransaction = MedicineTransactions::with('user')->find($transactionId);
         $transaction = $itemTransaction->first();
+        if (!$transaction && $parentTransaction) {
+            // Transaksi tipe JASA dapat diproses tanpa item obat di keranjang.
+            $transaction = [
+                'transaction_id' => $parentTransaction->id,
+                'transactions' => $parentTransaction,
+                'user' => $parentTransaction->user ?? Auth::user(),
+            ];
+        }
         $syncPayload = $this->buildCartSyncPayload($transactionId);
 
         return response()->json([
             'success' => true,
             'transaction' => $transaction,
+            'transaction_header' => $parentTransaction,
             'itemTransaction' => $itemTransaction,
             'cart_sync' => $syncPayload,
         ]);
