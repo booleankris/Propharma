@@ -123,7 +123,13 @@ class RecipeDetailSheet implements FromArray, WithStyles, WithColumnWidths, With
             'shift_logs.shift',
         ])
             ->where('pharmacy_id', $this->pharmacyId)
-            ->whereIn('transaction_type', ['RESEP TUNAI', 'KREDIT', 'RESEP KREDIT']);
+            ->where(function ($q) {
+                $q->whereIn('transaction_type', ['RESEP TUNAI', 'KREDIT', 'RESEP KREDIT'])
+                    ->orWhere(function ($jasa) {
+                        $jasa->where('transaction_type', 'JASA')
+                            ->whereRaw("UPPER(TRIM(COALESCE(service_invoice_type, ''))) = 'RESEP TUNAI'");
+                    });
+            });
 
         LiphTransactionScope::applySalesStatus($query);
         LiphTransactionScope::applyPeriod(
@@ -164,6 +170,7 @@ class RecipeDetailSheet implements FromArray, WithStyles, WithColumnWidths, With
                 $layanan = 'UM';
             }
 
+            // Harga jasa tidak masuk LIPH / Daftar Resep; hanya item obatnya saja (jika ada).
             if ($resepItems->isEmpty()) continue;
 
             // Hitung netto item setelah memperhitungkan retur (selaras dengan Sheet 2 Rekap Lembar Resep)
@@ -488,7 +495,13 @@ class RecipeMonthlySummarySheet implements FromArray, WithStyles, WithColumnWidt
             'returs' => fn ($q) => $q->where('status', 1),
         ])
             ->where('pharmacy_id', $this->pharmacyId)
-            ->whereIn('transaction_type', ['RESEP TUNAI', 'KREDIT', 'RESEP KREDIT']);
+            ->where(function ($q) {
+                $q->whereIn('transaction_type', ['RESEP TUNAI', 'KREDIT', 'RESEP KREDIT'])
+                    ->orWhere(function ($jasa) {
+                        $jasa->where('transaction_type', 'JASA')
+                            ->whereRaw("UPPER(TRIM(COALESCE(service_invoice_type, ''))) = 'RESEP TUNAI'");
+                    });
+            });
 
         LiphTransactionScope::applySalesStatus($query);
         LiphTransactionScope::applyPeriod($query, $yearStart, $yearEnd);

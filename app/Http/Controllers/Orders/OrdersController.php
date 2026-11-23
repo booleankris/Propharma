@@ -197,6 +197,7 @@ class OrdersController extends Controller
     {
         $pharmacyId = getPurchasingPharmacyId();
         $now = Carbon::now()->format('d/m/Y');
+        Order::syncStatusWithReceiving($pharmacyId ? [(int) $pharmacyId] : null);
 
         // 1. If explicit order_id is requested
         if ($request->filled('order_id')) {
@@ -205,16 +206,35 @@ class OrdersController extends Controller
                 ->first();
 
             if ($order) {
+                $hasReceiving = ReceivingItems::whereHas('order_items', function ($q) use ($order) {
+                    $q->where('order_id', $order->id);
+                })->exists();
+
+                if ((int) $order->status === 3) {
+                    return redirect()->route('receiving.index')
+                        ->with('success', 'Pesanan ini sudah selesai diterima.');
+                }
+
+                if ($hasReceiving || in_array((int) $order->status, [1, 2], true)) {
+                    if ((int) $order->status === 0 && $hasReceiving) {
+                        $order->update(['status' => 2]);
+                    }
+
+                    return redirect()->route('receiving.receive', $order->id)
+                        ->with('warning', 'Pesanan ini sudah masuk proses penerimaan barang.');
+                }
+
                 $order_id = $order->id;
                 $order_code = $order->code;
                 $d_price = OrderItems::where('order_id', $order_id)->where('status', '0')->sum('total') ?? 0;
                 $d_ppn = floor($d_price * 0.11) ?? 0;
                 $d_total = $d_price + $d_ppn ?? 0;
 
-                // Get other active drafts in this pharmacy for easy switching
+                // Get other active drafts in this pharmacy for easy switching (exclude orders that already have receiving)
                 $otherDrafts = Order::where('pharmacy_id', $pharmacyId)
                     ->where('status', 0)
                     ->where('id', '!=', $order_id)
+                    ->whereDoesntHave('order_items.receivingItems')
                     ->orderBy('id', 'desc')
                     ->get(['id', 'code', 'date']);
 
@@ -228,9 +248,10 @@ class OrdersController extends Controller
             return redirect()->route('orders.create', ['order_id' => $order->id]);
         }
 
-        // 3. Default: find latest open draft or create a new one
+        // 3. Default: find latest open draft (without receiving) or create a new one
         $latestDraft = Order::where('pharmacy_id', $pharmacyId)
             ->where('status', 0)
+            ->whereDoesntHave('order_items.receivingItems')
             ->orderBy('id', 'desc')
             ->first();
 

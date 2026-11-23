@@ -127,30 +127,46 @@ class LiphExport implements FromArray, WithStyles, WithColumnWidths, WithTitle
         );
     }
 
+    private function resolveParentTransactionType($trx): string
+    {
+        $rawType = strtoupper(trim((string) ($trx->transaction_type ?? '')));
+        if ($rawType !== 'JASA') {
+            return $rawType;
+        }
+
+        $invoiceType = strtoupper(trim((string) ($trx->service_invoice_type ?? '')));
+        return match ($invoiceType) {
+            'RESEP TUNAI', 'UM' => 'RESEP TUNAI',
+            'HV/OTC', 'HV', 'OTC' => 'HV/OTC',
+            default => 'UPDS',
+        };
+    }
+
     private function buildReportData(): array
     {
         $grouped = [];
+        $allowedTypes = array_merge(array_keys(self::TYPE_MAP), ['JASA']);
 
         if ($this->shiftType == "shift") {
             $transactions = MedicineTransactions::with([
                 'transactions' => fn($q) => $q->where('status', 1),
-                'shift_logs'
+                'shift_logs',
             ])
                 ->where('pharmacy_id', $this->pharmacyId)
                 ->tap(fn (Builder $query) => $this->applySalesStatusScope($query))
                 ->tap(fn (Builder $query) => $this->applyReportPeriod($query))
-                ->whereIn('transaction_type', array_keys(self::TYPE_MAP))
+                ->whereIn('transaction_type', $allowedTypes)
                 ->get();
 
             $grouped = $this->groupTransactions($transactions);
         } else if ($this->shiftType == 'semua') {
             $transactions = MedicineTransactions::with([
-                'transactions' => fn($q) => $q->where('status', 1)
+                'transactions' => fn($q) => $q->where('status', 1),
             ])
                 ->where('pharmacy_id', $this->pharmacyId)
                 ->tap(fn (Builder $query) => $this->applySalesStatusScope($query))
                 ->tap(fn (Builder $query) => $this->applyReportPeriod($query))
-                ->whereIn('transaction_type', array_keys(self::TYPE_MAP))
+                ->whereIn('transaction_type', $allowedTypes)
                 ->get();
 
             $grouped = $this->groupTransactions($transactions);
@@ -160,12 +176,12 @@ class LiphExport implements FromArray, WithStyles, WithColumnWidths, WithTitle
                 'transactions' => fn($q) => $q->where('status', 1),
                 'transactions.user',
                 'user',
-                'shift_logs.user'
+                'shift_logs.user',
             ])
                 ->where('pharmacy_id', $this->pharmacyId)
                 ->tap(fn (Builder $query) => $this->applySalesStatusScope($query))
                 ->tap(fn (Builder $query) => $this->applyReportPeriod($query))
-                ->whereIn('transaction_type', array_keys(self::TYPE_MAP))
+                ->whereIn('transaction_type', $allowedTypes)
                 ->tap(fn (Builder $query) => LiphTransactionScope::applyOnlineScope($query, $roleName))
                 ->get();
 
@@ -173,12 +189,12 @@ class LiphExport implements FromArray, WithStyles, WithColumnWidths, WithTitle
         } else {
             // Fallback for any other shiftType
             $transactions = MedicineTransactions::with([
-                'transactions' => fn($q) => $q->where('status', 1)
+                'transactions' => fn($q) => $q->where('status', 1),
             ])
                 ->where('pharmacy_id', $this->pharmacyId)
                 ->tap(fn (Builder $query) => $this->applySalesStatusScope($query))
                 ->tap(fn (Builder $query) => $this->applyReportPeriod($query))
-                ->whereIn('transaction_type', array_keys(self::TYPE_MAP))
+                ->whereIn('transaction_type', $allowedTypes)
                 ->get();
 
             $grouped = $this->groupTransactions($transactions);
@@ -204,14 +220,22 @@ class LiphExport implements FromArray, WithStyles, WithColumnWidths, WithTitle
         $grouped = [];
 
         foreach ($transactions as $trx) {
-            $originalMap = self::TYPE_MAP[$trx->transaction_type] ?? null;
+            $parentType = $this->resolveParentTransactionType($trx);
+            $originalMap = self::TYPE_MAP[$parentType] ?? null;
             if (!$originalMap) continue;
 
             [, $originalLabel] = $originalMap;
+            $isServiceTrx = strtoupper(trim((string) ($trx->transaction_type ?? ''))) === 'JASA';
 
             // Strictly filter cart items by status = 1 (exclude drafts/cancelled)
             $items = $trx->transactions->where('status', 1);
             $totalItems = $items->count();
+
+            // Transaksi JASA: harga jasa & ongkir tidak masuk LIPH.
+            // Jika tidak ada item obat sama sekali, jangan masukkan nominal/lembar apapun ke LIPH.
+            if ($isServiceTrx && $totalItems === 0) {
+                continue;
+            }
 
             $isReturnTrx = in_array($originalLabel, ['Retur Tunai', 'Retur Kredit'], true);
 
@@ -244,14 +268,14 @@ class LiphExport implements FromArray, WithStyles, WithColumnWidths, WithTitle
             // Bucket cart items by effective type label
             $byLabel = [];
             foreach ($items as $item) {
-                if ($trx->transaction_type === 'KREDIT') {
+                if ($parentType === 'KREDIT') {
                     // A switched item may retain UPDS/HV as its database invoice
                     // type, but LIPH must count the parent sale as credit.
                     $effectiveType = 'KREDIT';
                 } elseif ($item->cart_type) {
                     $effectiveType = self::CART_TYPE_ABBR[$item->cart_type] ?? $item->cart_type;
                 } else {
-                    $effectiveType = $trx->transaction_type;
+                    $effectiveType = $parentType;
                 }
 
                 $map = self::TYPE_MAP[$effectiveType] ?? $originalMap;

@@ -68,11 +68,28 @@ class LiphPdfExport
         return $pdf->download($filename);
     }
 
+    private function resolveParentTransactionType($trx): string
+    {
+        $rawType = strtoupper(trim((string) ($trx->transaction_type ?? '')));
+        if ($rawType !== 'JASA') {
+            return $rawType;
+        }
+
+        $invoiceType = strtoupper(trim((string) ($trx->service_invoice_type ?? '')));
+        return match ($invoiceType) {
+            'RESEP TUNAI', 'UM' => 'RESEP TUNAI',
+            'HV/OTC', 'HV', 'OTC' => 'HV/OTC',
+            default => 'UPDS',
+        };
+    }
+
     private function buildData(): array
     {
-        $query = MedicineTransactions::with(['transactions' => fn($q) => $q->where('status', 1)])
+        $query = MedicineTransactions::with([
+            'transactions' => fn($q) => $q->where('status', 1),
+        ])
             ->where('pharmacy_id', $this->pharmacyId)
-            ->whereIn('transaction_type', array_keys(self::TYPE_MAP));
+            ->whereIn('transaction_type', array_merge(array_keys(self::TYPE_MAP), ['JASA']));
 
         LiphTransactionScope::applySalesStatus($query);
         LiphTransactionScope::applyPeriod($query, $this->startDate, $this->endDate);
@@ -82,11 +99,20 @@ class LiphPdfExport
         $grouped = [];
 
         foreach ($transactions as $trx) {
-            $originalMap = self::TYPE_MAP[$trx->transaction_type] ?? null;
+            $parentType = $this->resolveParentTransactionType($trx);
+            $originalMap = self::TYPE_MAP[$parentType] ?? null;
             if (!$originalMap) continue;
 
             [, $originalLabel] = $originalMap;
+            $isServiceTrx = strtoupper(trim((string) ($trx->transaction_type ?? ''))) === 'JASA';
             $items = $trx->transactions->where('status', 1);
+
+            // Transaksi JASA: harga jasa & ongkir tidak masuk LIPH.
+            // Jika tidak ada item obat sama sekali, jangan masukkan nominal/lembar apapun ke LIPH.
+            if ($isServiceTrx && $items->isEmpty()) {
+                continue;
+            }
+
             $isReturnTrx = in_array($originalLabel, ['Retur Tunai', 'Retur Kredit'], true);
 
             if ($items->isEmpty() || $isReturnTrx) {
@@ -112,12 +138,12 @@ class LiphPdfExport
 
             $byLabel = [];
             foreach ($items as $item) {
-                if ($trx->transaction_type === 'KREDIT') {
+                if ($parentType === 'KREDIT') {
                     $effectiveType = 'KREDIT';
                 } elseif ($item->cart_type) {
                     $effectiveType = self::CART_TYPE_ABBR[$item->cart_type] ?? $item->cart_type;
                 } else {
-                    $effectiveType = $trx->transaction_type;
+                    $effectiveType = $parentType;
                 }
                 $map = self::TYPE_MAP[$effectiveType] ?? $originalMap;
                 [$grp, $lbl] = $map;

@@ -406,11 +406,13 @@
             const data = orderItemsTable ? orderItemsTable.row(this).data() : null;
             if (!data) return;
 
-            if (data.status == 0) {
+            const effectiveStatus = data.effective_status !== undefined ? Number(data.effective_status) : Number(data.status);
+
+            if (effectiveStatus === 0) {
                 window.location.href = "{{ route('orders.create') }}?order_id=" + data.id;
-            } else if (data.status == 1 || data.status == 2) {
+            } else if (effectiveStatus === 1 || effectiveStatus === 2) {
                 window.location.href = "/receive/" + data.id;
-            } else if (data.status == 3) {
+            } else if (effectiveStatus === 3) {
                 window.location.href = "/orders/" + data.id + "/revision";
             }
         });

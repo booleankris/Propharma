@@ -41,4 +41,18 @@ class Order extends Model
     {
         return $this->belongsTo(User::class, 'user_id');
     }
+
+    /**
+     * Naikkan otomatis orders berstatus 0 (PENDING) menjadi 2 (DIPESAN / dalam penerimaan)
+     * jika di dalamnya sudah terdapat item penerimaan (draft maupun sudah masuk stok).
+     */
+    public static function syncStatusWithReceiving(?array $pharmacyIds = null, ?array $orderIds = null): int
+    {
+        return static::query()
+            ->where('status', 0)
+            ->when(!empty($pharmacyIds), fn ($q) => $q->whereIn('pharmacy_id', $pharmacyIds))
+            ->when(!empty($orderIds), fn ($q) => $q->whereIn('id', $orderIds))
+            ->whereHas('order_items.receivingItems')
+            ->update(['status' => 2]);
+    }
 }

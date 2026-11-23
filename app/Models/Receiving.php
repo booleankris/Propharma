@@ -51,12 +51,16 @@ class Receiving extends Model
      */
     public static function syncPostedZeroStatus(?array $pharmacyIds = null, ?array $receivingIds = null): int
     {
-        return static::query()
+        $updated = static::query()
             ->where('status', 0)
             ->when(!empty($pharmacyIds), fn ($q) => $q->whereIn('pharmacy_id', $pharmacyIds))
             ->when(!empty($receivingIds), fn ($q) => $q->whereIn('id', $receivingIds))
             ->whereHas('receiving_details.receiving_items', fn ($q) => $q->whereNotNull('batches_id'))
             ->update(['status' => 2]);
+
+        Order::syncStatusWithReceiving($pharmacyIds);
+
+        return $updated;
     }
 }
 

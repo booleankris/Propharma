@@ -1469,8 +1469,11 @@ class ReceivingController extends Controller
 
     public function orderList(Request $request)
     {
+        $purchasingPharmacyId = getPurchasingPharmacyId();
+        Order::syncStatusWithReceiving($purchasingPharmacyId ? [(int) $purchasingPharmacyId] : null);
+
         $items = Order::query()
-            ->where('pharmacy_id', getPurchasingPharmacyId())
+            ->where('pharmacy_id', $purchasingPharmacyId)
             ->with(['order_items.receivingItems.receiving_details'])
             ->withCount('order_items')
             ->withCount(['order_items as active_items_count' => function ($q) {
@@ -1556,6 +1559,13 @@ class ReceivingController extends Controller
 
                 return $html;
             })
+            ->addColumn('effective_status', function ($row) {
+                $hasReceivingItems = $row->relationLoaded('order_items') && $row->order_items->contains(function ($oi) {
+                    return $oi->receivingItems->isNotEmpty();
+                });
+
+                return ((int) $row->status === 0 && $hasReceivingItems) ? 2 : (int) $row->status;
+            })
             // Status badge — pakai raw inline style, bukan class Tailwind, supaya warnanya
             // pasti render tanpa tergantung content-scanning/build Tailwind (ini yang bikin
             // titik statusnya sempat tidak muncul sebelumnya)
@@ -1566,7 +1576,12 @@ class ReceivingController extends Controller
                     'pending' => ['label' => 'PENDING', 'text' => '#be123c', 'bg' => '#fff1f2', 'border' => '#fecdd3', 'dot' => '#f43f5e'],
                 ];
 
-                $key = $row->status == 3 ? 'diterima' : (in_array($row->status, [1, 2]) ? 'dipesan' : 'pending');
+                $hasReceivingItems = $row->relationLoaded('order_items') && $row->order_items->contains(function ($oi) {
+                    return $oi->receivingItems->isNotEmpty();
+                });
+                $effectiveStatus = ((int) $row->status === 0 && $hasReceivingItems) ? 2 : (int) $row->status;
+
+                $key = $effectiveStatus == 3 ? 'diterima' : (in_array($effectiveStatus, [1, 2], true) ? 'dipesan' : 'pending');
                 $v = $variants[$key];
 
                 return '<span style="display:inline-flex; align-items:center; gap:6px; padding:4px 12px; border-radius:9999px; font-size:12px; font-weight:600; color:' . $v['text'] . '; background-color:' . $v['bg'] . '; border:1px solid ' . $v['border'] . ';">'
@@ -1577,6 +1592,13 @@ class ReceivingController extends Controller
             // Action buttons — Split Button Group (Primary + ••• Dropdown)
             ->addColumn('action', function ($row) {
                 $isEmpty = (($row->order_items_count ?? 0) == 0) || (($row->active_items_count ?? 0) == 0);
+                $hasDraftItems = false;
+                if ($row->relationLoaded('order_items')) {
+                    $hasDraftItems = $row->order_items->contains(function ($oi) {
+                        return $oi->receivingItems->isNotEmpty();
+                    });
+                }
+                $effectiveStatus = ((int) $row->status === 0 && $hasDraftItems) ? 2 : (int) $row->status;
 
                 // Helper untuk action item di dalam dropdown menu
                 $menuItem = function (string $href, string $label, string $iconSvg, string $colorClass = 'text-slate-700 hover:bg-slate-50', bool $blank = false) {
@@ -1598,8 +1620,8 @@ class ReceivingController extends Controller
                     '<path stroke-linecap="round" stroke-linejoin="round" d="M7 16V4m0 0L3 8m4-4l4 4m6 4v12m0 0l4-4m-4 4l-4-4"/>'
                 );
 
-                // STATUS 0: PENDING (Blue Solid Split Button)
-                if ($row->status == 0) {
+                // STATUS 0: PENDING (hanya jika belum ada penerimaan sama sekali)
+                if ($effectiveStatus == 0) {
                     $dropdownItems = ($isEmpty ? $deleteMenuItem : $menuItem(route('orders.create', ['order_id' => $row->id]), 'Buka Pesanan', '<path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 0 1 0-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.964-7.178Z"/><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z"/>'));
 
                     return '<div class="btn-split-group btn-split-blue inline-flex items-stretch rounded-lg shadow-xs overflow-hidden">'
@@ -1618,21 +1640,14 @@ class ReceivingController extends Controller
                         . '</div>';
                 }
 
-                $hasDraftItems = false;
-                if ($row->relationLoaded('order_items')) {
-                    $hasDraftItems = $row->order_items->contains(function ($oi) {
-                        return $oi->receivingItems->isNotEmpty();
-                    });
-                }
-
                 $rincianItem = $menuItem(
                     '/orders/' . $row->id . '/rincian',
                     'Rincian',
                     '<path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z"/>'
                 );
 
-                // STATUS 1 & 2: DIPESAN (Emerald Solid Split Button - Sesuai Mockup Pengguna)
-                if ($row->status == 1 || $row->status == 2) {
+                // STATUS 1 & 2: DIPESAN / DALAM PENERIMAAN (Emerald Solid Split Button)
+                if ($effectiveStatus == 1 || $effectiveStatus == 2) {
                     $dropdownItems = ($hasDraftItems ? $rincianItem : '') . $compareItem . ($isEmpty ? '<div class="my-1 border-t border-slate-100"></div>' . $deleteMenuItem : '');
 
                     return '<div class="btn-split-group btn-split-emerald inline-flex items-stretch rounded-lg shadow-xs overflow-hidden">'
@@ -3311,22 +3326,22 @@ class ReceivingController extends Controller
         $getOrder = Order::findOrFail($id);
         $orderPharmacyId = $getOrder->pharmacy_id;
 
-        $transaction = null;
-        if ($getOrder->receiving_id) {
+        // Prioritaskan header receiving yang sudah memiliki item penerimaan untuk BPBA ini
+        // (termasuk yang berstatus 2 setelah sebagian faktur disimpan ke stok).
+        $transaction = Receiving::with('receiving_details')
+            ->where('status', '!=', 3)
+            ->where('pharmacy_id', $orderPharmacyId)
+            ->whereHas('receiving_details.receiving_items.order_items', function ($q) use ($id) {
+                $q->where('order_id', $id);
+            })
+            ->orderByDesc('id')
+            ->first();
+
+        if (!$transaction && $getOrder->receiving_id) {
             $transaction = Receiving::with('receiving_details')
-                ->where('status', 0)
+                ->where('status', '!=', 3)
                 ->where('pharmacy_id', $orderPharmacyId)
                 ->find($getOrder->receiving_id);
-        }
-
-        if (!$transaction) {
-            $transaction = Receiving::with('receiving_details')
-                ->where('status', 0)
-                ->where('pharmacy_id', $orderPharmacyId)
-                ->whereHas('receiving_details.receiving_items.order_items', function ($q) use ($id) {
-                    $q->where('order_id', $id);
-                })
-                ->first();
         }
 
         if ($getOrder->status == 3) {
@@ -3381,15 +3396,28 @@ class ReceivingController extends Controller
         }
 
         $receiving_id = $transaction->id;
-        if (!$getOrder->receiving_id || $getOrder->receiving_id != $transaction->id) {
-            $getOrder->update(['receiving_id' => $transaction->id]);
+        $orderUpdates = [];
+        if (!$getOrder->receiving_id || (int) $getOrder->receiving_id !== (int) $transaction->id) {
+            $orderUpdates['receiving_id'] = $transaction->id;
         }
+        if ((int) $getOrder->status === 0 && $allFakturs->isNotEmpty()) {
+            $orderUpdates['status'] = 2;
+        }
+        if (!empty($orderUpdates)) {
+            $getOrder->update($orderUpdates);
+        }
+
         $receiving_code = $transaction->code;
         $order_id = $getOrder->id;
         $order_code = $getOrder->code;
 
         $receivingDetails = ReceivingDetails::with(['receiving_items.order_items.medicines', 'creditor'])
-            ->where('receiving_id', $transaction->id)
+            ->where(function ($q) use ($id, $transaction) {
+                $q->where('receiving_id', $transaction->id)
+                    ->orWhereHas('receiving_items.order_items', function ($oq) use ($id) {
+                        $oq->where('order_id', $id);
+                    });
+            })
             ->get();
 
         $summary = self::summarizeReceivingDetailsByPrintRule($receivingDetails);
@@ -3547,6 +3575,10 @@ class ReceivingController extends Controller
                 } else {
                     $item = ReceivingItems::create($itemData);
                 }
+            }
+
+            if ((int) $sourceOrder->status === 0) {
+                $sourceOrder->update(['status' => 2]);
             }
 
             DB::commit();
@@ -3946,7 +3978,7 @@ class ReceivingController extends Controller
             if (!empty($postedReceivingIds)) {
                 Receiving::syncPostedZeroStatus(null, $postedReceivingIds);
             }
-            if ($order && $order->status == 1) {
+            if ($order && in_array((int) $order->status, [0, 1], true)) {
                 $order->update(['status' => 2]);
             }
 

@@ -80,9 +80,24 @@ class MonitoringPenjualanService
         return $transactionType === 'ONLINE' ? 'onlineDigital' : null;
     }
 
-    private function effectiveItemType($item, string $transactionType): ?string
+    private function resolveParentTransactionType(string $transactionType, ?string $serviceInvoiceType = null): string
     {
-        $normalizedTrxType = mb_strtoupper(trim($transactionType));
+        $normalized = mb_strtoupper(trim($transactionType));
+        if ($normalized !== 'JASA') {
+            return $normalized;
+        }
+
+        $inv = mb_strtoupper(trim((string) $serviceInvoiceType));
+        return match ($inv) {
+            'RESEP TUNAI', 'UM' => 'RESEP TUNAI',
+            'HV/OTC', 'HV', 'OTC' => 'HV/OTC',
+            default => 'UPDS',
+        };
+    }
+
+    private function effectiveItemType($item, string $transactionType, ?string $serviceInvoiceType = null): ?string
+    {
+        $normalizedTrxType = $this->resolveParentTransactionType($transactionType, $serviceInvoiceType);
         if (in_array($normalizedTrxType, ['KREDIT', 'RESEP KREDIT'], true)) {
             return 'creditPrescription';
         }
@@ -93,7 +108,7 @@ class MonitoringPenjualanService
             return 'returns';
         }
 
-        $type = mb_strtoupper(trim((string) ($item->cart_type ?: $transactionType)));
+        $type = mb_strtoupper(trim((string) ($item->cart_type ?: $normalizedTrxType)));
         return match ($type) {
             'UK', 'KREDIT', 'RESEP KREDIT' => 'creditPrescription',
             'UM', 'RESEP TUNAI' => 'cashPrescription',
@@ -151,6 +166,14 @@ class MonitoringPenjualanService
             $items = $transaction->transactions;
             $users = collect([$transaction->user])->concat($items->pluck('user'))->filter()->unique('id');
             $transactionType = mb_strtoupper(trim((string) $transaction->transaction_type));
+            $serviceInvoiceType = $transaction->service_invoice_type ?? null;
+
+            // Transaksi JASA: harga jasa & ongkir tidak masuk LIPH.
+            // Jika tidak ada item obat sama sekali, jangan masukkan nominal/struk apapun ke LIPH.
+            if ($transactionType === 'JASA' && $items->isEmpty()) {
+                continue;
+            }
+
             $channel = $this->onlineChannel($users, $transactionType);
             $isOnline = $channel !== null;
             $channelPrefix = $isOnline ? 'online' : 'offline';
@@ -165,7 +188,7 @@ class MonitoringPenjualanService
             $classified = [];
             if (!$isReturnTrx) {
                 foreach ($items as $item) {
-                    $type = $this->effectiveItemType($item, $transactionType);
+                    $type = $this->effectiveItemType($item, $transactionType, $serviceInvoiceType);
                     if (!$type) continue;
                     $classified[] = ['item' => $item, 'type' => $type];
                     // Round per item using the exact same formula as Export Data Penjualan and LIPH.
@@ -211,7 +234,7 @@ class MonitoringPenjualanService
 
             // LIPH and Export Data Penjualan use subtotal for return headers and finalized transactions with no cart rows.
             if (!$classified) {
-                $fallbackType = $this->effectiveItemType((object) ['cart_type' => null], $transactionType);
+                $fallbackType = $this->effectiveItemType((object) ['cart_type' => null], $transactionType, $serviceInvoiceType);
                 $fallbackAmount = is_numeric($transaction->subtotal) ? (int) round((float) $transaction->subtotal) : 0;
                 if ($isReturnTrx && $fallbackAmount === 0 && $items->isNotEmpty()) {
                     $fallbackAmount = (int) $items->sum(function ($item) {
@@ -249,13 +272,13 @@ class MonitoringPenjualanService
             // receipt's effective class. Keep Monitoring Penjualan on the same
             // basis so its sales totals reconcile with LIPH's Netto Akhir.
             if ($classified) {
-                $originalType = $this->effectiveItemType((object) ['cart_type' => null], $transactionType);
+                $originalType = $this->effectiveItemType((object) ['cart_type' => null], $transactionType, $serviceInvoiceType);
                 $typeKeys = array_column($classified, 'type');
                 $discountType = in_array($originalType, $typeKeys, true)
                     ? $originalType
                     : $typeKeys[0];
             } else {
-                $discountType = $this->effectiveItemType((object) ['cart_type' => null], $transactionType);
+                $discountType = $this->effectiveItemType((object) ['cart_type' => null], $transactionType, $serviceInvoiceType);
             }
 
             $transactionDiscount = is_numeric($transaction->discount) ? (int) round((float) $transaction->discount) : 0;
@@ -291,7 +314,7 @@ class MonitoringPenjualanService
             // Count one receipt once, following LIPH's rule: keep its original class if present;
             // otherwise assign the receipt to its sole/first effective item class.
             if ($classified) {
-                $originalType = $this->effectiveItemType((object) ['cart_type' => null], $transactionType);
+                $originalType = $this->effectiveItemType((object) ['cart_type' => null], $transactionType, $serviceInvoiceType);
                 $typeKeys = array_column($classified, 'type');
                 if (in_array($originalType, $typeKeys, true)) $receiptType = $originalType;
                 else $receiptType = $typeKeys[0];
@@ -315,7 +338,7 @@ class MonitoringPenjualanService
                 $this->add($shift['receipts'], 'total', 1);
                 $this->add($shift['receipts'], $isOnline ? 'onlineTotal' : 'offlineTotal', 1);
             } else {
-                $originalType = $this->effectiveItemType((object) ['cart_type' => null], $transactionType);
+                $originalType = $this->effectiveItemType((object) ['cart_type' => null], $transactionType, $serviceInvoiceType);
                 if ($originalType === 'cashPrescription') $this->add($shift['receipts'], 'cashPrescription', 1);
                 elseif ($originalType === 'upds') $this->add($shift['receipts'], 'upds', 1);
                 elseif ($originalType === 'hv' || $originalType === 'nonPrescription') $this->add($shift['receipts'], 'hv', 1);
