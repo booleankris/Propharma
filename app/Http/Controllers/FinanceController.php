@@ -780,14 +780,15 @@ class FinanceController extends Controller
         $targetDate = $validated['target_date'];
         $anchorMode = $validated['anchor_mode'] ?? 'auto';
 
-        $accounts = $this->branchKasBankAccountsQuery()
+        $accounts = $this
+            ->branchKasBankAccountsQuery()
             ->where('is_active', true)
             ->orderByRaw("CASE WHEN account_type = 'kas_apotek' THEN 0 ELSE 1 END")
             ->orderBy('code')
             ->get(['id', 'code', 'name', 'account_type', 'balance']);
 
         $estimates = $accounts->map(
-            fn (FinanceAccount $account) => FinanceAccountBalanceResolver::estimateOpeningForAccount($account, $targetDate, $anchorMode)
+            fn(FinanceAccount $account) => FinanceAccountBalanceResolver::estimateOpeningForAccount($account, $targetDate, $anchorMode)
         )->values();
 
         return response()->json([
@@ -3500,7 +3501,7 @@ class FinanceController extends Controller
 
                 $penjualanAkumulasi += (float) ($pastTotals['penjualan'] ?? 0);
                 $pembelianAkumulasi += (float) ($pastTotals['pembelian'] ?? 0);
-                $biayaAkgumulasi += (float) ($pastTotals['biaya'] ?? 0);
+                $biayaAkumulasi += (float) ($pastTotals['biaya'] ?? 0);
                 $pendapatanAkumulasi += (float) ($pastTotals['pendapatan'] ?? 0);
             }
         }
@@ -4922,12 +4923,12 @@ class FinanceController extends Controller
             if (!$paymentDate)
                 $errors[] = "Baris {$line}: Tanggal Bayar harus format YYYY-MM-DD atau DD/MM/YYYY.";
 
-        $matchesQuery = MedicineTransactions::whereIn('transaction_type', ['KREDIT', 'RESEP KREDIT'])
-            ->where('transaction_code', $invoiceNumber)
-            ->whereIn('pharmacy_id', $pharmacyIds)
-            ->with('transactions');
-        \App\Support\LiphTransactionScope::applySalesStatus($matchesQuery);
-        $matches = $matchesQuery->get();
+            $matchesQuery = MedicineTransactions::whereIn('transaction_type', ['KREDIT', 'RESEP KREDIT'])
+                ->where('transaction_code', $invoiceNumber)
+                ->whereIn('pharmacy_id', $pharmacyIds)
+                ->with('transactions');
+            \App\Support\LiphTransactionScope::applySalesStatus($matchesQuery);
+            $matches = $matchesQuery->get();
             if ($invoiceNumber !== '' && $matches->isEmpty()) {
                 $errors[] = "Baris {$line}: Faktur/Transaksi '{$invoiceNumber}' tidak ditemukan pada cabang yang dapat diakses.";
             } elseif ($matches->count() > 1) {
