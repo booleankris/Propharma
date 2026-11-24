@@ -431,7 +431,7 @@ class KinerjaOmzetService
 
         for ($m = 1; $m < $selectedMonth; $m++) {
             $cacheKey = 'finance_monthly_sum_v2_' . implode('_', $pharmacyIds) . "_{$selectedYear}_{$m}";
-            $pastTotals = Cache::remember($cacheKey, 86400, function () use ($pharmacyIds, $selectedYear, $m) {
+            $computeMonthSummary = function () use ($pharmacyIds, $selectedYear, $m) {
                 $mStart = sprintf('%04d-%02d-01', $selectedYear, $m);
                 $mEnd = Carbon::createFromDate($selectedYear, $m, 1)->endOfMonth()->toDateString();
                 $service = new self();
@@ -444,7 +444,13 @@ class KinerjaOmzetService
                     'pendapatan' => $summary['pendapatan'],
                     'laba' => $summary['laba'],
                 ];
-            });
+            };
+
+            try {
+                $pastTotals = Cache::remember($cacheKey, 86400, $computeMonthSummary);
+            } catch (\Throwable $e) {
+                $pastTotals = $computeMonthSummary();
+            }
 
             $totals['penjualan'] += (float) ($pastTotals['penjualan'] ?? 0);
             $totals['pembelian'] += (float) ($pastTotals['pembelian'] ?? 0);

@@ -484,7 +484,7 @@ class FinanceController extends Controller
             return Excel::download(new CashflowExport($reportDays), $fileName);
         }
         $kinerjaDays = $kinerjaOmzet->build($pharmacyIds, $startDate, $endDate);
-        $neracaData = $neracaReport->build($pharmacyIds, $startDate, $endDate, (int) getActivePharmacyId());
+        $neracaData = $neracaReport->build($pharmacyIds, $startDate, $endDate, (int) getActivePharmacyId(), $kinerjaDays['days'] ?? []);
         $drawerAccount = $this->branchKasBankAccountsQuery()->where('account_type', 'kas_apotek')->first();
         $openingBalance = $drawerAccount
             ? FinancePayment::where('payment_type', 'SALDO AWAL')->where('account_id', $drawerAccount->id)->first()
@@ -2549,7 +2549,7 @@ class FinanceController extends Controller
         return $this->payablesReceivablesService()->getHutangDataset(
             $this->getTargetPharmacyIds(),
             [],
-            false,
+            true,
             null,
             1
         )['rows'];
@@ -2670,7 +2670,7 @@ class FinanceController extends Controller
         return $this->payablesReceivablesService()->getPiutangDataset(
             $this->getTargetPharmacyIds(),
             [],
-            false,
+            true,
             null,
             1
         )['rows'];
@@ -2696,7 +2696,7 @@ class FinanceController extends Controller
     {
         $targetPharmacyIds = $this->getTargetPharmacyIds();
 
-        $relations = [
+        $query = FinancePayment::with([
             'account',
             'expenseAccount',
             'incomeAccount',
@@ -2706,13 +2706,9 @@ class FinanceController extends Controller
             'receivingDetail.creditor',
             'transaction.debtors',
             'transaction.patients',
-        ];
-        if (Schema::hasTable('finance_opening_invoices') && Schema::hasColumn('finance_payments', 'opening_invoice_id')) {
-            $relations[] = 'openingInvoice.creditor';
-            $relations[] = 'openingInvoice.debtor';
-        }
-
-        $query = FinancePayment::with($relations)
+            'openingInvoice.creditor',
+            'openingInvoice.debtor',
+        ])
             ->whereHas('account', function ($q) {
                 $q->where('category', 'Kas & Bank');
                 $q->where('pharmacy_id', getActivePharmacyId());
@@ -2916,27 +2912,21 @@ class FinanceController extends Controller
      */
     protected function applyMutasiBranchScope($query, array $targetPharmacyIds)
     {
-        $hasOpeningCol = Schema::hasColumn('finance_payments', 'opening_invoice_id');
-
         return $query
             ->whereNotIn('payment_type', ['KREDIT CUTOFF', 'PIUTANG CUTOFF', 'RETUR'])
-            ->where(function ($q) use ($targetPharmacyIds, $hasOpeningCol) {
+            ->where(function ($q) use ($targetPharmacyIds) {
             $q
                 ->whereHas('receiving', function ($sub) use ($targetPharmacyIds) {
                     $sub->whereIn('pharmacy_id', $targetPharmacyIds);
                 })
                 ->orWhereHas('transaction', function ($sub) use ($targetPharmacyIds) {
                     $sub->whereIn('pharmacy_id', $targetPharmacyIds);
-                });
-
-            if ($hasOpeningCol) {
-                $q->orWhere(function ($sub) use ($targetPharmacyIds) {
+                })
+                ->orWhere(function ($sub) use ($targetPharmacyIds) {
                     $sub->whereNotNull('opening_invoice_id')
                         ->whereIn('pharmacy_id', $targetPharmacyIds);
-                });
-            }
-
-            $q->orWhere(function ($sub) use ($targetPharmacyIds) {
+                })
+                ->orWhere(function ($sub) use ($targetPharmacyIds) {
                     $sub
                         ->where('payment_type', 'BIAYA')
                         ->where(function ($sub2) use ($targetPharmacyIds) {

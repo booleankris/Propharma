@@ -155,7 +155,7 @@ class CashflowTradeReportService
             $key = 'creditor:' . ($code !== '' ? $code : 'unknown');
             if (!isset($rows['entities'][$key])) {
                 $name = $creditor?->name ?: ($code !== '' ? "Supplier {$code}" : 'Supplier tidak tercatat');
-                $rows['entities'][$key] = $this->blankEntity($key, $name, $rows['dates']);
+                $rows['entities'][$key] = $this->blankEntity($key, $name, array_keys($rows['dates']));
             }
 
             $ppnType = mb_strtoupper(trim((string) ($detail?->invoice_ppn ?? $creditor?->ppn_type ?? 'TANPA')));
@@ -179,7 +179,7 @@ class CashflowTradeReportService
                 $key = 'creditor:' . ($code !== '' ? $code : 'unknown');
                 if (!isset($rows['entities'][$key])) {
                     $name = $oi->creditor?->name ?: ($code !== '' ? "Supplier {$code}" : 'Supplier tidak tercatat');
-                    $rows['entities'][$key] = $this->blankEntity($key, $name, $rows['dates']);
+                    $rows['entities'][$key] = $this->blankEntity($key, $name, array_keys($rows['dates']));
                 }
                 $amount = (float) $oi->amount;
                 $rows['entities'][$key]['amounts'][$date] += $amount;
@@ -428,7 +428,10 @@ class CashflowTradeReportService
                     $entity['paymentAmounts'][$date] += (float) $amount;
             }
             $entity['periodPayments'] = array_sum($entity['paymentAmounts']);
-            $entity['closingBalance'] = max(0, $entity['openingBalance'] + $entity['periodTotal'] - $entity['periodPayments']);
+            $rawClosing = $entity['openingBalance'] + $entity['periodTotal'] - $entity['periodPayments'];
+            $entity['closingBalance'] = ($entity['openingBalance'] < 0 || $entity['periodTotal'] < 0)
+                ? $rawClosing
+                : max(0, $rawClosing);
         }
         unset($entity);
 
@@ -448,7 +451,8 @@ class CashflowTradeReportService
                     $entity['paymentAmounts'][$date] += (float) $amount;
             }
             $entity['periodPayments'] = array_sum($entity['paymentAmounts']);
-            $entity['closingBalance'] = max(0, $entity['openingBalance'] - $entity['periodPayments']);
+            $rawClosing = $entity['openingBalance'] - $entity['periodPayments'];
+            $entity['closingBalance'] = $entity['openingBalance'] < 0 ? $rawClosing : max(0, $rawClosing);
             $report['entities'][$key] = $entity;
         }
     }
@@ -514,7 +518,7 @@ class CashflowTradeReportService
             'periodTotal' => $periodTotal,
             'grandDue' => $grandDue,
             'periodPayments' => $periodPayments,
-            'closingBalance' => $closingBalance,
+            'closingBalance' => max(0.0, $closingBalance),
         ];
     }
 
