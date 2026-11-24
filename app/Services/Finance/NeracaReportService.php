@@ -333,60 +333,118 @@ class NeracaReportService
             $pharmacyIds[] = 9;
         }
 
-        // Ambil retur pembelian yang sudah berstatus "sudah_potong" hingga tanggal cutoff (konsisten dengan PayablesReceivablesService)
-        $returnsByDetailId = [];
-        $returnsByInvoiceNo = [];
+        $isSqlite = DB::connection()->getDriverName() === 'sqlite';
+        $receivingDateExpr = $isSqlite
+            ? "COALESCE(CASE WHEN date LIKE '__/__/____' THEN substr(date, 7, 4) || '-' || substr(date, 4, 2) || '-' || substr(date, 1, 2) WHEN date LIKE '____-__-__' THEN substr(date, 1, 10) ELSE NULL END, DATE(created_at))"
+            : "COALESCE(STR_TO_DATE(NULLIF(date, ''), '%d/%m/%Y'), STR_TO_DATE(NULLIF(date, ''), '%Y-%m-%d'), DATE(created_at))";
 
-        if (Schema::hasTable('purchase_returns') && Schema::hasTable('purchase_return_items')) {
-            $returnItems = DB::table('purchase_return_items as pri')
-                ->join('purchase_returns as pr', 'pr.id', '=', 'pri.purchase_return_id')
-                ->where('pr.status', '!=', 'dibatalkan')
-                ->where('pri.status', 'sudah_potong')
-                ->whereIn('pr.pharmacy_id', $pharmacyIds)
-                ->whereRaw('COALESCE(pri.deduction_date, pri.status_date, DATE(pr.created_at)) <= ?', [$asOfDate])
-                ->select('pr.receiving_id', 'pr.invoice_number', 'pri.subtotal')
-                ->get();
-
-            foreach ($returnItems as $item) {
-                $amt = (float) ($item->subtotal ?? 0);
-                if ($item->receiving_id) {
-                    $returnsByDetailId[$item->receiving_id] = ($returnsByDetailId[$item->receiving_id] ?? 0) + $amt;
-                }
-                if ($item->invoice_number) {
-                    $invKey = strtoupper(trim((string) $item->invoice_number));
-                    $returnsByInvoiceNo[$invKey] = ($returnsByInvoiceNo[$invKey] ?? 0) + $amt;
-                }
-            }
-        }
+        $hasOrderItemsJoin = Schema::hasTable('order_items') && Schema::hasColumn('receiving_items', 'order_items_id');
 
         $details = ReceivingDetails::query()
             ->with([
                 'receiving:id,pharmacy_id,status,date,created_at',
                 'creditor:code,ppn_type',
-                'receiving_items:id,receiving_details_id,total,raw_price,qty_received',
+                'receiving_items' => function ($query) use ($hasOrderItemsJoin) {
+                    $query->whereNotNull('batches_id')
+                        ->select([
+                            'id',
+                            'receiving_details_id',
+                            'order_items_id',
+                            'total',
+                            'raw_price',
+                            'qty_received',
+                            'qty',
+                            'discount',
+                            'extra_discount',
+                        ]);
+                    if ($hasOrderItemsJoin) {
+                        $query->with('order_items:id,price');
+                    }
+                },
                 'payments' => fn ($query) => $query->whereDate('payment_date', '<=', $asOfDate),
             ])
             ->whereRaw('UPPER(TRIM(COALESCE(invoice_payment, ""))) = ?', ['KREDIT'])
             ->postedToStock()
-            ->whereHas('receiving', function ($query) use ($pharmacyIds, $asOfDate) {
+            ->whereHas('receiving', function ($query) use ($pharmacyIds, $asOfDate, $receivingDateExpr) {
                 $query->whereIn('pharmacy_id', $pharmacyIds)
-                    ->where(function ($date) use ($asOfDate) {
-                        $date->whereRaw("COALESCE(STR_TO_DATE(NULLIF(date, ''), '%d/%m/%Y'), STR_TO_DATE(NULLIF(date, ''), '%Y-%m-%d'), DATE(created_at)) <= ?", [$asOfDate]);
-                    });
+                    ->whereRaw("{$receivingDateExpr} <= ?", [$asOfDate]);
             })
             ->get();
+
+        // Ambil retur pembelian yang berstatus "sudah_potong" hingga tanggal cutoff (konsisten & bebas duplikat seperti PayablesReceivablesService)
+        $returnsByDetailId = [];
+        if (Schema::hasTable('purchase_returns') && Schema::hasTable('purchase_return_items') && $details->isNotEmpty()) {
+            $detailIds = [];
+            $invoiceNumberToDetailIds = [];
+            $uniqueInvoices = [];
+
+            foreach ($details as $detail) {
+                $dId = (int) $detail->id;
+                $detailIds[] = $dId;
+                $invRaw = trim((string) ($detail->invoice_number ?? ''));
+                if ($invRaw !== '') {
+                    $uniqueInvoices[$invRaw] = true;
+                    $invoiceNumberToDetailIds[strtoupper($invRaw)][] = $dId;
+                }
+            }
+            $uniqueInvoiceList = array_keys($uniqueInvoices);
+
+            $seenReturnIdsByDetail = [];
+            $processReturnRows = function ($retRows) use (&$seenReturnIdsByDetail, &$returnsByDetailId, $invoiceNumberToDetailIds) {
+                foreach ($retRows as $r) {
+                    $matchedIds = [];
+                    if (!empty($r->pr_receiving_id)) {
+                        $matchedIds[] = (int) $r->pr_receiving_id;
+                    }
+                    $invNorm = strtoupper(trim((string) ($r->pr_invoice_number ?? '')));
+                    if ($invNorm !== '' && isset($invoiceNumberToDetailIds[$invNorm])) {
+                        foreach ($invoiceNumberToDetailIds[$invNorm] as $mId) {
+                            $matchedIds[] = $mId;
+                        }
+                    }
+
+                    $amt = (float) ($r->subtotal ?? 0);
+                    foreach (array_unique($matchedIds) as $dId) {
+                        if (isset($seenReturnIdsByDetail[$dId][$r->id])) {
+                            continue;
+                        }
+                        $seenReturnIdsByDetail[$dId][$r->id] = true;
+                        $returnsByDetailId[$dId] = ($returnsByDetailId[$dId] ?? 0.0) + $amt;
+                    }
+                }
+            };
+
+            foreach (array_chunk($detailIds, 400) as $chunkIds) {
+                $retByReceiving = DB::table('purchase_return_items as pri')
+                    ->join('purchase_returns as pr', 'pr.id', '=', 'pri.purchase_return_id')
+                    ->whereIn('pr.receiving_id', $chunkIds)
+                    ->where('pr.status', '!=', 'dibatalkan')
+                    ->where('pri.status', 'sudah_potong')
+                    ->whereRaw('COALESCE(pri.deduction_date, pri.status_date, DATE(pr.created_at)) <= ?', [$asOfDate])
+                    ->select(['pri.id', 'pri.subtotal', 'pr.receiving_id as pr_receiving_id', 'pr.invoice_number as pr_invoice_number'])
+                    ->get();
+                $processReturnRows($retByReceiving);
+            }
+
+            foreach (array_chunk($uniqueInvoiceList, 400) as $chunkInvoices) {
+                $retByInvoice = DB::table('purchase_return_items as pri')
+                    ->join('purchase_returns as pr', 'pr.id', '=', 'pri.purchase_return_id')
+                    ->whereIn('pr.invoice_number', $chunkInvoices)
+                    ->where('pr.status', '!=', 'dibatalkan')
+                    ->where('pri.status', 'sudah_potong')
+                    ->whereRaw('COALESCE(pri.deduction_date, pri.status_date, DATE(pr.created_at)) <= ?', [$asOfDate])
+                    ->select(['pri.id', 'pri.subtotal', 'pr.receiving_id as pr_receiving_id', 'pr.invoice_number as pr_invoice_number'])
+                    ->get();
+                $processReturnRows($retByInvoice);
+            }
+        }
 
         $balance = 0.0;
         foreach ($details as $detail) {
             $ppnType = strtoupper(trim((string) ($detail->invoice_ppn ?? $detail->creditor?->ppn_type ?? 'TANPA')));
             $invoiceTotal = ReceivingInvoiceTotals::calculate($detail->receiving_items, $ppnType)['total'];
 
-            $returFromPr = 0.0;
-            if (isset($returnsByDetailId[$detail->id])) {
-                $returFromPr = (float) $returnsByDetailId[$detail->id];
-            } elseif ($detail->invoice_number && isset($returnsByInvoiceNo[strtoupper(trim($detail->invoice_number))])) {
-                $returFromPr = (float) $returnsByInvoiceNo[strtoupper(trim($detail->invoice_number))];
-            }
+            $returFromPr = (float) ($returnsByDetailId[$detail->id] ?? 0.0);
 
             // Pembayaran kas/bank & pembayaran retur
             $paidCashBank = (float) $detail->payments->where('payment_type', '!=', 'RETUR')->sum('amount');
@@ -396,7 +454,11 @@ class NeracaReportService
             $paidApplied = round(min($netTotal, $paidCashBank), 2);
 
             // Sisa hutang faktur = (nilai faktur - potongan retur) - pembayaran kas/bank
-            $balance += max(0, $netTotal - $paidApplied);
+            $sisa = round(max(0, $netTotal - $paidApplied), 2);
+            if ($sisa < 0.005) {
+                $sisa = 0.0;
+            }
+            $balance += $sisa;
         }
 
         if (Schema::hasTable('finance_opening_invoices')) {
