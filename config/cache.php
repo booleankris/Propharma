@@ -51,7 +51,9 @@ return [
 
         'file' => [
             'driver' => 'file',
-            'path' => storage_path('framework/cache/data'),
+            'path' => storage_path('framework/cache/data/u_' . (function_exists('posix_geteuid') ? posix_geteuid() : PHP_SAPI)),
+            'lock_path' => storage_path('framework/cache/data/u_' . (function_exists('posix_geteuid') ? posix_geteuid() : PHP_SAPI)),
+            'permission' => 0664,
         ],
 
         'memcached' => [
