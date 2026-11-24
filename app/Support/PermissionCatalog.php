@@ -344,7 +344,11 @@ class PermissionCatalog
             }
         }
 
-        app(PermissionRegistrar::class)->forgetCachedPermissions();
+        try {
+            app(PermissionRegistrar::class)->forgetCachedPermissions();
+        } catch (\Throwable $e) {
+            // Ignore cache permission mismatch
+        }
         self::ensureOnlineRolesHaveTransfersPermission();
     }
 
@@ -355,8 +359,12 @@ class PermissionCatalog
     protected static function ensureOnlineRolesHaveTransfersPermission(): void
     {
         $cacheKey = 'permission_catalog_online_transfers_v1';
-        if (\Illuminate\Support\Facades\Cache::get($cacheKey)) {
-            return;
+        try {
+            if (\Illuminate\Support\Facades\Cache::get($cacheKey)) {
+                return;
+            }
+        } catch (\Throwable $e) {
+            // Ignore cache read error
         }
 
         $permission = Permission::where('name', 'transfers.manage')
@@ -377,11 +385,14 @@ class PermissionCatalog
             }
         }
 
-        if ($changed) {
-            app(PermissionRegistrar::class)->forgetCachedPermissions();
+        try {
+            if ($changed) {
+                app(PermissionRegistrar::class)->forgetCachedPermissions();
+            }
+            \Illuminate\Support\Facades\Cache::forever($cacheKey, true);
+        } catch (\Throwable $e) {
+            // Ignore cache write permission mismatch
         }
-
-        \Illuminate\Support\Facades\Cache::forever($cacheKey, true);
     }
 
     /**

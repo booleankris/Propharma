@@ -15,7 +15,11 @@ return new class extends Migration
             return;
         }
 
-        app(PermissionRegistrar::class)->forgetCachedPermissions();
+        try {
+            app(PermissionRegistrar::class)->forgetCachedPermissions();
+        } catch (\Throwable $e) {
+            // Ignore file cache permission mismatch between CLI and web user
+        }
 
         $permission = Permission::firstOrCreate([
             'name' => 'transfers.manage',
@@ -29,12 +33,20 @@ return new class extends Migration
             }
         }
 
-        app(PermissionRegistrar::class)->forgetCachedPermissions();
-        Cache::forever('permission_catalog_online_transfers_v1', true);
+        try {
+            app(PermissionRegistrar::class)->forgetCachedPermissions();
+            Cache::forever('permission_catalog_online_transfers_v1', true);
+        } catch (\Throwable $e) {
+            // Ignore file cache permission mismatch between CLI and web user
+        }
     }
 
     public function down(): void
     {
-        Cache::forget('permission_catalog_online_transfers_v1');
+        try {
+            Cache::forget('permission_catalog_online_transfers_v1');
+        } catch (\Throwable $e) {
+            // Ignore file cache permission mismatch
+        }
     }
 };

@@ -280,10 +280,44 @@ class FinanceController extends Controller
     }
 
     /**
+     * Pastikan tabel finance_opening_invoices tersedia meskipun php artisan migrate
+     * sempat tertahan oleh permission file cache di server.
+     */
+    private function ensureOpeningInvoicesSchema(): void
+    {
+        if (!Schema::hasTable('finance_opening_invoices')) {
+            Schema::create('finance_opening_invoices', function (\Illuminate\Database\Schema\Blueprint $table) {
+                $table->id();
+                $table->unsignedBigInteger('pharmacy_id')->index();
+                $table->string('type', 20)->index();
+                $table->string('creditor_code', 100)->nullable()->index();
+                $table->unsignedBigInteger('debtor_id')->nullable()->index();
+                $table->string('invoice_number', 150)->index();
+                $table->date('invoice_date')->index();
+                $table->date('due_date')->nullable();
+                $table->decimal('amount', 15, 2);
+                $table->boolean('is_submitted')->default(false);
+                $table->text('notes')->nullable();
+                $table->unsignedBigInteger('created_by')->nullable();
+                $table->timestamps();
+
+                $table->index(['pharmacy_id', 'type', 'invoice_date'], 'foi_pharmacy_type_date_idx');
+            });
+        }
+
+        if (Schema::hasTable('finance_payments') && !Schema::hasColumn('finance_payments', 'opening_invoice_id')) {
+            Schema::table('finance_payments', function (\Illuminate\Database\Schema\Blueprint $table) {
+                $table->unsignedBigInteger('opening_invoice_id')->nullable()->after('medicine_transaction_id')->index();
+            });
+        }
+    }
+
+    /**
      * Tambah Tagihan Saldo Awal Hutang Dagang per faktur (tanpa menambah stok obat & tanpa ubah Kas/Bank).
      */
     public function storeOpeningHutang(Request $request)
     {
+        $this->ensureOpeningInvoicesSchema();
         $targetPharmacyIds = $this->getTargetPharmacyIds();
         $pharmacyId = in_array(9, $targetPharmacyIds, true)
             ? 9
@@ -329,6 +363,7 @@ class FinanceController extends Controller
      */
     public function storeOpeningPiutang(Request $request)
     {
+        $this->ensureOpeningInvoicesSchema();
         $targetPharmacyIds = $this->getTargetPharmacyIds();
         $pharmacyId = in_array(1, $targetPharmacyIds, true)
             ? 1
@@ -3594,11 +3629,16 @@ class FinanceController extends Controller
         if ($selectedMonth > 1) {
             for ($m = 1; $m < $selectedMonth; $m++) {
                 $cacheKey = 'finance_monthly_sum_v2_' . implode('_', $pharmacyIds) . "_{$selectedYear}_{$m}";
-                $pastTotals = Cache::remember($cacheKey, 86400, function () use ($pharmacyIds, $selectedYear, $m) {
+                $computePastTotals = function () use ($pharmacyIds, $selectedYear, $m) {
                     $mStart = sprintf('%04d-%02d-01', $selectedYear, $m);
                     $mEnd = \Carbon\Carbon::createFromDate($selectedYear, $m, 1)->endOfMonth()->toDateString();
                     return $this->computePeriodTotals($pharmacyIds, $mStart, $mEnd);
-                });
+                };
+                try {
+                    $pastTotals = Cache::remember($cacheKey, 86400, $computePastTotals);
+                } catch (\Throwable $e) {
+                    $pastTotals = $computePastTotals();
+                }
 
                 $penjualanAkumulasi += (float) ($pastTotals['penjualan'] ?? 0);
                 $pembelianAkumulasi += (float) ($pastTotals['pembelian'] ?? 0);
@@ -3711,7 +3751,7 @@ class FinanceController extends Controller
         $activePharmacyId = (int) getActivePharmacyId();
         $cacheKey = 'finance_stock_valuation_v2_' . $activePharmacyId;
 
-        return Cache::remember($cacheKey, 60, function () use ($activePharmacyId) {
+        $computeValuation = function () use ($activePharmacyId) {
             $isPmi = ($activePharmacyId <= 0 || $activePharmacyId === 1 || $activePharmacyId === 9);
             $counterPharmacyId = $isPmi ? 1 : $activePharmacyId;
             $warehouseId = function_exists('getWarehousePharmacyId') ? (int) getWarehousePharmacyId() : 9;
@@ -3783,7 +3823,13 @@ class FinanceController extends Controller
                 'gudangQty' => $storageQty,
                 'gudangItems' => $storageItems,
             ];
-        });
+        };
+
+        try {
+            return Cache::remember($cacheKey, 60, $computeValuation);
+        } catch (\Throwable $e) {
+            return $computeValuation();
+        }
     }
 
     /**
@@ -3800,7 +3846,11 @@ class FinanceController extends Controller
         // Jika data lengkap tidak disediakan, gunakan cache agar angka badge dan ringkasan selalu konsisten di semua halaman
         $isFullData = ($hutang !== null && $cash !== null && $piutang !== null);
         if (!$isFullData) {
-            $cached = Cache::get($cacheKey);
+            try {
+                $cached = Cache::get($cacheKey);
+            } catch (\Throwable $e) {
+                $cached = null;
+            }
             if ($cached && isset($cached['nilaiStok']) && isset($cached['countCashbondActive'])) {
                 if ($hutang !== null) {
                     $cached = array_merge($cached, $isPrecomputedHutangStats ? $hutang : $this->summarizeHutangStats($hutang));
@@ -3957,7 +4007,11 @@ class FinanceController extends Controller
             'totalCashbondActive' => $totalCashbondActive,
         ], $piutangStats, $hutangStats);
 
-        Cache::put($cacheKey, $stats, 60);
+        try {
+            Cache::put($cacheKey, $stats, 60);
+        } catch (\Throwable $e) {
+            // Ignore file cache permission error on shared storage
+        }
 
         return $stats;
     }
@@ -3975,26 +4029,30 @@ class FinanceController extends Controller
      */
     protected function clearStatsCache()
     {
-        Cache::forget('finance_stats_summary');
-        $targetPharmacyIds = $this->getTargetPharmacyIds();
-        $activeId = getActivePharmacyId();
-        $branchSuffix = $activeId . '_' . implode('_', $targetPharmacyIds);
-        Cache::forget('finance_stats_summary_branch_' . $branchSuffix);
-        Cache::forget('finance_stats_summary_branch_v2_' . $branchSuffix);
-        Cache::forget('finance_stats_summary_branch_v2_' . $activeId . '_' . implode('_', $targetPharmacyIds));
-        $branches = [0, 1, 2, 3, 4, 5, 6, 9];
-        foreach ($branches as $b) {
-            Cache::forget('finance_stats_summary_' . $b);
-            Cache::forget('finance_stock_valuation_' . $b);
-            Cache::forget('finance_stock_valuation_v2_' . $b);
+        try {
+            Cache::forget('finance_stats_summary');
+            $targetPharmacyIds = $this->getTargetPharmacyIds();
+            $activeId = getActivePharmacyId();
+            $branchSuffix = $activeId . '_' . implode('_', $targetPharmacyIds);
+            Cache::forget('finance_stats_summary_branch_' . $branchSuffix);
+            Cache::forget('finance_stats_summary_branch_v2_' . $branchSuffix);
+            Cache::forget('finance_stats_summary_branch_v2_' . $activeId . '_' . implode('_', $targetPharmacyIds));
+            $branches = [0, 1, 2, 3, 4, 5, 6, 9];
+            foreach ($branches as $b) {
+                Cache::forget('finance_stats_summary_' . $b);
+                Cache::forget('finance_stock_valuation_' . $b);
+                Cache::forget('finance_stock_valuation_v2_' . $b);
+            }
+            $currentYear = (int) now()->year;
+            $pharmKey = implode('_', $targetPharmacyIds);
+            for ($m = 1; $m <= 12; $m++) {
+                Cache::forget("finance_monthly_sum_{$pharmKey}_{$currentYear}_{$m}");
+                Cache::forget("finance_monthly_sum_v2_{$pharmKey}_{$currentYear}_{$m}");
+            }
+            Cache::forget('finance_stats_summary_1_9');
+        } catch (\Throwable $e) {
+            // Ignore file cache permission error on shared storage
         }
-        $currentYear = (int) now()->year;
-        $pharmKey = implode('_', $targetPharmacyIds);
-        for ($m = 1; $m <= 12; $m++) {
-            Cache::forget("finance_monthly_sum_{$pharmKey}_{$currentYear}_{$m}");
-            Cache::forget("finance_monthly_sum_v2_{$pharmKey}_{$currentYear}_{$m}");
-        }
-        Cache::forget('finance_stats_summary_1_9');
     }
 
     /**
