@@ -26,6 +26,7 @@ use App\Models\TransactionService;
 use App\Models\MedicineTransfers;
 use App\Models\MedicineTransferItems;
 use App\Services\MedicineTransactionCodeGenerator;
+use App\Services\StockLedgerService;
 use App\Models\User;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
@@ -1533,12 +1534,13 @@ class SalesController extends Controller
             $logPrefix = null;
 
             foreach ($sortedCartItems as $cart) {
-                $medicine = $cart->medicine;
-                $medicine_id = $medicine->id;
+                $medicine_id = $cart->medicine->id;
+                // Kunci baris medicines sebelum membaca/membuat batch agar transaksi paralel terserialisasi.
+                $medicine = Medicines::whereKey($medicine_id)->lockForUpdate()->first() ?? $cart->medicine;
                 $qty_bought = $cart->quantity;
                 $batchDeductions = [];
 
-                // Ambil transfer item aktif untuk obat ini (FIFO expired_date ASC) sekaligus dalam 1 query
+                // Ambil transfer item aktif untuk obat ini (FEFO expired_date ASC, MINUS-AUTO paling akhir)
                 $transfers = MedicineTransferItems::join('batches', 'medicine_transfer_items.batches_id', '=', 'batches.id')
                     ->where('batches.medicine_id', $medicine_id)
                     ->where('batches.pharmacy_id', $pharmacyId)
@@ -1547,12 +1549,15 @@ class SalesController extends Controller
                         $q->whereNull('medicine_transfer_items.source_type')
                             ->orWhere('medicine_transfer_items.source_type', '!=', 'retur_gudang');
                     })
+                    ->orderByRaw("CASE WHEN batches.name = 'MINUS-AUTO' THEN 1 ELSE 0 END ASC")
+                    ->orderByRaw('CASE WHEN batches.expired_date IS NULL THEN 1 ELSE 0 END ASC')
                     ->orderBy('batches.expired_date', 'asc')
+                    ->orderBy('medicine_transfer_items.id', 'asc')
                     ->lockForUpdate()
                     ->select('medicine_transfer_items.*')
                     ->get();
 
-                $counterQtyBefore = (int) $transfers->sum('qty');
+                $counterQtyBefore = (float) $transfers->sum('qty');
 
                 // 1. Potong stok counter FIFO dari batch yang ada stok > 0
                 foreach ($transfers as $transfer) {
@@ -1574,7 +1579,9 @@ class SalesController extends Controller
                     }
                 }
 
-                // 2. Jika stok fisik habis namun sistem mengizinkan minus, potong pada batch terakhir
+                // 2. Jika stok fisik habis namun sistem mengizinkan minus:
+                //    - Jika sudah ada baris MTI di cabang, potong baris terakhir (atau MINUS-AUTO)
+                //    - Jika cabang belum punya MTI sama sekali, buat/kurangi batch virtual MINUS-AUTO
                 if ($qty_bought > 0) {
                     $lastTransfer = $transfers->last();
                     if ($lastTransfer) {
@@ -1583,6 +1590,20 @@ class SalesController extends Controller
                         $lastTransfer->save();
                         $batchDeductions[$lastTransfer->batches_id] = ($batchDeductions[$lastTransfer->batches_id] ?? 0) + $deductedQty;
                         $qty_bought = 0;
+                    } elseif (!isWarehousePharmacy($pharmacyId)) {
+                        $minusItem = app(StockLedgerService::class)->recordNegativeCounterSale(
+                            (int) $medicine_id,
+                            (int) $pharmacyId,
+                            (float) $qty_bought,
+                            (int) (auth()->id() ?? 1)
+                        );
+                        if ($minusItem) {
+                            $deductedQty = (float) $qty_bought;
+                            $batchDeductions[$minusItem->batches_id] = ($batchDeductions[$minusItem->batches_id] ?? 0) + $deductedQty;
+                            $qty_bought = 0;
+                        } else {
+                            Log::warning("Stok counter tidak ditemukan untuk obat: {$medicine->name} (ID: {$medicine_id}). Penjualan tetap diproses dengan stok minus.");
+                        }
                     } else {
                         Log::warning("Stok counter tidak ditemukan untuk obat: {$medicine->name} (ID: {$medicine_id}). Penjualan tetap diproses dengan stok minus.");
                     }

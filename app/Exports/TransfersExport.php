@@ -42,7 +42,12 @@ class TransfersExport implements FromQuery, WithHeadings, WithMapping, ShouldAut
             'etalases',
             'requestedMedicine',
             'sourceBatch.pharmacy',
-        ])->whereNull('receiving_items_id');
+        ])
+            ->whereNull('receiving_items_id')
+            ->whereHas('transfer', function ($q) {
+                $q->whereNull('code')
+                    ->orWhere('code', 'not like', 'TRF-INIT%');
+            });
 
         if ($this->startDate && $this->endDate) {
             $query->whereHas('transfer', function ($q) {

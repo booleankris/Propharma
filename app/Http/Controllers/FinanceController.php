@@ -17,6 +17,7 @@ use App\Models\Debtors;
 use App\Models\FinanceAccount;
 use App\Models\FinanceBalanceAdjustment;
 use App\Models\FinanceCashbond;
+use App\Models\FinanceOpeningInvoice;
 use App\Models\FinancePayment;
 use App\Models\MedicineCart;
 use App\Models\MedicineTransactions;
@@ -40,6 +41,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
@@ -236,7 +238,7 @@ class FinanceController extends Controller
     public function hutangDetail($id)
     {
         $detail = $this->payablesReceivablesService()->getHutangDetail(
-            (int) $id,
+            $id,
             $this->getTargetPharmacyIds()
         );
 
@@ -245,6 +247,148 @@ class FinanceController extends Controller
         }
 
         return response()->json(['data' => $detail]);
+    }
+
+    /**
+     * Preview Saldo Awal Hutang Dagang / Piutang per tanggal cut-off (identik dengan Neraca).
+     */
+    public function previewOpeningBalance(Request $request)
+    {
+        $type = strtoupper(trim((string) $request->query('type', 'HUTANG')));
+        $date = trim((string) $request->query('date', ''));
+        if ($date === '') {
+            $date = \Carbon\Carbon::now()->subMonthNoOverflow()->endOfMonth()->toDateString();
+        } else {
+            try {
+                $date = \Carbon\Carbon::parse($date)->toDateString();
+            } catch (\Throwable $e) {
+                $date = \Carbon\Carbon::now()->subMonthNoOverflow()->endOfMonth()->toDateString();
+            }
+        }
+
+        $targetPharmacyIds = $this->getTargetPharmacyIds();
+        $neracaService = app(\App\Services\Finance\NeracaReportService::class);
+        $balance = $type === 'PIUTANG'
+            ? $neracaService->receivableBalanceAtDate($targetPharmacyIds, $date)
+            : $neracaService->payableBalanceAtDate($targetPharmacyIds, $date);
+
+        return response()->json([
+            'type' => $type === 'PIUTANG' ? 'PIUTANG' : 'HUTANG',
+            'date' => $date,
+            'balance' => round((float) $balance, 2),
+        ]);
+    }
+
+    /**
+     * Tambah Tagihan Saldo Awal Hutang Dagang per faktur (tanpa menambah stok obat & tanpa ubah Kas/Bank).
+     */
+    public function storeOpeningHutang(Request $request)
+    {
+        $targetPharmacyIds = $this->getTargetPharmacyIds();
+        $pharmacyId = in_array(9, $targetPharmacyIds, true)
+            ? 9
+            : (int) ($targetPharmacyIds[0] ?? getActivePharmacyId());
+
+        $validated = $request->validate([
+            'creditor_code' => 'nullable|string|exists:creditors,code',
+            'invoice_number' => 'required|string|max:150',
+            'invoice_date' => 'required|date',
+            'due_date' => 'nullable|date',
+            'amount' => 'required|numeric|gt:0',
+            'notes' => 'nullable|string|max:500',
+        ], [
+            'creditor_code.exists' => 'PBF / Supplier yang dipilih tidak ditemukan.',
+            'invoice_number.required' => 'Nomor faktur wajib diisi.',
+            'invoice_date.required' => 'Tanggal faktur / cut-off wajib diisi.',
+            'amount.required' => 'Nominal sisa hutang wajib diisi.',
+            'amount.gt' => 'Nominal sisa hutang harus lebih dari 0.',
+        ]);
+
+        $dueDate = !empty($validated['due_date'])
+            ? $validated['due_date']
+            : \Carbon\Carbon::parse($validated['invoice_date'])->addDays(30)->toDateString();
+
+        FinanceOpeningInvoice::create([
+            'pharmacy_id' => $pharmacyId,
+            'type' => 'HUTANG',
+            'creditor_code' => !empty($validated['creditor_code']) ? trim($validated['creditor_code']) : null,
+            'invoice_number' => trim($validated['invoice_number']),
+            'invoice_date' => $validated['invoice_date'],
+            'due_date' => $dueDate,
+            'amount' => round((float) $validated['amount'], 2),
+            'notes' => trim((string) ($validated['notes'] ?? '')) ?: null,
+            'created_by' => Auth::id(),
+        ]);
+
+        $this->clearStatsCache();
+        return back()->with('success', 'Tagihan saldo awal hutang dagang berhasil ditambahkan (tanpa mengubah stok & Kas/Bank).');
+    }
+
+    /**
+     * Tambah Tagihan Saldo Awal Piutang per tagihan (tanpa mengurangi stok, tanpa masuk LIPH/Omzet, tanpa ubah Kas/Bank).
+     */
+    public function storeOpeningPiutang(Request $request)
+    {
+        $targetPharmacyIds = $this->getTargetPharmacyIds();
+        $pharmacyId = in_array(1, $targetPharmacyIds, true)
+            ? 1
+            : (int) ($targetPharmacyIds[0] ?? getActivePharmacyId());
+
+        $validated = $request->validate([
+            'debtor_id' => 'nullable|integer|exists:debtors,id',
+            'invoice_number' => 'required|string|max:150',
+            'invoice_date' => 'required|date',
+            'due_date' => 'nullable|date',
+            'amount' => 'required|numeric|gt:0',
+            'notes' => 'nullable|string|max:500',
+        ], [
+            'debtor_id.exists' => 'Debitur / Instansi yang dipilih tidak ditemukan.',
+            'invoice_number.required' => 'Nomor tagihan / faktur wajib diisi.',
+            'invoice_date.required' => 'Tanggal tagihan / cut-off wajib diisi.',
+            'amount.required' => 'Nominal sisa piutang wajib diisi.',
+            'amount.gt' => 'Nominal sisa piutang harus lebih dari 0.',
+        ]);
+
+        $dueDate = !empty($validated['due_date'])
+            ? $validated['due_date']
+            : \Carbon\Carbon::parse($validated['invoice_date'])->addDays(30)->toDateString();
+
+        FinanceOpeningInvoice::create([
+            'pharmacy_id' => $pharmacyId,
+            'type' => 'PIUTANG',
+            'debtor_id' => !empty($validated['debtor_id']) ? (int) $validated['debtor_id'] : null,
+            'invoice_number' => trim($validated['invoice_number']),
+            'invoice_date' => $validated['invoice_date'],
+            'due_date' => $dueDate,
+            'amount' => round((float) $validated['amount'], 2),
+            'notes' => trim((string) ($validated['notes'] ?? '')) ?: null,
+            'created_by' => Auth::id(),
+        ]);
+
+        $this->clearStatsCache();
+        return back()->with('success', 'Tagihan saldo awal piutang berhasil ditambahkan (tanpa mengubah stok, omzet, & Kas/Bank).');
+    }
+
+    /**
+     * Hapus tagihan saldo awal (hanya diizinkan jika belum memiliki pelunasan Kas & Bank reguler;
+     * pelunasan pra-cut-off non-kas aman ikut terhapus karena tidak menyentuh saldo Kas & Bank).
+     */
+    public function destroyOpeningInvoice($id)
+    {
+        $opening = FinanceOpeningInvoice::whereIn('pharmacy_id', $this->getTargetPharmacyIds())->findOrFail($id);
+        $hasRegularPayments = $opening->payments()
+            ->whereNotIn('payment_type', ['KREDIT CUTOFF', 'PIUTANG CUTOFF'])
+            ->exists();
+
+        if ($hasRegularPayments) {
+            return back()->withErrors(['error' => 'Tagihan saldo awal ini sudah memiliki pelunasan Kas & Bank dan tidak dapat dihapus.']);
+        }
+
+        $label = $opening->type === 'HUTANG' ? 'hutang dagang' : 'piutang';
+        $opening->delete();
+        $this->clearStatsCache();
+
+        return back()->with('success', "Tagihan saldo awal {$label} berhasil dihapus.");
     }
 
     /**
@@ -603,7 +747,7 @@ class FinanceController extends Controller
     public function piutangDetail($id)
     {
         $detail = $this->payablesReceivablesService()->getPiutangDetail(
-            (int) $id,
+            $id,
             $this->getTargetPharmacyIds()
         );
 
@@ -1544,8 +1688,10 @@ class FinanceController extends Controller
                 'transactions' => fn($query) => $query->where('status', 1),
             ])
             ->withSum(['payments as finance_paid' => fn($query) => $query
-                ->where('payment_type', 'PIUTANG')
+                ->whereIn('payment_type', ['PIUTANG', 'PIUTANG CUTOFF'])
                 ->whereDate('payment_date', '<=', $asOfDate)], 'amount')
+            ->withSum(['payments as finance_paid_total' => fn($query) => $query
+                ->whereIn('payment_type', ['PIUTANG', 'PIUTANG CUTOFF'])], 'amount')
             ->whereIn('pharmacy_id', $pharmacyIds)
             ->whereIn('transaction_type', ['KREDIT', 'RESEP KREDIT', 'RETUR KREDIT'])
             ->where(function ($period) use ($asOfDate) {
@@ -1578,10 +1724,8 @@ class FinanceController extends Controller
             }
 
             $total = max(0, $total);
-            $paid = min($total, max(
-                (float) ($transaction->finance_paid ?? 0),
-                (float) ($transaction->paid ?? 0)
-            ));
+            $legacyPaid = max(0, (float) ($transaction->paid ?? 0) - (float) ($transaction->finance_paid_total ?? 0));
+            $paid = min($total, max(0, (float) ($transaction->finance_paid ?? 0) + $legacyPaid));
             $balancesByDebtor[$debtorKey] = ($balancesByDebtor[$debtorKey] ?? 0) + max(0, $total - $paid);
         }
 
@@ -1591,7 +1735,27 @@ class FinanceController extends Controller
             }
         }
 
-        return (float) array_sum($balancesByDebtor);
+        $totalBalance = (float) array_sum($balancesByDebtor);
+
+        if (Schema::hasTable('finance_opening_invoices')) {
+            $openingReceivables = FinanceOpeningInvoice::query()
+                ->withSum(['payments as paid_as_of' => fn($q) => $q->whereDate('payment_date', '<=', $asOfDate)], 'amount')
+                ->where('type', 'PIUTANG')
+                ->whereIn('pharmacy_id', $pharmacyIds)
+                ->whereDate('invoice_date', '<=', $asOfDate)
+                ->get(['id', 'amount']);
+
+            foreach ($openingReceivables as $oi) {
+                $amt = (float) $oi->amount;
+                if ($amt < 0) {
+                    $totalBalance += $amt;
+                } else {
+                    $totalBalance += max(0.0, $amt - (float) ($oi->paid_as_of ?? 0));
+                }
+            }
+        }
+
+        return max(0.0, $totalBalance);
     }
 
     /**
@@ -1679,7 +1843,25 @@ class FinanceController extends Controller
             $balance += max(0, $invoiceTotal - $paidCashBank - $totalReturDeduction);
         }
 
-        return $balance;
+        if (Schema::hasTable('finance_opening_invoices')) {
+            $openingPayables = FinanceOpeningInvoice::query()
+                ->withSum(['payments as paid_as_of' => fn($q) => $q->whereDate('payment_date', '<=', $asOfDate)], 'amount')
+                ->where('type', 'HUTANG')
+                ->whereIn('pharmacy_id', $pharmacyIds)
+                ->whereDate('invoice_date', '<=', $asOfDate)
+                ->get(['id', 'amount']);
+
+            foreach ($openingPayables as $oi) {
+                $amt = (float) $oi->amount;
+                if ($amt < 0) {
+                    $balance += $amt;
+                } else {
+                    $balance += max(0.0, $amt - (float) ($oi->paid_as_of ?? 0));
+                }
+            }
+        }
+
+        return max(0.0, $balance);
     }
 
     /**
@@ -2585,6 +2767,8 @@ class FinanceController extends Controller
             'receivingDetail.creditor',
             'transaction.debtors',
             'transaction.patients',
+            'openingInvoice.creditor',
+            'openingInvoice.debtor',
         ])
             ->whereHas('account', function ($q) {
                 $q->where('category', 'Kas & Bank');
@@ -2682,15 +2866,20 @@ class FinanceController extends Controller
                 $deskripsi = "Penerimaan penjualan {$method} melalui {$bank}";
             }
         } elseif ($p->payment_type === 'PIUTANG') {
-            $pihakTerkait = $p->transaction->debtors->name ?? ($p->transaction->patients->name ?? 'Pelanggan Umum');
-            $doc = $p->transaction->invoice_number ?? $p->reference_number;
+            $pihakTerkait = $p->openingInvoice?->debtor?->name
+                ?? $p->transaction?->debtors?->name
+                ?? ($p->transaction?->patients?->name ?? 'Pelanggan Umum');
+            $doc = $p->openingInvoice?->invoice_number ?? $p->transaction?->invoice_number ?? $p->reference_number;
             if ($doc)
                 $noDokumen = $doc;
             if (!$deskripsi)
                 $deskripsi = "Penerimaan piutang penjualan dari {$pihakTerkait}";
         } elseif ($p->payment_type === 'KREDIT') {
-            $pihakTerkait = $p->receivingDetail->creditor->name ?? ($p->receivingDetail->creditor_code ?? 'PBF / Vendor');
-            $doc = $p->receivingDetail->invoice_number ?? $p->reference_number;
+            $pihakTerkait = $p->openingInvoice?->creditor?->name
+                ?? ($p->openingInvoice?->creditor_code ?: null)
+                ?? $p->receivingDetail?->creditor?->name
+                ?? ($p->receivingDetail?->creditor_code ?? 'PBF / Vendor');
+            $doc = $p->openingInvoice?->invoice_number ?? $p->receivingDetail?->invoice_number ?? $p->reference_number;
             if ($doc)
                 $noDokumen = $doc;
             if (!$deskripsi)
@@ -2784,13 +2973,19 @@ class FinanceController extends Controller
      */
     protected function applyMutasiBranchScope($query, array $targetPharmacyIds)
     {
-        return $query->where(function ($q) use ($targetPharmacyIds) {
+        return $query
+            ->whereNotIn('payment_type', ['KREDIT CUTOFF', 'PIUTANG CUTOFF', 'RETUR'])
+            ->where(function ($q) use ($targetPharmacyIds) {
             $q
                 ->whereHas('receiving', function ($sub) use ($targetPharmacyIds) {
                     $sub->whereIn('pharmacy_id', $targetPharmacyIds);
                 })
                 ->orWhereHas('transaction', function ($sub) use ($targetPharmacyIds) {
                     $sub->whereIn('pharmacy_id', $targetPharmacyIds);
+                })
+                ->orWhere(function ($sub) use ($targetPharmacyIds) {
+                    $sub->whereNotNull('opening_invoice_id')
+                        ->whereIn('pharmacy_id', $targetPharmacyIds);
                 })
                 ->orWhere(function ($sub) use ($targetPharmacyIds) {
                     $sub
@@ -2995,6 +3190,8 @@ class FinanceController extends Controller
             'receivingDetail.creditor',
             'transaction.debtors',
             'transaction.patients',
+            'openingInvoice.creditor',
+            'openingInvoice.debtor',
         ])
             ->whereHas('account', function ($q) {
                 $q->where('category', 'Kas & Bank');
@@ -3897,26 +4094,111 @@ class FinanceController extends Controller
     }
 
     /**
+     * Resolve akun referensi non-kas (FK account_id wajib terisi di tabel finance_payments)
+     * untuk pelunasan pra-cut-off; saldo akun ini TIDAK pernah ditambah/dikurangi.
+     */
+    private function resolveCutoffReferenceAccountId(?int $pharmacyId = null): int
+    {
+        $targetPharmacyId = ($pharmacyId && $pharmacyId > 0) ? $pharmacyId : (int) getActivePharmacyId();
+        $account = $this->branchKasBankAccountsQuery()
+            ->orderByRaw("CASE WHEN account_type = 'kas_apotek' OR code = '1-10001' THEN 0 ELSE 1 END")
+            ->orderBy('id')
+            ->first();
+
+        if (!$account && $targetPharmacyId > 0) {
+            FinanceAccount::ensureBranchDefaultAccounts($targetPharmacyId);
+            $account = FinanceAccount::where('category', 'Kas & Bank')
+                ->where('pharmacy_id', $targetPharmacyId)
+                ->orderBy('id')
+                ->first();
+        }
+
+        if (!$account) {
+            $account = FinanceAccount::where('category', 'Kas & Bank')->orderBy('id')->firstOrFail();
+        }
+
+        return (int) $account->id;
+    }
+
+    /**
      * Catat pembayaran faktur hutang dagang (Kredit).
      */
     public function storePayment(Request $request)
     {
+        $isCutoff = $request->boolean('is_cutoff');
+
         $validated = $request->validate([
-            'receiving_detail_id' => 'required|exists:receiving_details,id',
-            'account_id' => 'required|exists:finance_accounts,id',
+            'receiving_detail_id' => 'required',
+            'account_id' => $isCutoff ? 'nullable|exists:finance_accounts,id' : 'required|exists:finance_accounts,id',
             'payment_date' => 'required|date',
             'amount' => 'required|numeric|gt:0',
             'reference_number' => 'nullable|string|max:100',
             'notes' => 'nullable|string|max:500',
+            'is_cutoff' => 'nullable|boolean',
         ]);
 
-        $detail = ReceivingDetails::with(['receiving_items', 'payments', 'receiving'])->findOrFail($validated['receiving_detail_id']);
-        $account = $this->branchKasBankAccountsQuery()->findOrFail($validated['account_id']);
+        $account = null;
+        if (!$isCutoff) {
+            $account = $this->branchKasBankAccountsQuery()->findOrFail($validated['account_id']);
 
-        // Verifikasi akun harus ber-kategori 'Kas & Bank'
-        if ($account->category !== 'Kas & Bank') {
-            return back()->withErrors(['account_id' => 'Akun pembayaran harus berkategori Kas & Bank.']);
+            // Verifikasi akun harus ber-kategori 'Kas & Bank'
+            if ($account->category !== 'Kas & Bank') {
+                return back()->withErrors(['account_id' => 'Akun pembayaran harus berkategori Kas & Bank.']);
+            }
         }
+
+        $openingId = FinanceOpeningInvoice::parseCompositeId($validated['receiving_detail_id']);
+        if ($openingId !== null) {
+            abort_unless(Schema::hasTable('finance_opening_invoices'), 404);
+            $opening = FinanceOpeningInvoice::where('type', 'HUTANG')
+                ->whereIn('pharmacy_id', $this->getTargetPharmacyIds())
+                ->findOrFail($openingId);
+
+            $alreadyPaid = (float) FinancePayment::where('opening_invoice_id', $opening->id)
+                ->where('payment_type', '!=', 'RETUR')
+                ->sum('amount');
+            $sisaHutang = round(max(0, (float) $opening->amount - $alreadyPaid), 2);
+
+            if (round($validated['amount'], 2) > $sisaHutang) {
+                $formattedSisa = fmod($sisaHutang, 1) !== 0.0 ? number_format($sisaHutang, 2, ',', '.') : number_format($sisaHutang, 0, ',', '.');
+                return back()->withErrors(['amount' => 'Nominal pembayaran tidak boleh melebihi sisa tagihan (Rp ' . $formattedSisa . ').']);
+            }
+
+            $paymentAccountId = $isCutoff
+                ? $this->resolveCutoffReferenceAccountId($opening->pharmacy_id)
+                : $account->id;
+            $notes = trim((string) ($validated['notes'] ?? ''));
+            if ($isCutoff) {
+                $notes = $notes !== ''
+                    ? (str_contains(strtolower($notes), 'cut-off') ? $notes : '[Pra-Cut-off] ' . $notes)
+                    : 'Pelunasan Pra-Cut-off Saldo Awal Hutang (Tanpa Potong Kas & Bank)';
+            }
+
+            DB::transaction(function () use ($validated, $opening, $account, $paymentAccountId, $isCutoff, $notes) {
+                FinancePayment::create([
+                    'pharmacy_id' => $opening->pharmacy_id,
+                    'opening_invoice_id' => $opening->id,
+                    'account_id' => $paymentAccountId,
+                    'payment_type' => $isCutoff ? 'KREDIT CUTOFF' : 'KREDIT',
+                    'payment_date' => $validated['payment_date'],
+                    'amount' => $validated['amount'],
+                    'reference_number' => $validated['reference_number'] ?? ($isCutoff ? 'CUTOFF-HUTANG' : null),
+                    'notes' => $notes !== '' ? $notes : null,
+                    'created_by' => Auth::id(),
+                ]);
+
+                if (!$isCutoff && $account) {
+                    $account->decrement('balance', $validated['amount']);
+                }
+            });
+
+            $this->clearStatsCache();
+            return back()->with('success', $isCutoff
+                ? 'Pelunasan pra-cut-off tagihan saldo awal hutang berhasil dicatat tanpa memotong Kas & Bank.'
+                : 'Pembayaran tagihan saldo awal hutang dagang berhasil dicatat.');
+        }
+
+        $detail = ReceivingDetails::with(['receiving_items', 'payments', 'receiving'])->findOrFail($validated['receiving_detail_id']);
 
         // Hitung total invoice
         $subtotal = 0;
@@ -3942,23 +4224,35 @@ class FinanceController extends Controller
             return back()->withErrors(['amount' => 'Nominal pembayaran tidak boleh melebihi sisa tagihan (Rp ' . $formattedSisa . ').']);
         }
 
-        DB::transaction(function () use ($validated, $detail, $account, $netInvoice) {
+        $paymentAccountId = $isCutoff
+            ? $this->resolveCutoffReferenceAccountId($detail->receiving?->pharmacy_id)
+            : $account->id;
+        $notes = trim((string) ($validated['notes'] ?? ''));
+        if ($isCutoff) {
+            $notes = $notes !== ''
+                ? (str_contains(strtolower($notes), 'cut-off') ? $notes : '[Pra-Cut-off] ' . $notes)
+                : 'Pelunasan Pra-Cut-off (Tanpa Potong Kas & Bank)';
+        }
+
+        DB::transaction(function () use ($validated, $detail, $account, $paymentAccountId, $isCutoff, $notes, $netInvoice) {
             // 1. Simpan Payment
             FinancePayment::create([
                 'pharmacy_id' => $detail->receiving?->pharmacy_id,
                 'receiving_id' => $detail->receiving_id,
                 'receiving_detail_id' => $detail->id,
-                'account_id' => $account->id,
-                'payment_type' => 'KREDIT',
+                'account_id' => $paymentAccountId,
+                'payment_type' => $isCutoff ? 'KREDIT CUTOFF' : 'KREDIT',
                 'payment_date' => $validated['payment_date'],
                 'amount' => $validated['amount'],
-                'reference_number' => $validated['reference_number'] ?? null,
-                'notes' => $validated['notes'] ?? null,
+                'reference_number' => $validated['reference_number'] ?? ($isCutoff ? 'CUTOFF-HUTANG' : null),
+                'notes' => $notes !== '' ? $notes : null,
                 'created_by' => Auth::id(),
             ]);
 
-            // 2. Kurangi saldo akun Kas & Bank
-            $account->decrement('balance', $validated['amount']);
+            // 2. Kurangi saldo akun Kas & Bank (hanya untuk pembayaran kas/bank reguler, bukan pra-cut-off)
+            if (!$isCutoff && $account) {
+                $account->decrement('balance', $validated['amount']);
+            }
 
             // 3. Hitung akumulasi pembayaran yang sudah masuk
             $totalTerbayar = (float) FinancePayment::where('receiving_detail_id', $detail->id)
@@ -3972,7 +4266,9 @@ class FinanceController extends Controller
         });
 
         $this->clearStatsCache();
-        return back()->with('success', 'Pembayaran hutang dagang berhasil dicatat.');
+        return back()->with('success', $isCutoff
+            ? 'Pelunasan pra-cut-off hutang dagang berhasil dicatat tanpa memotong Kas & Bank.'
+            : 'Pembayaran hutang dagang berhasil dicatat.');
     }
 
     /**
@@ -4181,29 +4477,80 @@ class FinanceController extends Controller
     }
 
     /**
-     * Pelunasan massal (multi) faktur hutang dagang kredit (Maksimal 10 item).
+     * Pelunasan massal (multi) faktur hutang dagang kredit (Maksimal 10 item, atau 50 item untuk Pra-Cut-off).
      */
     public function storeBulkPayments(Request $request)
     {
+        $isCutoff = $request->boolean('is_cutoff');
+        $maxItems = $isCutoff ? 50 : 10;
+
         $validated = $request->validate([
-            'receiving_detail_ids' => 'required|array|min:1|max:10',
-            'receiving_detail_ids.*' => 'required|exists:receiving_details,id',
-            'account_id' => 'required|exists:finance_accounts,id',
+            'receiving_detail_ids' => "required|array|min:1|max:{$maxItems}",
+            'receiving_detail_ids.*' => 'required',
+            'account_id' => $isCutoff ? 'nullable|exists:finance_accounts,id' : 'required|exists:finance_accounts,id',
             'payment_date' => 'required|date',
             'reference_number' => 'nullable|string|max:100',
             'notes' => 'nullable|string|max:500',
+            'is_cutoff' => 'nullable|boolean',
         ]);
 
-        $account = $this->branchKasBankAccountsQuery()->findOrFail($validated['account_id']);
-        if ($account->category !== 'Kas & Bank') {
-            return back()->withErrors(['account_id' => 'Akun pembayaran harus berkategori Kas & Bank.']);
+        $account = null;
+        if (!$isCutoff) {
+            $account = $this->branchKasBankAccountsQuery()->findOrFail($validated['account_id']);
+            if ($account->category !== 'Kas & Bank') {
+                return back()->withErrors(['account_id' => 'Akun pembayaran harus berkategori Kas & Bank.']);
+            }
         }
+        $cutoffAccountId = $isCutoff ? $this->resolveCutoffReferenceAccountId() : null;
+        $targetPharmacyIds = $this->getTargetPharmacyIds();
+        $hasOpeningTable = Schema::hasTable('finance_opening_invoices');
 
         $totalPaidAll = 0;
         $processedCount = 0;
 
-        DB::transaction(function () use ($validated, $account, &$totalPaidAll, &$processedCount) {
+        DB::transaction(function () use ($validated, $account, $isCutoff, $cutoffAccountId, $targetPharmacyIds, $hasOpeningTable, &$totalPaidAll, &$processedCount) {
             foreach ($validated['receiving_detail_ids'] as $detailId) {
+                $openingId = FinanceOpeningInvoice::parseCompositeId($detailId);
+                if ($openingId !== null) {
+                    if (!$hasOpeningTable) {
+                        continue;
+                    }
+                    $opening = FinanceOpeningInvoice::where('type', 'HUTANG')
+                        ->whereIn('pharmacy_id', $targetPharmacyIds)
+                        ->find($openingId);
+                    if (!$opening) {
+                        continue;
+                    }
+                    $alreadyPaid = (float) FinancePayment::where('opening_invoice_id', $opening->id)
+                        ->where('payment_type', '!=', 'RETUR')
+                        ->sum('amount');
+                    $remaining = round(max(0, (float) $opening->amount - $alreadyPaid), 2);
+                    if ($remaining < 0.005) {
+                        continue;
+                    }
+
+                    $rawNotes = trim((string) ($validated['notes'] ?? ''));
+                    $finalNotes = $isCutoff
+                        ? ($rawNotes !== '' ? (str_contains(strtolower($rawNotes), 'cut-off') ? $rawNotes : '[Pra-Cut-off] ' . $rawNotes) : 'Pelunasan Pra-Cut-off Massal Saldo Awal Hutang (Tanpa Potong Kas & Bank)')
+                        : ($rawNotes !== '' ? ($rawNotes . ' (Pelunasan Massal)') : ('Pelunasan Massal via ' . $account->name));
+
+                    FinancePayment::create([
+                        'pharmacy_id' => $opening->pharmacy_id,
+                        'opening_invoice_id' => $opening->id,
+                        'account_id' => $isCutoff ? $cutoffAccountId : $account->id,
+                        'payment_type' => $isCutoff ? 'KREDIT CUTOFF' : 'KREDIT',
+                        'payment_date' => $validated['payment_date'],
+                        'amount' => $remaining,
+                        'reference_number' => $validated['reference_number'] ?? ($isCutoff ? 'CUTOFF-HUTANG' : null),
+                        'notes' => $finalNotes,
+                        'created_by' => Auth::id(),
+                    ]);
+
+                    $totalPaidAll += $remaining;
+                    $processedCount++;
+                    continue;
+                }
+
                 $detail = ReceivingDetails::with(['receiving_items', 'payments', 'receiving'])->find($detailId);
                 if (!$detail || $detail->invoice_payment !== 'KREDIT')
                     continue;
@@ -4234,18 +4581,21 @@ class FinanceController extends Controller
                     continue;
                 }
 
+                $rawNotes = trim((string) ($validated['notes'] ?? ''));
+                $finalNotes = $isCutoff
+                    ? ($rawNotes !== '' ? (str_contains(strtolower($rawNotes), 'cut-off') ? $rawNotes : '[Pra-Cut-off] ' . $rawNotes) : 'Pelunasan Pra-Cut-off Massal (Tanpa Potong Kas & Bank)')
+                    : ($rawNotes !== '' ? ($rawNotes . ' (Pelunasan Massal)') : ('Pelunasan Massal via ' . $account->name));
+
                 FinancePayment::create([
                     'pharmacy_id' => $detail->receiving?->pharmacy_id,
                     'receiving_id' => $detail->receiving_id,
                     'receiving_detail_id' => $detail->id,
-                    'account_id' => $account->id,
-                    'payment_type' => 'KREDIT',
+                    'account_id' => $isCutoff ? $cutoffAccountId : $account->id,
+                    'payment_type' => $isCutoff ? 'KREDIT CUTOFF' : 'KREDIT',
                     'payment_date' => $validated['payment_date'],
                     'amount' => $remaining,
-                    'reference_number' => $validated['reference_number'] ?? null,
-                    'notes' => !empty($validated['notes'])
-                        ? ($validated['notes'] . ' (Pelunasan Massal)')
-                        : ('Pelunasan Massal via ' . $account->name),
+                    'reference_number' => $validated['reference_number'] ?? ($isCutoff ? 'CUTOFF-HUTANG' : null),
+                    'notes' => $finalNotes,
                     'created_by' => Auth::id(),
                 ]);
 
@@ -4257,14 +4607,16 @@ class FinanceController extends Controller
                 }
             }
 
-            if ($totalPaidAll > 0) {
+            if (!$isCutoff && $account && $totalPaidAll > 0) {
                 $account->decrement('balance', $totalPaidAll);
             }
         });
 
         $this->clearStatsCache();
         $formattedTotal = number_format($totalPaidAll, 0, ',', '.');
-        return back()->with('success', "Berhasil melunasi {$processedCount} faktur hutang dagang sebesar Rp {$formattedTotal} via {$account->name}.");
+        return back()->with('success', $isCutoff
+            ? "Berhasil melunasi pra-cut-off {$processedCount} faktur hutang dagang sebesar Rp {$formattedTotal} (tanpa memotong Kas & Bank)."
+            : "Berhasil melunasi {$processedCount} faktur hutang dagang sebesar Rp {$formattedTotal} via {$account->name}.");
     }
 
     /**
@@ -4272,8 +4624,11 @@ class FinanceController extends Controller
      */
     public function importHutangPayments(Request $request)
     {
+        $isCutoffImport = $request->boolean('is_cutoff');
+
         $request->validate([
             'file' => 'required|file|mimes:xlsx,xls,csv,txt|max:10240',
+            'is_cutoff' => 'nullable|boolean',
         ]);
 
         try {
@@ -4322,7 +4677,8 @@ class FinanceController extends Controller
 
             if ($invoiceNumber === '')
                 $errors[] = "Baris {$line}: No. Faktur kosong.";
-            if ($bankCode === '')
+            $rowIsCutoff = $isCutoffImport || in_array(mb_strtoupper($bankCode), ['CUTOFF', 'CUT-OFF', 'PRA-CUTOFF', 'NON-KAS'], true);
+            if (!$rowIsCutoff && $bankCode === '')
                 $errors[] = "Baris {$line}: Kode Bank kosong.";
             if ($invoiceNumber !== '' && isset($seenInvoices[mb_strtolower($invoiceNumber)])) {
                 $errors[] = "Baris {$line}: No. Faktur {$invoiceNumber} tercantum lebih dari sekali.";
@@ -4330,8 +4686,8 @@ class FinanceController extends Controller
             if ($invoiceNumber !== '')
                 $seenInvoices[mb_strtolower($invoiceNumber)] = true;
 
-            $account = $accountsByCode->get(mb_strtolower($bankCode));
-            if (!$account && $bankCode !== '')
+            $account = $rowIsCutoff ? null : $accountsByCode->get(mb_strtolower($bankCode));
+            if (!$rowIsCutoff && !$account && $bankCode !== '')
                 $errors[] = "Baris {$line}: Kode Bank '{$bankCode}' tidak ditemukan atau tidak aktif.";
 
             try {
@@ -4357,14 +4713,29 @@ class FinanceController extends Controller
                 ->postedToStock()
                 ->whereHas('receiving', fn($query) => $query->whereIn('pharmacy_id', $pharmacyIds))
                 ->get();
-            if ($invoiceNumber !== '' && $matches->count() === 0) {
+            $openingMatches = (Schema::hasTable('finance_opening_invoices') && $invoiceNumber !== '')
+                ? FinanceOpeningInvoice::where('type', 'HUTANG')
+                    ->where('invoice_number', $invoiceNumber)
+                    ->whereIn('pharmacy_id', $pharmacyIds)
+                    ->get()
+                : collect();
+            $totalMatches = $matches->count() + $openingMatches->count();
+
+            if ($invoiceNumber !== '' && $totalMatches === 0) {
                 $errors[] = "Baris {$line}: Faktur '{$invoiceNumber}' tidak ditemukan pada cabang yang dapat diakses.";
-            } elseif ($matches->count() > 1) {
+            } elseif ($totalMatches > 1) {
                 $errors[] = "Baris {$line}: Faktur '{$invoiceNumber}' cocok ke lebih dari satu data. Periksa nomor faktur.";
             }
 
-            if ($matches->count() === 1 && $account && $paymentDate) {
-                $prepared[] = ['line' => $line, 'detail' => $matches->first(), 'account' => $account, 'payment_date' => $paymentDate];
+            if ($totalMatches === 1 && ($rowIsCutoff || $account) && $paymentDate) {
+                $prepared[] = [
+                    'line' => $line,
+                    'detail' => $matches->count() === 1 ? $matches->first() : null,
+                    'opening' => $openingMatches->count() === 1 ? $openingMatches->first() : null,
+                    'account' => $account,
+                    'is_cutoff' => $rowIsCutoff,
+                    'payment_date' => $paymentDate,
+                ];
             }
         }
 
@@ -4373,11 +4744,46 @@ class FinanceController extends Controller
         if ($errors)
             throw ValidationException::withMessages(['file' => implode("\n", $errors)]);
 
+        $hasAnyCutoff = collect($prepared)->contains(fn($e) => !empty($e['is_cutoff']));
+        $cutoffAccountId = $hasAnyCutoff ? $this->resolveCutoffReferenceAccountId() : null;
+
         $totalPaid = 0.0;
-        DB::transaction(function () use ($prepared, &$totalPaid) {
+        DB::transaction(function () use ($prepared, $cutoffAccountId, &$totalPaid) {
             foreach ($prepared as $entry) {
+                $entryIsCutoff = !empty($entry['is_cutoff']);
+                $account = $entryIsCutoff ? null : FinanceAccount::whereKey($entry['account']->id)->lockForUpdate()->firstOrFail();
+
+                if (!empty($entry['opening'])) {
+                    $opening = FinanceOpeningInvoice::whereKey($entry['opening']->id)->lockForUpdate()->firstOrFail();
+                    $alreadyPaid = (float) FinancePayment::where('opening_invoice_id', $opening->id)
+                        ->where('payment_type', '!=', 'RETUR')
+                        ->sum('amount');
+                    $remaining = round(max(0, (float) $opening->amount - $alreadyPaid), 2);
+                    if ($remaining < 0.005) {
+                        throw ValidationException::withMessages(['file' => "Baris {$entry['line']}: Tagihan saldo awal '{$opening->invoice_number}' sudah lunas."]);
+                    }
+
+                    FinancePayment::create([
+                        'pharmacy_id' => $opening->pharmacy_id,
+                        'opening_invoice_id' => $opening->id,
+                        'account_id' => $entryIsCutoff ? $cutoffAccountId : $account->id,
+                        'payment_type' => $entryIsCutoff ? 'KREDIT CUTOFF' : 'KREDIT',
+                        'payment_date' => $entry['payment_date'],
+                        'amount' => $remaining,
+                        'reference_number' => $entryIsCutoff ? 'CUTOFF-HUTANG' : null,
+                        'notes' => $entryIsCutoff
+                            ? 'Pelunasan Pra-Cut-off Saldo Awal Hutang melalui impor file (Tanpa Potong Kas & Bank)'
+                            : 'Pelunasan Saldo Awal Hutang Dagang melalui impor file',
+                        'created_by' => Auth::id(),
+                    ]);
+                    if (!$entryIsCutoff && $account) {
+                        $account->decrement('balance', $remaining);
+                    }
+                    $totalPaid += $remaining;
+                    continue;
+                }
+
                 $detail = ReceivingDetails::whereKey($entry['detail']->id)->lockForUpdate()->firstOrFail();
-                $account = FinanceAccount::whereKey($entry['account']->id)->lockForUpdate()->firstOrFail();
                 $detail->load(['receiving_items.order_items', 'creditor', 'receiving']);
                 $subtotal = 0.0;
                 foreach ($detail->receiving_items as $item) {
@@ -4401,15 +4807,19 @@ class FinanceController extends Controller
                     'pharmacy_id' => $detail->receiving?->pharmacy_id,
                     'receiving_id' => $detail->receiving_id,
                     'receiving_detail_id' => $detail->id,
-                    'account_id' => $account->id,
-                    'payment_type' => 'KREDIT',
+                    'account_id' => $entryIsCutoff ? $cutoffAccountId : $account->id,
+                    'payment_type' => $entryIsCutoff ? 'KREDIT CUTOFF' : 'KREDIT',
                     'payment_date' => $entry['payment_date'],
                     'amount' => $remaining,
-                    'reference_number' => null,
-                    'notes' => 'Pelunasan Hutang Dagang melalui impor file',
+                    'reference_number' => $entryIsCutoff ? 'CUTOFF-HUTANG' : null,
+                    'notes' => $entryIsCutoff
+                        ? 'Pelunasan Pra-Cut-off Hutang Dagang melalui impor file (Tanpa Potong Kas & Bank)'
+                        : 'Pelunasan Hutang Dagang melalui impor file',
                     'created_by' => Auth::id(),
                 ]);
-                $account->decrement('balance', $remaining);
+                if (!$entryIsCutoff && $account) {
+                    $account->decrement('balance', $remaining);
+                }
                 $totalPaid += $remaining;
                 if ($detail->receiving)
                     $detail->receiving->update(['status' => 3]);
@@ -4417,7 +4827,7 @@ class FinanceController extends Controller
         });
 
         $this->clearStatsCache();
-        return back()->with('success', 'Impor berhasil: ' . count($prepared) . ' faktur dilunasi dengan total Rp ' . number_format($totalPaid, 0, ',', '.') . '.');
+        return back()->with('success', 'Impor berhasil: ' . count($prepared) . ' faktur dilunasi dengan total Rp ' . number_format($totalPaid, 0, ',', '.') . ($isCutoffImport ? ' (Pra-Cut-off, tanpa memotong Kas & Bank).' : '.'));
     }
 
     public function downloadHutangPaymentTemplate()
@@ -4716,21 +5126,84 @@ class FinanceController extends Controller
      */
     public function storePiutangPayment(Request $request)
     {
+        $isCutoff = $request->boolean('is_cutoff');
+
         $validated = $request->validate([
-            'medicine_transaction_id' => 'required|exists:medicine_transactions,id',
-            'account_id' => 'required|exists:finance_accounts,id',
+            'medicine_transaction_id' => 'required',
+            'account_id' => $isCutoff ? 'nullable|exists:finance_accounts,id' : 'required|exists:finance_accounts,id',
             'payment_date' => 'required|date',
             'amount' => 'required|numeric|gt:0',
             'reference_number' => 'nullable|string|max:100',
             'notes' => 'nullable|string|max:500',
+            'is_cutoff' => 'nullable|boolean',
         ]);
 
-        $tx = MedicineTransactions::with(['payments', 'returs'])->findOrFail($validated['medicine_transaction_id']);
-        $account = $this->branchKasBankAccountsQuery()->findOrFail($validated['account_id']);
+        $account = null;
+        if (!$isCutoff) {
+            $account = $this->branchKasBankAccountsQuery()->findOrFail($validated['account_id']);
 
-        if ($account->category !== 'Kas & Bank') {
-            return back()->withErrors(['account_id' => 'Akun pembayaran harus berkategori Kas & Bank.']);
+            if ($account->category !== 'Kas & Bank') {
+                return back()->withErrors(['account_id' => 'Akun pembayaran harus berkategori Kas & Bank.']);
+            }
         }
+
+        $openingId = FinanceOpeningInvoice::parseCompositeId($validated['medicine_transaction_id']);
+        if ($openingId !== null) {
+            abort_unless(Schema::hasTable('finance_opening_invoices'), 404);
+            $opening = FinanceOpeningInvoice::where('type', 'PIUTANG')
+                ->whereIn('pharmacy_id', $this->getTargetPharmacyIds())
+                ->findOrFail($openingId);
+
+            $totalTerbayarExisting = (float) FinancePayment::where('opening_invoice_id', $opening->id)
+                ->where('payment_type', '!=', 'RETUR')
+                ->sum('amount');
+            $sisa = round(max(0, (float) $opening->amount - $totalTerbayarExisting), 2);
+
+            if (round($validated['amount'], 2) > $sisa) {
+                $formattedSisa = fmod($sisa, 1) !== 0.0 ? number_format($sisa, 2, ',', '.') : number_format($sisa, 0, ',', '.');
+                return back()->withErrors(['amount' => 'Nominal pembayaran tidak boleh melebihi sisa tagihan piutang (Rp ' . $formattedSisa . ').']);
+            }
+
+            $paymentAccountId = $isCutoff
+                ? $this->resolveCutoffReferenceAccountId($opening->pharmacy_id)
+                : $account->id;
+            $notes = trim((string) ($validated['notes'] ?? ''));
+            if ($isCutoff) {
+                $notes = $notes !== ''
+                    ? (str_contains(strtolower($notes), 'cut-off') ? $notes : '[Pra-Cut-off] ' . $notes)
+                    : 'Pelunasan Pra-Cut-off Saldo Awal Piutang (Tanpa Tambah Kas & Bank)';
+            }
+
+            DB::beginTransaction();
+            try {
+                FinancePayment::create([
+                    'pharmacy_id' => $opening->pharmacy_id,
+                    'opening_invoice_id' => $opening->id,
+                    'account_id' => $paymentAccountId,
+                    'payment_type' => $isCutoff ? 'PIUTANG CUTOFF' : 'PIUTANG',
+                    'payment_date' => $validated['payment_date'],
+                    'amount' => $validated['amount'],
+                    'reference_number' => $validated['reference_number'] ?? ($isCutoff ? 'CUTOFF-PIUTANG' : null),
+                    'notes' => $notes !== '' ? $notes : null,
+                    'created_by' => Auth::id(),
+                ]);
+
+                if (!$isCutoff && $account) {
+                    $account->increment('balance', $validated['amount']);
+                }
+
+                DB::commit();
+                $this->clearStatsCache();
+                return redirect()->back()->with('success', $isCutoff
+                    ? 'Pelunasan pra-cut-off tagihan saldo awal piutang berhasil dicatat tanpa menambah Kas & Bank.'
+                    : 'Penerimaan pembayaran tagihan saldo awal piutang berhasil dicatat.');
+            } catch (\Exception $e) {
+                DB::rollBack();
+                return back()->withErrors(['error' => 'Gagal mencatat penerimaan pembayaran piutang: ' . $e->getMessage()]);
+            }
+        }
+
+        $tx = MedicineTransactions::with(['payments', 'returs'])->findOrFail($validated['medicine_transaction_id']);
 
         $totalRetur = (float) $tx->returs->sum('total_retur');
         $totalTerbayarExisting = (float) $tx->payments->sum('amount');
@@ -4743,17 +5216,27 @@ class FinanceController extends Controller
             return back()->withErrors(['amount' => 'Nominal pembayaran tidak boleh melebihi sisa tagihan piutang (Rp ' . $formattedSisa . ').']);
         }
 
+        $paymentAccountId = $isCutoff
+            ? $this->resolveCutoffReferenceAccountId($tx->pharmacy_id)
+            : $account->id;
+        $notes = trim((string) ($validated['notes'] ?? ''));
+        if ($isCutoff) {
+            $notes = $notes !== ''
+                ? (str_contains(strtolower($notes), 'cut-off') ? $notes : '[Pra-Cut-off] ' . $notes)
+                : 'Pelunasan Pra-Cut-off Piutang (Tanpa Tambah Kas & Bank)';
+        }
+
         DB::beginTransaction();
         try {
             FinancePayment::create([
                 'pharmacy_id' => $tx->pharmacy_id,
                 'medicine_transaction_id' => $tx->id,
-                'account_id' => $account->id,
-                'payment_type' => 'PIUTANG',
+                'account_id' => $paymentAccountId,
+                'payment_type' => $isCutoff ? 'PIUTANG CUTOFF' : 'PIUTANG',
                 'payment_date' => $validated['payment_date'],
                 'amount' => $validated['amount'],
-                'reference_number' => $validated['reference_number'],
-                'notes' => $validated['notes'],
+                'reference_number' => $validated['reference_number'] ?? ($isCutoff ? 'CUTOFF-PIUTANG' : null),
+                'notes' => $notes !== '' ? $notes : null,
                 'created_by' => Auth::id(),
             ]);
 
@@ -4761,13 +5244,17 @@ class FinanceController extends Controller
             $tx->paid = (string) $newTotalPaid;
             $tx->save();
 
-            // Tambah saldo akun Kas & Bank (Penerimaan Piutang)
-            $account->increment('balance', $validated['amount']);
+            // Tambah saldo akun Kas & Bank (hanya untuk penerimaan kas/bank reguler, bukan pra-cut-off)
+            if (!$isCutoff && $account) {
+                $account->increment('balance', $validated['amount']);
+            }
 
             DB::commit();
 
             $this->clearStatsCache();
-            return redirect()->back()->with('success', 'Penerimaan pembayaran piutang berhasil dicatat.');
+            return redirect()->back()->with('success', $isCutoff
+                ? 'Pelunasan pra-cut-off piutang berhasil dicatat tanpa menambah Kas & Bank.'
+                : 'Penerimaan pembayaran piutang berhasil dicatat.');
         } catch (\Exception $e) {
             DB::rollBack();
             return back()->withErrors(['error' => 'Gagal mencatat penerimaan pembayaran piutang: ' . $e->getMessage()]);
@@ -4775,7 +5262,7 @@ class FinanceController extends Controller
     }
 
     /**
-     * Pelunasan massal piutang penjualan (Maks. 10 Faktur).
+     * Pelunasan massal piutang penjualan (Maks. 10 Faktur, atau 50 untuk Pra-Cut-off).
      */
     public function bulkPiutangPayment(Request $request)
     {
@@ -4785,28 +5272,53 @@ class FinanceController extends Controller
             $request->merge(['transaction_ids' => $ids]);
         }
 
+        $isCutoff = $request->boolean('is_cutoff');
+        $maxItems = $isCutoff ? 50 : 10;
+
         $validated = $request->validate([
-            'transaction_ids' => 'required|array|min:1|max:10',
-            'transaction_ids.*' => 'required|exists:medicine_transactions,id',
-            'account_id' => 'required|exists:finance_accounts,id',
+            'transaction_ids' => "required|array|min:1|max:{$maxItems}",
+            'transaction_ids.*' => 'required',
+            'account_id' => $isCutoff ? 'nullable|exists:finance_accounts,id' : 'required|exists:finance_accounts,id',
             'payment_date' => 'required|date',
             'reference_number' => 'nullable|string|max:100',
             'notes' => 'nullable|string|max:500',
+            'is_cutoff' => 'nullable|boolean',
         ], [
             'transaction_ids.required' => 'Pilih minimal 1 transaksi piutang untuk dilunasi.',
             'transaction_ids.min' => 'Pilih minimal 1 transaksi piutang.',
-            'transaction_ids.max' => 'Maksimal 10 transaksi piutang yang dapat dilunasi sekaligus.',
+            'transaction_ids.max' => "Maksimal {$maxItems} transaksi piutang yang dapat dilunasi sekaligus.",
             'account_id.required' => 'Silakan pilih akun Kas & Bank penerima.',
         ]);
 
-        $account = $this->branchKasBankAccountsQuery()->findOrFail($validated['account_id']);
-        if ($account->category !== 'Kas & Bank') {
-            return back()->withErrors(['account_id' => 'Akun kas/bank yang dipilih harus berkategori Kas & Bank.']);
+        $account = null;
+        if (!$isCutoff) {
+            $account = $this->branchKasBankAccountsQuery()->findOrFail($validated['account_id']);
+            if ($account->category !== 'Kas & Bank') {
+                return back()->withErrors(['account_id' => 'Akun kas/bank yang dipilih harus berkategori Kas & Bank.']);
+            }
+        }
+        $cutoffAccountId = $isCutoff ? $this->resolveCutoffReferenceAccountId() : null;
+
+        $openingIds = [];
+        $txIds = [];
+        foreach ($validated['transaction_ids'] as $rawId) {
+            $parsedOpeningId = FinanceOpeningInvoice::parseCompositeId($rawId);
+            if ($parsedOpeningId !== null) {
+                $openingIds[] = $parsedOpeningId;
+            } elseif (is_numeric($rawId)) {
+                $txIds[] = (int) $rawId;
+            }
         }
 
-        $transactions = MedicineTransactions::with(['payments', 'returs'])
-            ->whereIn('id', $validated['transaction_ids'])
-            ->get();
+        $transactions = !empty($txIds)
+            ? MedicineTransactions::with(['payments', 'returs'])->whereIn('id', $txIds)->get()
+            : collect();
+        $openingInvoices = (!empty($openingIds) && Schema::hasTable('finance_opening_invoices'))
+            ? FinanceOpeningInvoice::where('type', 'PIUTANG')
+                ->whereIn('pharmacy_id', $this->getTargetPharmacyIds())
+                ->whereIn('id', $openingIds)
+                ->get()
+            : collect();
 
         DB::beginTransaction();
         try {
@@ -4821,23 +5333,64 @@ class FinanceController extends Controller
                 if ($sisa < 0.005)
                     continue;
 
+                $rawNotes = trim((string) ($validated['notes'] ?? ''));
+                $finalNotes = $isCutoff
+                    ? ($rawNotes !== '' ? (str_contains(strtolower($rawNotes), 'cut-off') ? $rawNotes : '[Pra-Cut-off] ' . $rawNotes) : 'Pelunasan Pra-Cut-off Massal Piutang (Tanpa Tambah Kas & Bank)')
+                    : ($rawNotes ?: 'Pelunasan massal piutang penjualan');
+
                 FinancePayment::create([
                     'pharmacy_id' => $tx->pharmacy_id,
                     'medicine_transaction_id' => $tx->id,
-                    'account_id' => $account->id,
-                    'payment_type' => 'PIUTANG',
+                    'account_id' => $isCutoff ? $cutoffAccountId : $account->id,
+                    'payment_type' => $isCutoff ? 'PIUTANG CUTOFF' : 'PIUTANG',
                     'payment_date' => $validated['payment_date'],
                     'amount' => $sisa,
-                    'reference_number' => $validated['reference_number'] ?: ('BULK-PIUTANG-' . date('YmdHis')),
-                    'notes' => $validated['notes'] ?: 'Pelunasan massal piutang penjualan',
+                    'reference_number' => $validated['reference_number'] ?: ($isCutoff ? 'CUTOFF-PIUTANG' : ('BULK-PIUTANG-' . date('YmdHis'))),
+                    'notes' => $finalNotes,
                     'created_by' => Auth::id(),
                 ]);
 
                 $tx->paid = (string) round($totalPaid + $sisa, 2);
                 $tx->save();
 
-                // Tambah saldo akun Kas & Bank
-                $account->increment('balance', $sisa);
+                // Tambah saldo akun Kas & Bank (hanya untuk penerimaan reguler)
+                if (!$isCutoff && $account) {
+                    $account->increment('balance', $sisa);
+                }
+
+                $processedCount++;
+            }
+
+            foreach ($openingInvoices as $opening) {
+                $totalPaid = (float) FinancePayment::where('opening_invoice_id', $opening->id)
+                    ->where('payment_type', '!=', 'RETUR')
+                    ->sum('amount');
+                $sisa = round(max(0, (float) $opening->amount - $totalPaid), 2);
+
+                if ($sisa < 0.005) {
+                    continue;
+                }
+
+                $rawNotes = trim((string) ($validated['notes'] ?? ''));
+                $finalNotes = $isCutoff
+                    ? ($rawNotes !== '' ? (str_contains(strtolower($rawNotes), 'cut-off') ? $rawNotes : '[Pra-Cut-off] ' . $rawNotes) : 'Pelunasan Pra-Cut-off Massal Saldo Awal Piutang (Tanpa Tambah Kas & Bank)')
+                    : ($rawNotes ?: 'Pelunasan massal saldo awal piutang');
+
+                FinancePayment::create([
+                    'pharmacy_id' => $opening->pharmacy_id,
+                    'opening_invoice_id' => $opening->id,
+                    'account_id' => $isCutoff ? $cutoffAccountId : $account->id,
+                    'payment_type' => $isCutoff ? 'PIUTANG CUTOFF' : 'PIUTANG',
+                    'payment_date' => $validated['payment_date'],
+                    'amount' => $sisa,
+                    'reference_number' => $validated['reference_number'] ?: ($isCutoff ? 'CUTOFF-PIUTANG' : ('BULK-PIUTANG-' . date('YmdHis'))),
+                    'notes' => $finalNotes,
+                    'created_by' => Auth::id(),
+                ]);
+
+                if (!$isCutoff && $account) {
+                    $account->increment('balance', $sisa);
+                }
 
                 $processedCount++;
             }
@@ -4845,7 +5398,9 @@ class FinanceController extends Controller
             DB::commit();
 
             $this->clearStatsCache();
-            return redirect()->back()->with('success', "Berhasil melunasi {$processedCount} tagihan piutang penjualan.");
+            return redirect()->back()->with('success', $isCutoff
+                ? "Berhasil melunasi pra-cut-off {$processedCount} tagihan piutang penjualan (tanpa menambah Kas & Bank)."
+                : "Berhasil melunasi {$processedCount} tagihan piutang penjualan.");
         } catch (\Exception $e) {
             DB::rollBack();
             return back()->withErrors(['error' => 'Gagal memproses pelunasan massal piutang: ' . $e->getMessage()]);
@@ -4857,7 +5412,11 @@ class FinanceController extends Controller
      */
     public function importPiutangPayments(Request $request)
     {
-        $request->validate(['file' => 'required|file|mimes:xlsx,xls,csv,txt|max:10240']);
+        $isCutoffImport = $request->boolean('is_cutoff');
+        $request->validate([
+            'file' => 'required|file|mimes:xlsx,xls,csv,txt|max:10240',
+            'is_cutoff' => 'nullable|boolean',
+        ]);
 
         try {
             $file = $request->file('file');
@@ -4894,7 +5453,8 @@ class FinanceController extends Controller
 
             if ($invoiceNumber === '')
                 $errors[] = "Baris {$line}: No. Faktur/Transaksi kosong.";
-            if ($bankCode === '')
+            $rowIsCutoff = $isCutoffImport || in_array(mb_strtoupper($bankCode), ['CUTOFF', 'CUT-OFF', 'PRA-CUTOFF', 'NON-KAS'], true);
+            if (!$rowIsCutoff && $bankCode === '')
                 $errors[] = "Baris {$line}: Kode Bank kosong.";
             $invoiceKey = mb_strtolower($invoiceNumber);
             if ($invoiceNumber !== '' && isset($seenInvoices[$invoiceKey]))
@@ -4902,8 +5462,8 @@ class FinanceController extends Controller
             if ($invoiceNumber !== '')
                 $seenInvoices[$invoiceKey] = true;
 
-            $account = $accountsByCode->get(mb_strtolower($bankCode));
-            if (!$account && $bankCode !== '')
+            $account = $rowIsCutoff ? null : $accountsByCode->get(mb_strtolower($bankCode));
+            if (!$rowIsCutoff && !$account && $bankCode !== '')
                 $errors[] = "Baris {$line}: Kode Bank '{$bankCode}' tidak ditemukan atau tidak aktif.";
 
             $paymentDate = null;
@@ -4929,14 +5489,29 @@ class FinanceController extends Controller
                 ->with('transactions');
             \App\Support\LiphTransactionScope::applySalesStatus($matchesQuery);
             $matches = $matchesQuery->get();
-            if ($invoiceNumber !== '' && $matches->isEmpty()) {
+            $openingMatches = (Schema::hasTable('finance_opening_invoices') && $invoiceNumber !== '')
+                ? FinanceOpeningInvoice::where('type', 'PIUTANG')
+                    ->where('invoice_number', $invoiceNumber)
+                    ->whereIn('pharmacy_id', $pharmacyIds)
+                    ->get()
+                : collect();
+            $totalMatches = $matches->count() + $openingMatches->count();
+
+            if ($invoiceNumber !== '' && $totalMatches === 0) {
                 $errors[] = "Baris {$line}: Faktur/Transaksi '{$invoiceNumber}' tidak ditemukan pada cabang yang dapat diakses.";
-            } elseif ($matches->count() > 1) {
+            } elseif ($totalMatches > 1) {
                 $errors[] = "Baris {$line}: Nomor '{$invoiceNumber}' cocok ke lebih dari satu transaksi.";
             }
 
-            if ($matches->count() === 1 && $account && $paymentDate) {
-                $prepared[] = ['line' => $line, 'transaction' => $matches->first(), 'account' => $account, 'payment_date' => $paymentDate];
+            if ($totalMatches === 1 && ($rowIsCutoff || $account) && $paymentDate) {
+                $prepared[] = [
+                    'line' => $line,
+                    'transaction' => $matches->count() === 1 ? $matches->first() : null,
+                    'opening' => $openingMatches->count() === 1 ? $openingMatches->first() : null,
+                    'account' => $account,
+                    'is_cutoff' => $rowIsCutoff,
+                    'payment_date' => $paymentDate,
+                ];
             }
         }
 
@@ -4945,12 +5520,47 @@ class FinanceController extends Controller
         if ($errors)
             throw ValidationException::withMessages(['file' => implode("\n", $errors)]);
 
+        $hasAnyCutoff = collect($prepared)->contains(fn($e) => !empty($e['is_cutoff']));
+        $cutoffAccountId = $hasAnyCutoff ? $this->resolveCutoffReferenceAccountId() : null;
+
         $totalReceived = 0.0;
-        DB::transaction(function () use ($prepared, &$totalReceived) {
+        DB::transaction(function () use ($prepared, $cutoffAccountId, &$totalReceived) {
             foreach ($prepared as $entry) {
+                $entryIsCutoff = !empty($entry['is_cutoff']);
+                $account = $entryIsCutoff ? null : FinanceAccount::whereKey($entry['account']->id)->lockForUpdate()->firstOrFail();
+
+                if (!empty($entry['opening'])) {
+                    $opening = FinanceOpeningInvoice::whereKey($entry['opening']->id)->lockForUpdate()->firstOrFail();
+                    $alreadyPaid = (float) FinancePayment::where('opening_invoice_id', $opening->id)
+                        ->where('payment_type', '!=', 'RETUR')
+                        ->sum('amount');
+                    $remaining = round(max(0, (float) $opening->amount - $alreadyPaid), 2);
+                    if ($remaining < 0.005) {
+                        throw ValidationException::withMessages(['file' => "Baris {$entry['line']}: Tagihan saldo awal piutang '{$opening->invoice_number}' sudah lunas."]);
+                    }
+
+                    FinancePayment::create([
+                        'pharmacy_id' => $opening->pharmacy_id,
+                        'opening_invoice_id' => $opening->id,
+                        'account_id' => $entryIsCutoff ? $cutoffAccountId : $account->id,
+                        'payment_type' => $entryIsCutoff ? 'PIUTANG CUTOFF' : 'PIUTANG',
+                        'payment_date' => $entry['payment_date'],
+                        'amount' => $remaining,
+                        'reference_number' => $entryIsCutoff ? 'CUTOFF-PIUTANG' : null,
+                        'notes' => $entryIsCutoff
+                            ? 'Pelunasan Pra-Cut-off Saldo Awal Piutang melalui impor file (Tanpa Tambah Kas & Bank)'
+                            : 'Pelunasan Saldo Awal Piutang melalui impor file',
+                        'created_by' => Auth::id(),
+                    ]);
+                    if (!$entryIsCutoff && $account) {
+                        $account->increment('balance', $remaining);
+                    }
+                    $totalReceived += $remaining;
+                    continue;
+                }
+
                 $tx = MedicineTransactions::whereKey($entry['transaction']->id)->lockForUpdate()->firstOrFail();
                 $tx->load(['transactions', 'returs']);
-                $account = FinanceAccount::whereKey($entry['account']->id)->lockForUpdate()->firstOrFail();
                 $totalRetur = (float) $tx->returs->sum('total_retur');
                 $paymentsTotal = (float) FinancePayment::where('medicine_transaction_id', $tx->id)->sum('amount');
                 $alreadyPaid = max($paymentsTotal, (float) ($tx->paid ?? 0));
@@ -4967,23 +5577,27 @@ class FinanceController extends Controller
                 FinancePayment::create([
                     'pharmacy_id' => $tx->pharmacy_id,
                     'medicine_transaction_id' => $tx->id,
-                    'account_id' => $account->id,
-                    'payment_type' => 'PIUTANG',
+                    'account_id' => $entryIsCutoff ? $cutoffAccountId : $account->id,
+                    'payment_type' => $entryIsCutoff ? 'PIUTANG CUTOFF' : 'PIUTANG',
                     'payment_date' => $entry['payment_date'],
                     'amount' => $remaining,
-                    'reference_number' => null,
-                    'notes' => 'Pelunasan Piutang melalui impor file',
+                    'reference_number' => $entryIsCutoff ? 'CUTOFF-PIUTANG' : null,
+                    'notes' => $entryIsCutoff
+                        ? 'Pelunasan Pra-Cut-off Piutang melalui impor file (Tanpa Tambah Kas & Bank)'
+                        : 'Pelunasan Piutang melalui impor file',
                     'created_by' => Auth::id(),
                 ]);
                 $tx->paid = (string) round($alreadyPaid + $remaining, 2);
                 $tx->save();
-                $account->increment('balance', $remaining);
+                if (!$entryIsCutoff && $account) {
+                    $account->increment('balance', $remaining);
+                }
                 $totalReceived += $remaining;
             }
         });
 
         $this->clearStatsCache();
-        return back()->with('success', 'Impor berhasil: ' . count($prepared) . ' transaksi piutang dilunasi dengan total penerimaan Rp ' . number_format($totalReceived, 0, ',', '.') . '.');
+        return back()->with('success', 'Impor berhasil: ' . count($prepared) . ' transaksi piutang dilunasi dengan total Rp ' . number_format($totalReceived, 0, ',', '.') . ($isCutoffImport ? ' (Pra-Cut-off, tanpa menambah Kas & Bank).' : '.'));
     }
 
     public function downloadPiutangPaymentTemplate()
@@ -5354,6 +5968,18 @@ class FinanceController extends Controller
     public function submitHutang(Request $request, $id)
     {
         $validated = $request->validate(['is_submitted' => 'required|boolean']);
+
+        $openingId = FinanceOpeningInvoice::parseCompositeId($id);
+        if ($openingId !== null) {
+            abort_unless(Schema::hasTable('finance_opening_invoices'), 404);
+            $opening = FinanceOpeningInvoice::where('type', 'HUTANG')
+                ->whereIn('pharmacy_id', $this->getTargetPharmacyIds())
+                ->findOrFail($openingId);
+            $opening->is_submitted = $validated['is_submitted'];
+            $opening->save();
+            return redirect()->back()->with('success', 'Status pengajuan hutang berhasil diperbarui.');
+        }
+
         $item = ReceivingDetails::findOrFail($id);
 
         $item->is_submitted = $validated['is_submitted'];
@@ -5365,6 +5991,18 @@ class FinanceController extends Controller
     public function submitPiutang(Request $request, $id)
     {
         $validated = $request->validate(['is_submitted' => 'required|boolean']);
+
+        $openingId = FinanceOpeningInvoice::parseCompositeId($id);
+        if ($openingId !== null) {
+            abort_unless(Schema::hasTable('finance_opening_invoices'), 404);
+            $opening = FinanceOpeningInvoice::where('type', 'PIUTANG')
+                ->whereIn('pharmacy_id', $this->getTargetPharmacyIds())
+                ->findOrFail($openingId);
+            $opening->is_submitted = $validated['is_submitted'];
+            $opening->save();
+            return redirect()->back()->with('success', 'Status pengajuan piutang berhasil diperbarui.');
+        }
+
         $item = MedicineTransactions::findOrFail($id);
 
         $item->is_submitted = $validated['is_submitted'];
@@ -5377,11 +6015,28 @@ class FinanceController extends Controller
     {
         $validated = $request->validate([
             'ids' => 'required|array',
-            'ids.*' => 'exists:receiving_details,id',
+            'ids.*' => 'required',
             'is_submitted' => 'required|boolean'
         ]);
 
+        $targetPharmacyIds = $this->getTargetPharmacyIds();
+        $hasOpeningTable = Schema::hasTable('finance_opening_invoices');
+
         foreach ($validated['ids'] as $id) {
+            $openingId = FinanceOpeningInvoice::parseCompositeId($id);
+            if ($openingId !== null) {
+                if (!$hasOpeningTable) {
+                    continue;
+                }
+                $opening = FinanceOpeningInvoice::where('type', 'HUTANG')
+                    ->whereIn('pharmacy_id', $targetPharmacyIds)
+                    ->find($openingId);
+                if ($opening) {
+                    $opening->is_submitted = $validated['is_submitted'];
+                    $opening->save();
+                }
+                continue;
+            }
             $item = ReceivingDetails::find($id);
             if ($item) {
                 $item->is_submitted = $validated['is_submitted'];
@@ -5398,11 +6053,28 @@ class FinanceController extends Controller
     {
         $validated = $request->validate([
             'ids' => 'required|array',
-            'ids.*' => 'exists:medicine_transactions,id',
+            'ids.*' => 'required',
             'is_submitted' => 'required|boolean'
         ]);
 
+        $targetPharmacyIds = $this->getTargetPharmacyIds();
+        $hasOpeningTable = Schema::hasTable('finance_opening_invoices');
+
         foreach ($validated['ids'] as $id) {
+            $openingId = FinanceOpeningInvoice::parseCompositeId($id);
+            if ($openingId !== null) {
+                if (!$hasOpeningTable) {
+                    continue;
+                }
+                $opening = FinanceOpeningInvoice::where('type', 'PIUTANG')
+                    ->whereIn('pharmacy_id', $targetPharmacyIds)
+                    ->find($openingId);
+                if ($opening) {
+                    $opening->is_submitted = $validated['is_submitted'];
+                    $opening->save();
+                }
+                continue;
+            }
             $item = MedicineTransactions::find($id);
             if ($item) {
                 $item->is_submitted = $validated['is_submitted'];

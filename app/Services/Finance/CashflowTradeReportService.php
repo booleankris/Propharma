@@ -4,6 +4,7 @@ namespace App\Services\Finance;
 
 use App\Models\Creditor;
 use App\Models\Debtors;
+use App\Models\FinanceOpeningInvoice;
 use App\Models\FinancePayment;
 use App\Models\MedicineTransactions;
 use App\Models\ReceivingDetails;
@@ -13,6 +14,7 @@ use App\Support\LiphTransactionScope;
 use App\Support\ReceivingInvoiceTotals;
 use Carbon\CarbonPeriod;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Carbon;
 
 class CashflowTradeReportService
@@ -58,6 +60,29 @@ class CashflowTradeReportService
             }
             $rows['entities'][$key]['amounts'][$date] += $amount;
             $rows['entities'][$key]['total'] += $amount;
+        }
+
+        if (Schema::hasTable('finance_opening_invoices')) {
+            $openingInPeriod = FinanceOpeningInvoice::query()
+                ->with('debtor:id,name')
+                ->where('type', 'PIUTANG')
+                ->whereIn('pharmacy_id', $pharmacyIds)
+                ->whereBetween('invoice_date', [$startDate, $endDate])
+                ->get();
+
+            foreach ($openingInPeriod as $oi) {
+                $date = $oi->invoice_date?->toDateString();
+                if (!$date || !isset($rows['dates'][$date])) continue;
+                $debtorId = (int) ($oi->debtor_id ?? 0);
+                $key = 'debtor:' . $debtorId;
+                if (!isset($rows['entities'][$key])) {
+                    $name = $oi->debtor?->name ?: 'Debitur tidak tercatat';
+                    $rows['entities'][$key] = $this->blankEntity($key, $name, array_keys($rows['dates']));
+                }
+                $amount = (float) $oi->amount;
+                $rows['entities'][$key]['amounts'][$date] += $amount;
+                $rows['entities'][$key]['total'] += $amount;
+            }
         }
 
         $opening = $this->receivableBalancesBefore($pharmacyIds, $startDate);
@@ -139,6 +164,29 @@ class CashflowTradeReportService
             $rows['entities'][$key]['total'] += $amount;
         }
 
+        if (Schema::hasTable('finance_opening_invoices')) {
+            $openingInPeriod = FinanceOpeningInvoice::query()
+                ->with('creditor:code,name')
+                ->where('type', 'HUTANG')
+                ->whereIn('pharmacy_id', $pharmacyIds)
+                ->whereBetween('invoice_date', [$startDate, $endDate])
+                ->get();
+
+            foreach ($openingInPeriod as $oi) {
+                $date = $oi->invoice_date?->toDateString();
+                if (!$date || !isset($rows['dates'][$date])) continue;
+                $code = (string) ($oi->creditor_code ?? '');
+                $key = 'creditor:' . ($code !== '' ? $code : 'unknown');
+                if (!isset($rows['entities'][$key])) {
+                    $name = $oi->creditor?->name ?: ($code !== '' ? "Supplier {$code}" : 'Supplier tidak tercatat');
+                    $rows['entities'][$key] = $this->blankEntity($key, $name, $rows['dates']);
+                }
+                $amount = (float) $oi->amount;
+                $rows['entities'][$key]['amounts'][$date] += $amount;
+                $rows['entities'][$key]['total'] += $amount;
+            }
+        }
+
         $opening = $this->payableBalancesBefore($pharmacyIds, $startDate);
         $payments = $this->payablePaymentsInPeriod($pharmacyIds, $startDate, $endDate);
         $this->attachBalanceColumns($rows, $opening, $payments);
@@ -155,8 +203,8 @@ class CashflowTradeReportService
         $paymentCutoff = Carbon::parse($startDate)->subDay()->toDateString();
         $transactions = MedicineTransactions::query()
             ->with(['debtors:id,name', 'transactions' => fn($query) => $query->where('status', 1)])
-            ->withSum(['payments as finance_paid' => fn($query) => $query->where('payment_type', 'PIUTANG')->whereDate('payment_date', '<=', $paymentCutoff)], 'amount')
-            ->withSum(['payments as finance_paid_total' => fn($query) => $query->where('payment_type', 'PIUTANG')], 'amount')
+            ->withSum(['payments as finance_paid' => fn($query) => $query->whereIn('payment_type', ['PIUTANG', 'PIUTANG CUTOFF'])->whereDate('payment_date', '<=', $paymentCutoff)], 'amount')
+            ->withSum(['payments as finance_paid_total' => fn($query) => $query->whereIn('payment_type', ['PIUTANG', 'PIUTANG CUTOFF'])], 'amount')
             ->whereIn('pharmacy_id', $pharmacyIds)
             ->whereIn('transaction_type', ['KREDIT', 'RESEP KREDIT', 'RETUR KREDIT'])
             ->where(function ($query) use ($cutoff) {
@@ -188,6 +236,25 @@ class CashflowTradeReportService
         foreach ($returns as $key => $amount) {
             $balances[$key] = max(0, ($balances[$key] ?? 0) - $amount);
         }
+
+        if (Schema::hasTable('finance_opening_invoices')) {
+            $openingReceivables = FinanceOpeningInvoice::query()
+                ->withSum(['payments as paid_before' => fn($q) => $q->whereDate('payment_date', '<=', $paymentCutoff)], 'amount')
+                ->where('type', 'PIUTANG')
+                ->whereIn('pharmacy_id', $pharmacyIds)
+                ->whereDate('invoice_date', '<', $startDate)
+                ->get(['id', 'debtor_id', 'amount']);
+
+            foreach ($openingReceivables as $oi) {
+                $key = 'debtor:' . (int) ($oi->debtor_id ?? 0);
+                $amt = (float) $oi->amount;
+                $remaining = $amt < 0 ? $amt : max(0.0, $amt - (float) ($oi->paid_before ?? 0));
+                if (abs($remaining) >= 0.005) {
+                    $balances[$key] = ($balances[$key] ?? 0) + $remaining;
+                }
+            }
+        }
+
         return $balances;
     }
 
@@ -197,14 +264,20 @@ class CashflowTradeReportService
     private function receivablePaymentsInPeriod(array $pharmacyIds, string $startDate, string $endDate): array
     {
         $payments = FinancePayment::query()
-            ->with('transaction:id,debtor_id')
-            ->where('payment_type', 'PIUTANG')
+            ->with(['transaction:id,debtor_id', 'openingInvoice:id,debtor_id'])
+            ->whereIn('payment_type', ['PIUTANG', 'PIUTANG CUTOFF'])
             ->whereBetween('payment_date', [$startDate, $endDate])
-            ->whereHas('transaction', fn($query) => $query->whereIn('pharmacy_id', $pharmacyIds))
-            ->get(['id', 'medicine_transaction_id', 'amount', 'payment_date']);
+            ->where(function ($q) use ($pharmacyIds) {
+                $q->whereHas('transaction', fn($sub) => $sub->whereIn('pharmacy_id', $pharmacyIds));
+                if (Schema::hasTable('finance_opening_invoices')) {
+                    $q->orWhereHas('openingInvoice', fn($sub) => $sub->where('type', 'PIUTANG')->whereIn('pharmacy_id', $pharmacyIds));
+                }
+            })
+            ->get(['id', 'medicine_transaction_id', 'opening_invoice_id', 'amount', 'payment_date']);
         $totals = [];
         foreach ($payments as $payment) {
-            $key = 'debtor:' . (int) ($payment->transaction?->debtor_id ?? 0);
+            $debtorId = $payment->openingInvoice?->debtor_id ?? $payment->transaction?->debtor_id ?? 0;
+            $key = 'debtor:' . (int) $debtorId;
             $date = Carbon::parse($payment->payment_date)->toDateString();
             $totals[$key][$date] = ($totals[$key][$date] ?? 0) + $this->number($payment->amount);
         }
@@ -290,6 +363,26 @@ class CashflowTradeReportService
 
             $balances[$key] = ($balances[$key] ?? 0) + max(0, $invoiceTotal - $paidCashBank - $totalReturDeduction);
         }
+
+        if (Schema::hasTable('finance_opening_invoices')) {
+            $openingPayables = FinanceOpeningInvoice::query()
+                ->withSum(['payments as paid_before' => fn($q) => $q->whereDate('payment_date', '<=', $paymentCutoff)], 'amount')
+                ->where('type', 'HUTANG')
+                ->whereIn('pharmacy_id', $pharmacyIds)
+                ->whereDate('invoice_date', '<', $startDate)
+                ->get(['id', 'creditor_code', 'amount']);
+
+            foreach ($openingPayables as $oi) {
+                $code = (string) ($oi->creditor_code ?? '');
+                $key = 'creditor:' . ($code !== '' ? $code : 'unknown');
+                $amt = (float) $oi->amount;
+                $remaining = $amt < 0 ? $amt : max(0.0, $amt - (float) ($oi->paid_before ?? 0));
+                if (abs($remaining) >= 0.005) {
+                    $balances[$key] = ($balances[$key] ?? 0) + $remaining;
+                }
+            }
+        }
+
         return $balances;
     }
 
@@ -303,14 +396,19 @@ class CashflowTradeReportService
         }
 
         $payments = FinancePayment::query()
-            ->with('receivingDetail:id,creditor_code')
-            ->where('payment_type', 'KREDIT')
+            ->with(['receivingDetail:id,creditor_code', 'openingInvoice:id,creditor_code'])
+            ->whereIn('payment_type', ['KREDIT', 'KREDIT CUTOFF'])
             ->whereBetween('payment_date', [$startDate, $endDate])
-            ->whereHas('receivingDetail.receiving', fn($query) => $query->whereIn('pharmacy_id', $pharmacyIds))
-            ->get(['id', 'receiving_detail_id', 'amount', 'payment_date']);
+            ->where(function ($q) use ($pharmacyIds) {
+                $q->whereHas('receivingDetail.receiving', fn($sub) => $sub->whereIn('pharmacy_id', $pharmacyIds));
+                if (Schema::hasTable('finance_opening_invoices')) {
+                    $q->orWhereHas('openingInvoice', fn($sub) => $sub->where('type', 'HUTANG')->whereIn('pharmacy_id', $pharmacyIds));
+                }
+            })
+            ->get(['id', 'receiving_detail_id', 'opening_invoice_id', 'amount', 'payment_date']);
         $totals = [];
         foreach ($payments as $payment) {
-            $code = (string) ($payment->receivingDetail?->creditor_code ?? '');
+            $code = (string) ($payment->openingInvoice?->creditor_code ?? $payment->receivingDetail?->creditor_code ?? '');
             $key = 'creditor:' . ($code !== '' ? $code : 'unknown');
             $date = Carbon::parse($payment->payment_date)->toDateString();
             $totals[$key][$date] = ($totals[$key][$date] ?? 0) + $this->number($payment->amount);

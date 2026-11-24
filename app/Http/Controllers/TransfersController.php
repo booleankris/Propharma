@@ -22,6 +22,7 @@ use App\Exports\TransfersExport;
 use App\Models\ExportJob;
 use App\Jobs\ProcessTransfersExport;
 use App\Services\MedicineTransferCodeGenerator;
+use App\Services\StockLedgerService;
 
 class TransfersController extends Controller
 {
@@ -1534,6 +1535,9 @@ class TransfersController extends Controller
         $applyFilters = function ($query) use ($search, $startDate, $endDate, $expiredDate, $status, $hasLocationSchema) {
             $query->whereDoesntHave('items', function ($q) {
                 $q->whereNotNull('receiving_items_id');
+            })->where(function ($q) {
+                $q->whereNull('code')
+                    ->orWhere('code', 'not like', 'TRF-INIT%');
             });
 
             if ($search) {
@@ -1733,12 +1737,18 @@ class TransfersController extends Controller
         $srcPharmacyId = $srcBatch->pharmacy_id;
 
         // 2. Strict idempotency guard: check if an incoming log for this transfer code and dest batch already exists
+        $incomingQty = (float) $item->qty;
+        $logQtyCandidates = array_values(array_unique([
+            $incomingQty,
+            (float) ($item->original_qty ?? $incomingQty),
+        ]));
+
         $hasIncomingLog = ItemsLog::where('transaction_code', $transfer->code)
             ->where('batches_id', $destBatch->id)
             ->where('status', 7)
             ->where('type', 'MU')
             ->where('medicine_id', $medicine->id)
-            ->where('qty', $item->qty)
+            ->whereIn('qty', $logQtyCandidates)
             ->whereRaw('qty_after > qty_before')
             ->exists();
 
@@ -1781,13 +1791,16 @@ class TransfersController extends Controller
                 'status' => 1,
                 'etalases_id' => $item->etalases_id,
             ];
+            if ($item->original_qty === null) {
+                $itemUpdate['original_qty'] = $incomingQty;
+            }
             if ($this->hasTransferItemEtalaseAuditColumns() && $item->etalases_id) {
                 $itemUpdate['etalase_updated_by'] = $this->actorId();
                 $itemUpdate['etalase_updated_at'] = $now;
             }
             $item->update($itemUpdate);
 
-            $destQtyAfter = $destQtyBefore + $item->qty;
+            $destQtyAfter = $destQtyBefore + $incomingQty;
         }
 
         // ── Log destination (incoming) ────────────────────────────
@@ -1796,7 +1809,7 @@ class TransfersController extends Controller
             'code' => $this->generateItemsLogCode(),
             'type' => 'MU',
             'medicine_id' => $medicine->id,
-            'qty' => $item->qty,
+            'qty' => $incomingQty,
             'qty_before' => $destQtyBefore,
             'qty_after' => $destQtyAfter,
             'total' => 0,
@@ -1805,6 +1818,15 @@ class TransfersController extends Controller
             'batches_id' => $destBatch->id,
             'user_id' => $this->actorId(),
         ]);
+
+        // Kompensasikan stok counter minus sebelumnya secara zero-sum (tanpa ubah original_qty / ItemsLog)
+        if (!$isReturnToGudang && !isWarehousePharmacy($destPharmacyId) && $incomingQty > 0) {
+            app(StockLedgerService::class)->settleNegativeCounterStock(
+                (int) $medicine->id,
+                (int) $destPharmacyId,
+                $item
+            );
+        }
     }
 
     public function acceptTransfer(Request $request, MedicineTransfers $transfer)

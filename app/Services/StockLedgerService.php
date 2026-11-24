@@ -3,10 +3,14 @@
 namespace App\Services;
 
 use App\Models\Batches;
+use App\Models\Etalases;
 use App\Models\ItemsLog;
+use App\Models\Medicines;
 use App\Models\MedicineTransferItems;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 class StockLedgerService
 {
@@ -309,5 +313,195 @@ class StockLedgerService
             'discrepancy'        => $dbStock - $ledgerBalance,
             'has_opening_anchor' => $ledger['hasOpeningAnchor'],
         ];
+    }
+
+    /**
+     * Buat atau kurangi baris stok counter minus virtual ('MINUS-AUTO') saat cabang
+     * melakukan penjualan ketika belum ada baris medicine_transfer_items sama sekali.
+     * Harus dipanggil di dalam DB transaction setelah row medicines dikunci (lockForUpdate).
+     */
+    public function recordNegativeCounterSale(
+        int $medicineId,
+        int $pharmacyId,
+        float $qtyToDeduct,
+        int $actorId = 1
+    ): ?MedicineTransferItems {
+        if ($qtyToDeduct <= 0 || isWarehousePharmacy($pharmacyId)) {
+            return null;
+        }
+
+        $minusBatch = Batches::where('medicine_id', $medicineId)
+            ->where('pharmacy_id', $pharmacyId)
+            ->where('name', 'MINUS-AUTO')
+            ->lockForUpdate()
+            ->first();
+
+        if (!$minusBatch) {
+            $minusBatch = Batches::create([
+                'medicine_id' => $medicineId,
+                'pharmacy_id' => $pharmacyId,
+                'name' => 'MINUS-AUTO',
+                'expired_date' => null,
+                'stock' => 0,
+                'status' => 0,
+            ]);
+        }
+
+        $existingItem = MedicineTransferItems::where('batches_id', $minusBatch->id)
+            ->where('status', 1)
+            ->where(function ($q) {
+                $q->whereNull('source_type')
+                    ->orWhere('source_type', '!=', 'retur_gudang');
+            })
+            ->lockForUpdate()
+            ->first();
+
+        if ($existingItem) {
+            if ($existingItem->original_qty === null) {
+                $existingItem->original_qty = 0;
+            }
+            $existingItem->qty = (float) $existingItem->qty - $qtyToDeduct;
+            $existingItem->save();
+
+            return $existingItem;
+        }
+
+        $initCode = 'TRF-INIT-MINUS-' . $pharmacyId;
+        $transferHeaderId = DB::table('medicine_transfers')
+            ->where('code', $initCode)
+            ->value('id');
+
+        if (!$transferHeaderId) {
+            $transferColumns = Schema::hasTable('medicine_transfers')
+                ? array_flip(Schema::getColumnListing('medicine_transfers'))
+                : [];
+
+            $now = now();
+            $headerData = [
+                'code' => $initCode,
+                'status' => 1,
+                'created_at' => $now,
+                'updated_at' => $now,
+            ];
+
+            if (isset($transferColumns['user_id'])) {
+                $headerData['user_id'] = $actorId > 0 ? $actorId : 1;
+            }
+            if (isset($transferColumns['is_request'])) {
+                $headerData['is_request'] = false;
+            }
+            if (isset($transferColumns['source_pharmacy_id'])) {
+                $headerData['source_pharmacy_id'] = $pharmacyId;
+            }
+            if (isset($transferColumns['destination_pharmacy_id'])) {
+                $headerData['destination_pharmacy_id'] = $pharmacyId;
+            }
+
+            $transferHeaderId = DB::table('medicine_transfers')->insertGetId($headerData);
+        }
+
+        $etalaseId = MedicineTransferItems::join('batches', 'medicine_transfer_items.batches_id', '=', 'batches.id')
+            ->where('batches.medicine_id', $medicineId)
+            ->where('batches.pharmacy_id', $pharmacyId)
+            ->whereNotNull('medicine_transfer_items.etalases_id')
+            ->orderByDesc('medicine_transfer_items.id')
+            ->value('medicine_transfer_items.etalases_id');
+
+        if (!$etalaseId) {
+            $etalaseId = Etalases::where('pharmacy_id', $pharmacyId)
+                ->orderByDesc('status')
+                ->orderBy('id')
+                ->value('id')
+                ?? Etalases::orderBy('id')->value('id');
+        }
+
+        return MedicineTransferItems::create([
+            'medicine_transfer_id' => $transferHeaderId,
+            'batches_id' => $minusBatch->id,
+            'etalases_id' => $etalaseId,
+            'qty' => -abs($qtyToDeduct),
+            'original_qty' => 0,
+            'source_type' => 'pelayanan',
+            'status' => 1,
+        ]);
+    }
+
+    /**
+     * Kompensasikan stok counter minus (zero-sum) saat stok baru masuk ke cabang
+     * (Mutasi Masuk ACC / Pembelian Langsung Cabang), tanpa mengubah original_qty.
+     */
+    public function settleNegativeCounterStock(
+        int $medicineId,
+        int $pharmacyId,
+        MedicineTransferItems $incomingItem
+    ): float {
+        if (isWarehousePharmacy($pharmacyId)) {
+            return 0.0;
+        }
+
+        $availableQty = (float) $incomingItem->qty;
+        if ($availableQty <= 0 || (int) $incomingItem->status !== 1) {
+            return 0.0;
+        }
+
+        // Konsistenkan hirarki lock dengan POS checkout: kunci baris medicines terlebih dulu.
+        Medicines::whereKey($medicineId)->lockForUpdate()->first();
+
+        $needsOriginalPreserve = $incomingItem->original_qty === null;
+        if ($needsOriginalPreserve) {
+            $incomingItem->original_qty = $availableQty;
+        }
+
+        $negativeItems = MedicineTransferItems::join('batches', 'medicine_transfer_items.batches_id', '=', 'batches.id')
+            ->where('batches.medicine_id', $medicineId)
+            ->where('batches.pharmacy_id', $pharmacyId)
+            ->where('medicine_transfer_items.status', 1)
+            ->where('medicine_transfer_items.id', '!=', $incomingItem->id)
+            ->where('medicine_transfer_items.qty', '<', 0)
+            ->where(function ($q) {
+                $q->whereNull('medicine_transfer_items.source_type')
+                    ->orWhere('medicine_transfer_items.source_type', '!=', 'retur_gudang');
+            })
+            ->orderByRaw("CASE WHEN batches.name = 'MINUS-AUTO' THEN 0 ELSE 1 END ASC")
+            ->orderByRaw('CASE WHEN batches.expired_date IS NULL THEN 1 ELSE 0 END ASC')
+            ->orderBy('batches.expired_date', 'asc')
+            ->orderBy('medicine_transfer_items.id', 'asc')
+            ->lockForUpdate()
+            ->select('medicine_transfer_items.*')
+            ->get();
+
+        if ($negativeItems->isEmpty()) {
+            if ($needsOriginalPreserve) {
+                $incomingItem->save();
+            }
+
+            return 0.0;
+        }
+
+        $settledTotal = 0.0;
+        foreach ($negativeItems as $negItem) {
+            if ($availableQty <= 0) {
+                break;
+            }
+
+            $deficit = abs((float) $negItem->qty);
+            if ($deficit <= 0) {
+                continue;
+            }
+
+            $offset = min($availableQty, $deficit);
+            $negItem->qty = (float) $negItem->qty + $offset;
+            $negItem->save();
+
+            $availableQty -= $offset;
+            $settledTotal += $offset;
+        }
+
+        if ($settledTotal > 0 || $needsOriginalPreserve) {
+            $incomingItem->qty = $availableQty;
+            $incomingItem->save();
+        }
+
+        return $settledTotal;
     }
 }

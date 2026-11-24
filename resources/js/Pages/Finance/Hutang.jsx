@@ -11,7 +11,7 @@ import {
     CreditCard, Search, Filter, Check, X, Building2,
     Calendar, CheckCircle2, AlertCircle, Eye, ChevronLeft, ChevronRight,
     ArrowLeft, Printer, Share2, MoreVertical, ChevronDown, History, Landmark, Maximize2, Download, FileSpreadsheet,
-    AlertTriangle, Clock, ArrowUp, ArrowDown, ArrowUpDown, Upload, RotateCcw, Loader2
+    AlertTriangle, Clock, ArrowUp, ArrowDown, ArrowUpDown, Upload, RotateCcw, Loader2, Plus, Trash2
 } from 'lucide-react';
 
 // Helper mengecek apakah faktur sudah dianggap lunas atau diretur penuh
@@ -21,6 +21,8 @@ const isItemSettled = (item) => {
         item.status === 'Lunas' ||
         item.status === 'Diretur Penuh' ||
         item.status === 'Lunas (Ada Retur)' ||
+        item.status === 'Koreksi Saldo Awal' ||
+        Boolean(item.is_negative_adjustment) ||
         (Number(item.sisa) || 0) <= 0.005
     );
 };
@@ -254,6 +256,7 @@ export default function Hutang({
         sisa: 0,
         reference_number: '',
         notes: '',
+        is_cutoff: false,
     });
     const [isSubmittingPayment, setIsSubmittingPayment] = useState(false);
 
@@ -264,12 +267,113 @@ export default function Hutang({
         payment_date: new Date().toISOString().split('T')[0],
         reference_number: '',
         notes: '',
+        is_cutoff: false,
     });
     const [isSubmittingBulk, setIsSubmittingBulk] = useState(false);
     const [isImportModalOpen, setIsImportModalOpen] = useState(false);
     const [importFile, setImportFile] = useState(null);
+    const [importIsCutoff, setImportIsCutoff] = useState(false);
     const [isImporting, setIsImporting] = useState(false);
     const [importSuccessMessage, setImportSuccessMessage] = useState('');
+
+    // State Modal Tambah Tagihan Saldo Awal Hutang (Per Faktur)
+    const getDefaultCutoffDate = () => {
+        const now = new Date();
+        const prevEnd = new Date(now.getFullYear(), now.getMonth(), 0);
+        return `${prevEnd.getFullYear()}-${String(prevEnd.getMonth() + 1).padStart(2, '0')}-${String(prevEnd.getDate()).padStart(2, '0')}`;
+    };
+    const [isOpeningModalOpen, setIsOpeningModalOpen] = useState(false);
+    const [openingPreviewBalance, setOpeningPreviewBalance] = useState(null);
+    const [isLoadingOpeningPreview, setIsLoadingOpeningPreview] = useState(false);
+    const [openingCreditorQuery, setOpeningCreditorQuery] = useState('');
+    const [openingForm, setOpeningForm] = useState({
+        creditor_code: '',
+        invoice_number: '',
+        invoice_date: getDefaultCutoffDate(),
+        due_date: '',
+        amount: '',
+        notes: '',
+    });
+    const [isSubmittingOpening, setIsSubmittingOpening] = useState(false);
+    const filteredOpeningCreditors = useMemo(() => {
+        const q = openingCreditorQuery.trim().toLowerCase();
+        if (!q) return creditors;
+        return creditors.filter(
+            (c) => (c.name && c.name.toLowerCase().includes(q)) || (c.code && c.code.toLowerCase().includes(q))
+        );
+    }, [creditors, openingCreditorQuery]);
+
+    const fetchOpeningPreview = async (dateStr) => {
+        setIsLoadingOpeningPreview(true);
+        try {
+            const res = await axios.get('/finance/opening-balance-preview', {
+                params: { type: 'HUTANG', date: dateStr || getDefaultCutoffDate() },
+            });
+            setOpeningPreviewBalance(Number(res?.data?.balance ?? 0));
+        } catch (err) {
+            console.error('Gagal memuat saldo awal hutang:', err);
+            setOpeningPreviewBalance(null);
+        } finally {
+            setIsLoadingOpeningPreview(false);
+        }
+    };
+
+    const openOpeningModal = () => {
+        const defaultDate = getDefaultCutoffDate();
+        setOpeningCreditorQuery('');
+        setOpeningForm({
+            creditor_code: '',
+            invoice_number: '',
+            invoice_date: defaultDate,
+            due_date: '',
+            amount: '',
+            notes: '',
+        });
+        setIsOpeningModalOpen(true);
+        fetchOpeningPreview(defaultDate);
+    };
+
+    const handleOpeningSubmit = (e) => {
+        e.preventDefault();
+        const amt = parseFloat(openingForm.amount);
+        if (isNaN(amt) || amt <= 0) {
+            alert('Nominal tagihan harus lebih dari 0.');
+            return;
+        }
+        setIsSubmittingOpening(true);
+        router.post('/finance/hutang/opening', {
+            ...openingForm,
+            creditor_code: openingForm.creditor_code || null,
+            amount: amt,
+        }, {
+            preserveScroll: true,
+            onSuccess: () => {
+                setIsOpeningModalOpen(false);
+                setIsSubmittingOpening(false);
+                detailCacheRef.current = {};
+            },
+            onError: (errs) => {
+                setIsSubmittingOpening(false);
+                alert(Object.values(errs).flat()[0] || 'Gagal menambah tagihan saldo awal hutang.');
+            },
+        });
+    };
+
+    const handleDeleteOpening = (item) => {
+        if (!item?.is_opening || !item?.opening_id) return;
+        if (!window.confirm(`Hapus tagihan saldo awal "${item.nomor}" (${formatRupiah(item.total)})?`)) return;
+        router.delete(`/finance/hutang/opening/${item.opening_id}`, {
+            preserveScroll: true,
+            onSuccess: () => {
+                delete detailCacheRef.current[item.id];
+                if (drawerHutang?.id === item.id) setDrawerHutang(null);
+                if (detailViewHutang?.id === item.id) setDetailViewHutang(null);
+            },
+            onError: (errs) => {
+                alert(Object.values(errs).flat()[0] || 'Gagal menghapus tagihan saldo awal.');
+            },
+        });
+    };
 
     // Statistik Jatuh Tempo (dari server jika tersedia)
     const dueStats = useMemo(() => {
@@ -316,6 +420,13 @@ export default function Hutang({
 
     // Helper status badge render
     const renderStatusBadge = (item) => {
+        if (item.status === 'Koreksi Saldo Awal' || item.is_negative_adjustment) {
+            return (
+                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-indigo-100 text-indigo-800 border border-indigo-200" title="Koreksi pengurang Saldo Awal Hutang Dagang">
+                    <span>Koreksi Saldo Awal</span>
+                </span>
+            );
+        }
         if (item.status === 'Diretur Penuh') {
             return (
                 <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-purple-100 text-purple-800 border border-purple-200" title="Tagihan diretur penuh (Sisa Rp 0)">
@@ -429,6 +540,7 @@ export default function Hutang({
             sisa: item.sisa,
             reference_number: '',
             notes: `Pelunasan tagihan faktur ${item.nomor} kepada ${item.vendor}`,
+            is_cutoff: false,
         });
         setIsPaymentModalOpen(true);
     };
@@ -436,7 +548,7 @@ export default function Hutang({
     // Submit Pembayaran Satuan
     const handlePaymentSubmit = (e) => {
         e.preventDefault();
-        if (!paymentForm.account_id) {
+        if (!paymentForm.is_cutoff && !paymentForm.account_id) {
             alert('Pilih akun kas & bank terlebih dahulu.');
             return;
         }
@@ -451,7 +563,11 @@ export default function Hutang({
         }
 
         setIsSubmittingPayment(true);
-        router.post('/finance/payments', paymentForm, {
+        router.post('/finance/payments', {
+            ...paymentForm,
+            account_id: paymentForm.is_cutoff ? null : paymentForm.account_id,
+            is_cutoff: Boolean(paymentForm.is_cutoff),
+        }, {
             preserveScroll: true,
             onSuccess: () => {
                 setIsPaymentModalOpen(false);
@@ -480,6 +596,7 @@ export default function Hutang({
             payment_date: new Date().toISOString().split('T')[0],
             reference_number: '',
             notes: `Pelunasan massal ${selectedHutangIds.length} faktur hutang pembelian`,
+            is_cutoff: false,
         });
         setIsBulkModalOpen(true);
     };
@@ -487,17 +604,18 @@ export default function Hutang({
     // Submit Pelunasan Massal
     const handleBulkSubmit = (e) => {
         e.preventDefault();
-        if (!bulkForm.account_id) {
+        if (!bulkForm.is_cutoff && !bulkForm.account_id) {
             alert('Pilih akun kas & bank terlebih dahulu.');
             return;
         }
         setIsSubmittingBulk(true);
         router.post('/finance/bulk-payments', {
             receiving_detail_ids: selectedHutangIds,
-            account_id: bulkForm.account_id,
+            account_id: bulkForm.is_cutoff ? null : bulkForm.account_id,
             payment_date: bulkForm.payment_date,
             reference_number: bulkForm.reference_number,
             notes: bulkForm.notes,
+            is_cutoff: Boolean(bulkForm.is_cutoff),
         }, {
             preserveScroll: true,
             onSuccess: () => {
@@ -519,6 +637,7 @@ export default function Hutang({
         if (!importFile) return alert('Pilih file Excel atau CSV terlebih dahulu.');
         const formData = new FormData();
         formData.append('file', importFile);
+        formData.append('is_cutoff', importIsCutoff ? '1' : '0');
         setIsImporting(true);
         router.post('/finance/hutang/import-payments', formData, {
             forceFormData: true,
@@ -526,6 +645,7 @@ export default function Hutang({
             onSuccess: (page) => {
                 setIsImportModalOpen(false);
                 setImportFile(null);
+                setImportIsCutoff(false);
                 setIsImporting(false);
                 detailCacheRef.current = {};
                 setSelectedHutangIds([]);
@@ -588,6 +708,16 @@ export default function Hutang({
                         </h1>
 
                         <div className="flex items-center gap-2 flex-wrap">
+                            {detailViewHutang.is_opening && (
+                                <button
+                                    type="button"
+                                    onClick={() => handleDeleteOpening(detailViewHutang)}
+                                    className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-red-700 bg-red-50 border border-red-200 rounded-lg hover:bg-red-100 transition cursor-pointer"
+                                >
+                                    <Trash2 className="w-3.5 h-3.5" />
+                                    <span>Hapus Saldo Awal</span>
+                                </button>
+                            )}
                             {detailViewHutang.sisa > 0.005 && (
                                 <button
                                     type="button"
@@ -1247,7 +1377,16 @@ export default function Hutang({
                                     )}
                                 </div>
 
-                                {/* Tombol Export Excel */}
+                                {/* Tombol Tambah Saldo Awal, Import, & Export Excel */}
+                                <button
+                                    type="button"
+                                    onClick={openOpeningModal}
+                                    className="inline-flex items-center gap-1.5 px-3 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-semibold transition shadow-2xs cursor-pointer"
+                                    title="Tambah faktur hutang dagang pra-sistem (Saldo Awal) tanpa mengubah stok & Kas/Bank"
+                                >
+                                    <Plus className="w-3.5 h-3.5" />
+                                    <span>Tambah Saldo Awal</span>
+                                </button>
                                 <button
                                     type="button"
                                     onClick={() => setIsImportModalOpen(true)}
@@ -1380,17 +1519,24 @@ export default function Hutang({
                                                     )}
                                                 </td>
                                                 <td className="px-4 py-3.5">
-                                                    <button
-                                                        type="button"
-                                                        onClick={(e) => {
-                                                            e.stopPropagation();
-                                                            setDetailViewHutang(item);
-                                                        }}
-                                                        className="font-bold text-slate-900 hover:text-blue-600 text-left transition group-hover:text-blue-600 cursor-pointer"
-                                                        title="Buka Halaman Detil Lengkap"
-                                                    >
-                                                        {item.nomor}
-                                                    </button>
+                                                    <div className="flex items-center gap-1.5 flex-wrap">
+                                                        <button
+                                                            type="button"
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                openHutangDetail(item);
+                                                            }}
+                                                            className="font-bold text-slate-900 hover:text-blue-600 text-left transition group-hover:text-blue-600 cursor-pointer"
+                                                            title="Buka Halaman Detil Lengkap"
+                                                        >
+                                                            {item.nomor}
+                                                        </button>
+                                                        {item.is_opening && (
+                                                            <span className="inline-flex items-center px-1.5 py-0.5 rounded-md text-[10px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200">
+                                                                Saldo Awal
+                                                            </span>
+                                                        )}
+                                                    </div>
                                                     <div className="text-[11px] text-slate-400 mt-0.5">
                                                         {item.referensi} • Tgl: {item.tanggal}
                                                     </div>
@@ -1558,24 +1704,52 @@ export default function Hutang({
                         </div>
 
                         <form onSubmit={handlePaymentSubmit} className="p-6 space-y-4 text-xs">
-                            <div>
-                                <label className="block text-slate-700 font-semibold mb-1">
-                                    Bayar Dari Akun (Kas & Bank) <span className="text-red-500">*</span>
-                                </label>
-                                <select
-                                    value={paymentForm.account_id}
-                                    onChange={(e) => setPaymentForm({ ...paymentForm, account_id: e.target.value })}
-                                    required
-                                    className="w-full px-3 py-2.5 bg-white border border-slate-200 rounded-xl text-xs font-medium text-slate-800 focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                                >
-                                    <option value="">-- Pilih Akun Kas & Bank --</option>
-                                    {kasBankAccounts.map((acc) => (
-                                        <option key={acc.id} value={acc.id}>
-                                            {acc.name} ({acc.code}) {acc.account_number ? `- ${acc.account_number}` : ''} - Saldo: {formatRupiah(acc.balance)}
-                                        </option>
-                                    ))}
-                                </select>
-                            </div>
+                            <label className={`flex items-start gap-2.5 p-3 rounded-xl border cursor-pointer transition ${paymentForm.is_cutoff ? 'bg-indigo-50 border-indigo-300' : 'bg-slate-50 border-slate-200 hover:bg-slate-100/70'}`}>
+                                <input
+                                    type="checkbox"
+                                    checked={Boolean(paymentForm.is_cutoff)}
+                                    onChange={(e) => {
+                                        const checked = e.target.checked;
+                                        setPaymentForm({
+                                            ...paymentForm,
+                                            is_cutoff: checked,
+                                            payment_date: checked ? getDefaultCutoffDate() : new Date().toISOString().split('T')[0],
+                                        });
+                                    }}
+                                    className="mt-0.5 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                                />
+                                <div>
+                                    <div className="font-bold text-slate-800">Pelunasan Pra-Cut-off (Tanpa Potong Kas &amp; Bank)</div>
+                                    <div className="text-[11px] text-slate-500 mt-0.5 leading-snug">
+                                        Aktifkan untuk faktur lama sebelum tanggal cut-off yang sudah lunas di luar sistem. Saldo Kas &amp; Bank tidak akan berkurang.
+                                    </div>
+                                </div>
+                            </label>
+
+                            {paymentForm.is_cutoff ? (
+                                <div className="p-3 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-[11px] leading-relaxed">
+                                    <strong>Mode Pra-Cut-off aktif:</strong> Pembayaran ini hanya melunasi tagihan &amp; mengurangi Saldo Hutang Dagang tanpa memotong saldo Kas &amp; Bank. Isi <strong>Tanggal Bayar</strong> pada atau sebelum tanggal cut-off Saldo Awal (misal 31 Okt).
+                                </div>
+                            ) : (
+                                <div>
+                                    <label className="block text-slate-700 font-semibold mb-1">
+                                        Bayar Dari Akun (Kas &amp; Bank) <span className="text-red-500">*</span>
+                                    </label>
+                                    <select
+                                        value={paymentForm.account_id}
+                                        onChange={(e) => setPaymentForm({ ...paymentForm, account_id: e.target.value })}
+                                        required
+                                        className="w-full px-3 py-2.5 bg-white border border-slate-200 rounded-xl text-xs font-medium text-slate-800 focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                                    >
+                                        <option value="">-- Pilih Akun Kas &amp; Bank --</option>
+                                        {kasBankAccounts.map((acc) => (
+                                            <option key={acc.id} value={acc.id}>
+                                                {acc.name} ({acc.code}) {acc.account_number ? `- ${acc.account_number}` : ''} - Saldo: {formatRupiah(acc.balance)}
+                                            </option>
+                                        ))}
+                                    </select>
+                                </div>
+                            )}
 
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
@@ -1655,9 +1829,9 @@ export default function Hutang({
                                 <button
                                     type="submit"
                                     disabled={isSubmittingPayment}
-                                    className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-semibold transition disabled:opacity-50"
+                                    className={`px-4 py-2 text-white rounded-xl text-xs font-semibold transition disabled:opacity-50 ${paymentForm.is_cutoff ? 'bg-indigo-600 hover:bg-indigo-700' : 'bg-blue-600 hover:bg-blue-700'}`}
                                 >
-                                    {isSubmittingPayment ? 'Memproses...' : 'Simpan Pembayaran'}
+                                    {isSubmittingPayment ? 'Memproses...' : (paymentForm.is_cutoff ? 'Simpan Pelunasan Pra-Cut-off' : 'Simpan Pembayaran')}
                                 </button>
                             </div>
                         </form>
@@ -1682,10 +1856,24 @@ export default function Hutang({
                             <p className="text-slate-600 leading-relaxed">
                                 Isi satu faktur per baris. Sistem akan membayar seluruh sisa tagihan dan memilih akun berdasarkan Kode Bank.
                             </p>
+                            <label className={`flex items-start gap-2.5 p-3 rounded-xl border cursor-pointer transition ${importIsCutoff ? 'bg-indigo-50 border-indigo-300' : 'bg-slate-50 border-slate-200 hover:bg-slate-100/70'}`}>
+                                <input
+                                    type="checkbox"
+                                    checked={importIsCutoff}
+                                    onChange={(e) => setImportIsCutoff(e.target.checked)}
+                                    className="mt-0.5 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                                />
+                                <div>
+                                    <div className="font-bold text-slate-800">Mode Pelunasan Pra-Cut-off (Tanpa Potong Kas &amp; Bank)</div>
+                                    <div className="text-[11px] text-slate-500 mt-0.5 leading-snug">
+                                        Aktifkan jika seluruh baris di file adalah faktur lama pra-cut-off. Kolom Kode Bank boleh dikosongkan (atau isi <code className="px-1 bg-white rounded border">CUTOFF</code> per baris).
+                                    </div>
+                                </div>
+                            </label>
                             <div className="rounded-xl bg-slate-50 border border-slate-200 p-3 text-slate-600">
                                 <div className="font-semibold text-slate-700 mb-1">Kolom wajib</div>
-                                <div>No. Faktur · Tanggal Bayar · Kode Bank</div>
-                                <div className="mt-1 text-slate-500">Tanggal: YYYY-MM-DD atau DD/MM/YYYY. Kode Bank harus sama dengan kode akun Kas &amp; Bank.</div>
+                                <div>No. Faktur · Tanggal Bayar · {importIsCutoff ? 'Kode Bank (opsional)' : 'Kode Bank'}</div>
+                                <div className="mt-1 text-slate-500">Tanggal: YYYY-MM-DD atau DD/MM/YYYY. Kode Bank harus sama dengan kode akun Kas &amp; Bank (atau <code className="px-1 bg-white rounded border">CUTOFF</code> untuk non-kas).</div>
                             </div>
                             <a href="/finance/hutang/import-template" className="inline-flex items-center gap-1.5 text-blue-700 font-semibold hover:text-blue-800">
                                 <Download className="w-3.5 h-3.5" /> Unduh template CSV
@@ -1736,24 +1924,52 @@ export default function Hutang({
                                 </div>
                             </div>
 
-                            <div>
-                                <label className="block text-slate-700 font-semibold mb-1">
-                                    Bayar Dari Akun (Kas & Bank) <span className="text-red-500">*</span>
-                                </label>
-                                <select
-                                    value={bulkForm.account_id}
-                                    onChange={(e) => setBulkForm({ ...bulkForm, account_id: e.target.value })}
-                                    required
-                                    className="w-full px-3 py-2.5 bg-white border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                                >
-                                    <option value="">-- Pilih Akun Kas & Bank --</option>
-                                    {kasBankAccounts.map((acc) => (
-                                        <option key={acc.id} value={acc.id}>
-                                            {acc.name} ({acc.code}) - Saldo: {formatRupiah(acc.balance)}
-                                        </option>
-                                    ))}
-                                </select>
-                            </div>
+                            <label className={`flex items-start gap-2.5 p-3 rounded-xl border cursor-pointer transition ${bulkForm.is_cutoff ? 'bg-indigo-50 border-indigo-300' : 'bg-slate-50 border-slate-200 hover:bg-slate-100/70'}`}>
+                                <input
+                                    type="checkbox"
+                                    checked={Boolean(bulkForm.is_cutoff)}
+                                    onChange={(e) => {
+                                        const checked = e.target.checked;
+                                        setBulkForm({
+                                            ...bulkForm,
+                                            is_cutoff: checked,
+                                            payment_date: checked ? getDefaultCutoffDate() : new Date().toISOString().split('T')[0],
+                                        });
+                                    }}
+                                    className="mt-0.5 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                                />
+                                <div>
+                                    <div className="font-bold text-slate-800">Pelunasan Pra-Cut-off (Tanpa Potong Kas &amp; Bank)</div>
+                                    <div className="text-[11px] text-slate-500 mt-0.5 leading-snug">
+                                        Untuk menandai lunas faktur-faktur lama sebelum cut-off yang sudah terbayar di luar sistem. Saldo Kas &amp; Bank tetap utuh.
+                                    </div>
+                                </div>
+                            </label>
+
+                            {bulkForm.is_cutoff ? (
+                                <div className="p-3 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-[11px] leading-relaxed">
+                                    <strong>Mode Pra-Cut-off aktif:</strong> {selectedHutangIds.length} faktur terpilih akan ditandai lunas tanpa memotong saldo Kas &amp; Bank. Pastikan <strong>Tanggal Bayar</strong> diisi ≤ tanggal cut-off Saldo Awal.
+                                </div>
+                            ) : (
+                                <div>
+                                    <label className="block text-slate-700 font-semibold mb-1">
+                                        Bayar Dari Akun (Kas &amp; Bank) <span className="text-red-500">*</span>
+                                    </label>
+                                    <select
+                                        value={bulkForm.account_id}
+                                        onChange={(e) => setBulkForm({ ...bulkForm, account_id: e.target.value })}
+                                        required
+                                        className="w-full px-3 py-2.5 bg-white border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                                    >
+                                        <option value="">-- Pilih Akun Kas &amp; Bank --</option>
+                                        {kasBankAccounts.map((acc) => (
+                                            <option key={acc.id} value={acc.id}>
+                                                {acc.name} ({acc.code}) - Saldo: {formatRupiah(acc.balance)}
+                                            </option>
+                                        ))}
+                                    </select>
+                                </div>
+                            )}
 
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
@@ -1798,9 +2014,9 @@ export default function Hutang({
                                 <button
                                     type="submit"
                                     disabled={isSubmittingBulk}
-                                    className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-semibold transition disabled:opacity-50"
+                                    className={`px-4 py-2 text-white rounded-xl text-xs font-semibold transition disabled:opacity-50 ${bulkForm.is_cutoff ? 'bg-indigo-600 hover:bg-indigo-700' : 'bg-blue-600 hover:bg-blue-700'}`}
                                 >
-                                    {isSubmittingBulk ? 'Memproses...' : 'Konfirmasi Pelunasan Massal'}
+                                    {isSubmittingBulk ? 'Memproses...' : (bulkForm.is_cutoff ? 'Konfirmasi Pelunasan Pra-Cut-off' : 'Konfirmasi Pelunasan Massal')}
                                 </button>
                             </div>
                         </form>
@@ -1819,31 +2035,43 @@ export default function Hutang({
                 title="Rincian Faktur Hutang"
                 subtitle={(item) => `${item.nomor} • ${item.referensi}`}
                 renderFooter={(item) => (
-                    <div className="flex items-center gap-2 w-full">
-                        <button
-                            type="button"
-                            onClick={() => {
-                                const target = item;
-                                setDrawerHutang(null);
-                                openHutangDetail(target);
-                            }}
-                            className="flex-1 py-2.5 border border-slate-200 text-slate-700 hover:bg-slate-50 active:scale-[0.99] rounded-xl text-xs font-bold transition text-center cursor-pointer"
-                        >
-                            Buka Halaman Lengkap
-                        </button>
-                        {item.sisa > 0.005 ? (
+                    <div className="space-y-2 w-full">
+                        <div className="flex items-center gap-2 w-full">
                             <button
                                 type="button"
                                 onClick={() => {
                                     const target = item;
                                     setDrawerHutang(null);
-                                    openPaymentModal(target);
+                                    openHutangDetail(target);
                                 }}
-                                className="flex-1 py-2.5 bg-blue-600 hover:bg-blue-700 active:scale-[0.99] text-white rounded-xl text-xs font-bold transition shadow-xs text-center cursor-pointer"
+                                className="flex-1 py-2.5 border border-slate-200 text-slate-700 hover:bg-slate-50 active:scale-[0.99] rounded-xl text-xs font-bold transition text-center cursor-pointer"
                             >
-                                Bayar Tagihan
+                                Buka Halaman Lengkap
                             </button>
-                        ) : null}
+                            {item.sisa > 0.005 ? (
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        const target = item;
+                                        setDrawerHutang(null);
+                                        openPaymentModal(target);
+                                    }}
+                                    className="flex-1 py-2.5 bg-blue-600 hover:bg-blue-700 active:scale-[0.99] text-white rounded-xl text-xs font-bold transition shadow-xs text-center cursor-pointer"
+                                >
+                                    Bayar Tagihan
+                                </button>
+                            ) : null}
+                        </div>
+                        {item.is_opening && (
+                            <button
+                                type="button"
+                                onClick={() => handleDeleteOpening(item)}
+                                className="w-full py-2 border border-red-200 bg-red-50 hover:bg-red-100 text-red-700 rounded-xl text-xs font-semibold transition flex items-center justify-center gap-1.5 cursor-pointer"
+                            >
+                                <Trash2 className="w-3.5 h-3.5" />
+                                <span>Hapus Tagihan Saldo Awal</span>
+                            </button>
+                        )}
                     </div>
                 )}
             >
@@ -2061,6 +2289,175 @@ export default function Hutang({
                     </>
                 )}
             </Drawer>
+
+            {/* Modal Tambah Tagihan Saldo Awal Hutang (Per Faktur) */}
+            {isOpeningModalOpen && (() => {
+                const parsedInvoiceAmt = openingForm.amount === '' ? 0 : (parseFloat(openingForm.amount) || 0);
+
+                return (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-xs p-4">
+                    <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto animate-in fade-in zoom-in-95 duration-200">
+                        <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between sticky top-0 bg-white z-10">
+                            <div className="flex items-center gap-2">
+                                <Plus className="w-5 h-5 text-indigo-600" />
+                                <h3 className="font-bold text-slate-900 text-sm">Tambah Faktur Saldo Awal Hutang Dagang</h3>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={() => setIsOpeningModalOpen(false)}
+                                className="text-slate-400 hover:text-slate-600 p-1 rounded-lg"
+                            >
+                                <X className="w-4 h-4" />
+                            </button>
+                        </div>
+
+                        <form onSubmit={handleOpeningSubmit} className="p-6 space-y-4 text-xs">
+                            {/* Box Saldo Awal Neraca Saat Ini */}
+                            <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-between">
+                                <div>
+                                    <div className="text-[11px] font-semibold text-slate-500">
+                                        Saldo Awal Hutang di Neraca (per {openingForm.invoice_date || '-'})
+                                    </div>
+                                    <div className="text-lg font-black text-slate-900 mt-0.5">
+                                        {isLoadingOpeningPreview
+                                            ? 'Menghitung...'
+                                            : (openingPreviewBalance !== null ? formatRupiah(openingPreviewBalance) : '-')}
+                                    </div>
+                                </div>
+                                <span className="px-2 py-1 rounded-lg bg-white border border-slate-200 text-[10px] font-bold text-slate-500">
+                                    Cut-off Neraca
+                                </span>
+                            </div>
+
+                            <div className="p-3 rounded-xl bg-indigo-50 border border-indigo-200 text-indigo-900 text-[11px] leading-relaxed">
+                                <strong>Input Per Faktur Lama (Belum Tercatat):</strong> Masukkan <strong>nominal faktur yang belum masuk sistem</strong> (bukan total seluruh saldo awal). Tidak mengubah stok obat maupun Kas &amp; Bank.
+                            </div>
+
+                            <div>
+                                <label className="block text-slate-700 font-semibold mb-1">
+                                    Vendor / PBF <span className="text-slate-400 font-normal">(Opsional)</span>
+                                </label>
+                                <input
+                                    type="text"
+                                    placeholder="Ketik untuk mencari nama atau kode PBF..."
+                                    value={openingCreditorQuery}
+                                    onChange={(e) => setOpeningCreditorQuery(e.target.value)}
+                                    className="w-full px-3 py-2 mb-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 focus:bg-white focus:outline-none"
+                                />
+                                <select
+                                    value={openingForm.creditor_code}
+                                    onChange={(e) => setOpeningForm({ ...openingForm, creditor_code: e.target.value })}
+                                    className="w-full px-3 py-2.5 bg-white border border-slate-200 rounded-xl text-xs font-medium text-slate-800 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                                >
+                                    <option value="">-- Tanpa PBF / Saldo Awal Umum ({filteredOpeningCreditors.length} PBF tersedia) --</option>
+                                    {filteredOpeningCreditors.map((c) => (
+                                        <option key={c.code} value={c.code}>
+                                            {c.name} ({c.code})
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-slate-700 font-semibold mb-1">
+                                        Nomor Faktur <span className="text-red-500">*</span>
+                                    </label>
+                                    <input
+                                        type="text"
+                                        placeholder="Contoh: SA-PBF-001"
+                                        value={openingForm.invoice_number}
+                                        onChange={(e) => setOpeningForm({ ...openingForm, invoice_number: e.target.value })}
+                                        required
+                                        className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-medium focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-slate-700 font-semibold mb-1">
+                                        Nominal Faktur Ini (Rp) <span className="text-red-500">*</span>
+                                    </label>
+                                    <input
+                                        type="number"
+                                        step="any"
+                                        min="0.01"
+                                        placeholder="0"
+                                        value={openingForm.amount}
+                                        onChange={(e) => setOpeningForm({ ...openingForm, amount: e.target.value })}
+                                        required
+                                        className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-900 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                                    />
+                                </div>
+                            </div>
+
+                            {openingPreviewBalance !== null && parsedInvoiceAmt > 0 && (
+                                <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 text-[11px] flex items-center justify-between text-slate-700">
+                                    <span>Saldo Awal Neraca akan menjadi:</span>
+                                    <strong className="text-indigo-700 text-xs">{formatRupiah(openingPreviewBalance + parsedInvoiceAmt)}</strong>
+                                </div>
+                            )}
+
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-slate-700 font-semibold mb-1">
+                                        Tanggal Faktur / Cut-off <span className="text-red-500">*</span>
+                                    </label>
+                                    <input
+                                        type="date"
+                                        value={openingForm.invoice_date}
+                                        onChange={(e) => {
+                                            const val = e.target.value;
+                                            setOpeningForm({ ...openingForm, invoice_date: val });
+                                            if (val) fetchOpeningPreview(val);
+                                        }}
+                                        required
+                                        className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-slate-700 font-semibold mb-1">
+                                        Tanggal Jatuh Tempo
+                                    </label>
+                                    <input
+                                        type="date"
+                                        value={openingForm.due_date}
+                                        onChange={(e) => setOpeningForm({ ...openingForm, due_date: e.target.value })}
+                                        className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                                    />
+                                </div>
+                            </div>
+
+                            <div>
+                                <label className="block text-slate-700 font-semibold mb-1">Catatan</label>
+                                <textarea
+                                    rows={2}
+                                    placeholder="Contoh: Faktur lama pra-migrasi belum sempat diinput di penerimaan..."
+                                    value={openingForm.notes}
+                                    onChange={(e) => setOpeningForm({ ...openingForm, notes: e.target.value })}
+                                    className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                                />
+                            </div>
+
+                            <div className="pt-4 border-t border-slate-100 flex items-center justify-end gap-2">
+                                <button
+                                    type="button"
+                                    onClick={() => setIsOpeningModalOpen(false)}
+                                    className="px-4 py-2 border border-slate-200 text-slate-700 rounded-xl text-xs font-semibold hover:bg-slate-50 transition"
+                                >
+                                    Batal
+                                </button>
+                                <button
+                                    type="submit"
+                                    disabled={isSubmittingOpening}
+                                    className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-semibold transition disabled:opacity-50"
+                                >
+                                    {isSubmittingOpening ? 'Menyimpan...' : 'Tambah Faktur Saldo Awal'}
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+                );
+            })()}
 
             {/* Floating Action Bar saat faktur dicentang */}
             <FloatingActionBar

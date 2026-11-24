@@ -16,6 +16,7 @@ class FinancePayment extends Model
         'receiving_id',
         'receiving_detail_id',
         'medicine_transaction_id',
+        'opening_invoice_id',
         'account_id',
         'transfer_account_id',
         'expense_account_id',
@@ -72,6 +73,11 @@ class FinancePayment extends Model
     public function transaction()
     {
         return $this->belongsTo(MedicineTransactions::class, 'medicine_transaction_id');
+    }
+
+    public function openingInvoice()
+    {
+        return $this->belongsTo(FinanceOpeningInvoice::class, 'opening_invoice_id');
     }
 
     public function creator()

@@ -125,7 +125,10 @@ class KasBankExport implements FromArray, WithStyles, WithColumnWidths, WithTitl
             'receivingDetail.creditor',
             'transaction.debtors',
             'transaction.patients',
+            'openingInvoice.creditor',
+            'openingInvoice.debtor',
         ])
+            ->whereNotIn('payment_type', ['KREDIT CUTOFF', 'PIUTANG CUTOFF', 'RETUR'])
             ->whereHas('account', function ($q) {
                 $q
                     ->where('category', 'Kas & Bank')
@@ -139,6 +142,10 @@ class KasBankExport implements FromArray, WithStyles, WithColumnWidths, WithTitl
                     })
                     ->orWhereHas('transaction', function ($sub) {
                         $sub->whereIn('pharmacy_id', $this->targetPharmacyIds);
+                    })
+                    ->orWhere(function ($sub) {
+                        $sub->whereNotNull('opening_invoice_id')
+                            ->whereIn('pharmacy_id', $this->targetPharmacyIds);
                     })
                     ->orWhere(function ($sub) {
                         $sub
@@ -414,15 +421,20 @@ class KasBankExport implements FromArray, WithStyles, WithColumnWidths, WithTitl
                 $deskripsi = "Penerimaan penjualan {$method} melalui {$bank}";
             }
         } elseif ($p->payment_type === 'PIUTANG') {
-            $pihakTerkait = $p->transaction->debtors->name ?? ($p->transaction->patients->name ?? 'Pelanggan Umum');
-            $doc = $p->transaction->invoice_number ?? $p->reference_number;
+            $pihakTerkait = $p->openingInvoice?->debtor?->name
+                ?? $p->transaction?->debtors?->name
+                ?? ($p->transaction?->patients?->name ?? 'Pelanggan Umum');
+            $doc = $p->openingInvoice?->invoice_number ?? $p->transaction?->invoice_number ?? $p->reference_number;
             if ($doc)
                 $noDokumen = $doc;
             if (!$deskripsi)
                 $deskripsi = "Penerimaan piutang penjualan dari {$pihakTerkait}";
         } elseif ($p->payment_type === 'KREDIT') {
-            $pihakTerkait = $p->receivingDetail->creditor->name ?? ($p->receivingDetail->creditor_code ?? 'PBF / Vendor');
-            $doc = $p->receivingDetail->invoice_number ?? $p->reference_number;
+            $pihakTerkait = $p->openingInvoice?->creditor?->name
+                ?? ($p->openingInvoice?->creditor_code ?: null)
+                ?? $p->receivingDetail?->creditor?->name
+                ?? ($p->receivingDetail?->creditor_code ?? 'PBF / Vendor');
+            $doc = $p->openingInvoice?->invoice_number ?? $p->receivingDetail?->invoice_number ?? $p->reference_number;
             if ($doc)
                 $noDokumen = $doc;
             if (!$deskripsi)

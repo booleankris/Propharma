@@ -3,6 +3,7 @@
 namespace App\Services\Finance;
 
 use App\Models\FinanceAccount;
+use App\Models\FinanceOpeningInvoice;
 use App\Models\FinancePayment;
 use App\Models\MedicineTransactions;
 use App\Models\ReceivingDetails;
@@ -248,15 +249,15 @@ class NeracaReportService
         return FinanceAccountBalanceResolver::calculateFromOpening($accountId, $opening, $asOfDate);
     }
 
-    private function receivableBalanceAtDate(array $pharmacyIds, string $asOfDate): float
+    public function receivableBalanceAtDate(array $pharmacyIds, string $asOfDate): float
     {
         $transactions = MedicineTransactions::query()
             ->with(['transactions' => fn ($query) => $query->where('status', 1)])
             ->withSum(['payments as finance_paid' => fn ($query) => $query
-                ->where('payment_type', 'PIUTANG')
+                ->whereIn('payment_type', ['PIUTANG', 'PIUTANG CUTOFF'])
                 ->whereDate('payment_date', '<=', $asOfDate)], 'amount')
             ->withSum(['payments as finance_paid_total' => fn ($query) => $query
-                ->where('payment_type', 'PIUTANG')], 'amount')
+                ->whereIn('payment_type', ['PIUTANG', 'PIUTANG CUTOFF'])], 'amount')
             ->whereIn('pharmacy_id', $pharmacyIds)
             ->whereIn('transaction_type', ['KREDIT', 'RESEP KREDIT', 'RETUR KREDIT'])
             ->where(function ($period) use ($asOfDate) {
@@ -302,10 +303,30 @@ class NeracaReportService
             }
         }
 
-        return round((float) array_sum($balancesByDebtor), 2);
+        $totalBalance = (float) array_sum($balancesByDebtor);
+
+        if (Schema::hasTable('finance_opening_invoices')) {
+            $openingReceivables = FinanceOpeningInvoice::query()
+                ->withSum(['payments as paid_as_of' => fn ($q) => $q->whereDate('payment_date', '<=', $asOfDate)], 'amount')
+                ->where('type', 'PIUTANG')
+                ->whereIn('pharmacy_id', $pharmacyIds)
+                ->whereDate('invoice_date', '<=', $asOfDate)
+                ->get(['id', 'amount']);
+
+            foreach ($openingReceivables as $oi) {
+                $amt = (float) $oi->amount;
+                if ($amt < 0) {
+                    $totalBalance += $amt;
+                } else {
+                    $totalBalance += max(0.0, $amt - (float) ($oi->paid_as_of ?? 0));
+                }
+            }
+        }
+
+        return round(max(0.0, $totalBalance), 2);
     }
 
-    private function payableBalanceAtDate(array $pharmacyIds, string $asOfDate): float
+    public function payableBalanceAtDate(array $pharmacyIds, string $asOfDate): float
     {
         // PMI (Apotek ID 1): Pemesanan dan pembelian dari supplier dicatat di Gudang PMI (ID 9).
         if (in_array(1, $pharmacyIds, true) && !in_array(9, $pharmacyIds, true)) {
@@ -378,7 +399,25 @@ class NeracaReportService
             $balance += max(0, $netTotal - $paidApplied);
         }
 
-        return round($balance, 2);
+        if (Schema::hasTable('finance_opening_invoices')) {
+            $openingPayables = FinanceOpeningInvoice::query()
+                ->withSum(['payments as paid_as_of' => fn ($q) => $q->whereDate('payment_date', '<=', $asOfDate)], 'amount')
+                ->where('type', 'HUTANG')
+                ->whereIn('pharmacy_id', $pharmacyIds)
+                ->whereDate('invoice_date', '<=', $asOfDate)
+                ->get(['id', 'amount']);
+
+            foreach ($openingPayables as $oi) {
+                $amt = (float) $oi->amount;
+                if ($amt < 0) {
+                    $balance += $amt;
+                } else {
+                    $balance += max(0.0, $amt - (float) ($oi->paid_as_of ?? 0));
+                }
+            }
+        }
+
+        return round(max(0.0, $balance), 2);
     }
 
     /**

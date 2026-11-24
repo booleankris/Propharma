@@ -1599,6 +1599,8 @@ class SuppliesController extends Controller
                     }
                 }
             })
+            ->orderByRaw('CASE WHEN expired_date IS NULL THEN 1 ELSE 0 END ASC')
+            ->orderByRaw("CASE WHEN name = 'MINUS-AUTO' THEN 1 ELSE 0 END ASC")
             ->orderBy('expired_date', 'asc') // FEFO
             ->withSum(['medicine_transfer_items as counter_stock' => function ($q) use ($counterPharmacyId) {
                 $q->where('status', 1)
@@ -2039,6 +2041,8 @@ class SuppliesController extends Controller
                       $sub->whereNull('source_type')->orWhere('source_type', '!=', 'retur_gudang');
                   });
             }], 'qty')
+            ->orderByRaw('CASE WHEN expired_date IS NULL THEN 1 ELSE 0 END ASC')
+            ->orderByRaw("CASE WHEN name = 'MINUS-AUTO' THEN 1 ELSE 0 END ASC")
             ->orderBy('expired_date', 'asc')
             ->get(['id', 'name', 'expired_date', 'stock', 'pharmacy_id']);
 
@@ -2123,6 +2127,8 @@ class SuppliesController extends Controller
                             $q->where('pharmacy_id', $counterPharmacyId);
                         }
                     })
+                    ->orderByRaw('CASE WHEN expired_date IS NULL THEN 1 ELSE 0 END ASC')
+                    ->orderByRaw("CASE WHEN name = 'MINUS-AUTO' THEN 1 ELSE 0 END ASC")
                     ->orderBy('expired_date', 'asc')
                     ->first();
 

@@ -25,6 +25,7 @@ use Form;
 use App\Exports\Orders\BuyPriceHistoryExport;
 use App\Jobs\ProcessBuyPriceHistoryExport;
 use App\Models\ExportJob;
+use App\Services\StockLedgerService;
 use Illuminate\Support\Facades\Storage;
 use Maatwebsite\Excel\Facades\Excel;
 
@@ -2618,7 +2619,7 @@ class ReceivingController extends Controller
             }
 
             if (!$isWarehouse && isset($transferHeader)) {
-                MedicineTransferItems::create([
+                $createdTransferItem = MedicineTransferItems::create([
                     'medicine_transfer_id' => $transferHeader->id,
                     'batches_id' => $batch->id,
                     'receiving_items_id' => $receivingItem->id,
@@ -2627,6 +2628,14 @@ class ReceivingController extends Controller
                     'original_qty' => $actualQty,
                     'status' => 1,
                 ]);
+
+                if ((float) $effectiveQtyToAdd > 0) {
+                    app(StockLedgerService::class)->settleNegativeCounterStock(
+                        (int) $batch->medicine_id,
+                        (int) $batch->pharmacy_id,
+                        $createdTransferItem
+                    );
+                }
             }
 
             if ($effectiveQtyToAdd > 0) {
@@ -3946,6 +3955,26 @@ class ReceivingController extends Controller
                 collect($transferItemsInserts)
                     ->chunk(500)
                     ->each(fn($chunk) => MedicineTransferItems::insert($chunk->toArray()));
+
+                if (!isWarehousePharmacy($pharmacyId)) {
+                    $insertedBatchIds = array_values(array_unique(array_column($transferItemsInserts, 'batches_id')));
+                    $createdTransferItems = MedicineTransferItems::with('batches:id,medicine_id,pharmacy_id')
+                        ->where('medicine_transfer_id', $transferHeader->id)
+                        ->whereIn('batches_id', $insertedBatchIds)
+                        ->where('qty', '>', 0)
+                        ->where('status', 1)
+                        ->orderBy('id')
+                        ->get();
+
+                    $stockLedger = app(StockLedgerService::class);
+                    foreach ($createdTransferItems as $createdTransferItem) {
+                        $medId = (int) optional($createdTransferItem->batches)->medicine_id;
+                        $pharmId = (int) (optional($createdTransferItem->batches)->pharmacy_id ?? $pharmacyId);
+                        if ($medId > 0 && $pharmId > 0) {
+                            $stockLedger->settleNegativeCounterStock($medId, $pharmId, $createdTransferItem);
+                        }
+                    }
+                }
             }
 
             // Persist batch and the exact unit conversion used when stock was posted.

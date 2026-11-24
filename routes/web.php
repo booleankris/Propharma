@@ -632,7 +632,9 @@ Route::middleware(['auth', 'role:General Manager|Kasir|Gudang PMI|HO|administrat
     Route::prefix('finance')->name('finance.')->middleware(['role:Finance|General Manager|administrator|HO'])->group(function () {
         Route::get('/', [\App\Http\Controllers\FinanceController::class, 'index'])->name('index');
         Route::get('/hutang', [\App\Http\Controllers\FinanceController::class, 'hutang'])->name('hutang');
-        Route::get('/hutang/{id}/detail', [\App\Http\Controllers\FinanceController::class, 'hutangDetail'])->whereNumber('id')->name('hutang.detail');
+        Route::get('/hutang/{id}/detail', [\App\Http\Controllers\FinanceController::class, 'hutangDetail'])->where('id', '[0-9]+|OB-[0-9]+')->name('hutang.detail');
+        Route::post('/hutang/opening', [\App\Http\Controllers\FinanceController::class, 'storeOpeningHutang'])->name('hutang.opening.store');
+        Route::delete('/hutang/opening/{id}', [\App\Http\Controllers\FinanceController::class, 'destroyOpeningInvoice'])->whereNumber('id')->name('hutang.opening.destroy');
         Route::get('/cash', [\App\Http\Controllers\FinanceController::class, 'cash'])->name('cash');
         Route::get('/cashflow', [\App\Http\Controllers\FinanceController::class, 'cashflow'])->name('cashflow');
         Route::get('/cashflow/export', [\App\Http\Controllers\FinanceController::class, 'exportCashflow'])->name('cashflow.export');
@@ -644,7 +646,9 @@ Route::middleware(['auth', 'role:General Manager|Kasir|Gudang PMI|HO|administrat
         Route::post('/tarik-tunai', [\App\Http\Controllers\FinanceController::class, 'storeTarikTunai'])->name('tarikTunai.store');
         Route::get('/konsinyasi', [\App\Http\Controllers\FinanceController::class, 'konsinyasi'])->name('konsinyasi');
         Route::get('/piutang', [\App\Http\Controllers\FinanceController::class, 'piutang'])->name('piutang');
-        Route::get('/piutang/{id}/detail', [\App\Http\Controllers\FinanceController::class, 'piutangDetail'])->whereNumber('id')->name('piutang.detail');
+        Route::get('/piutang/{id}/detail', [\App\Http\Controllers\FinanceController::class, 'piutangDetail'])->where('id', '[0-9]+|OB-[0-9]+')->name('piutang.detail');
+        Route::post('/piutang/opening', [\App\Http\Controllers\FinanceController::class, 'storeOpeningPiutang'])->name('piutang.opening.store');
+        Route::delete('/piutang/opening/{id}', [\App\Http\Controllers\FinanceController::class, 'destroyOpeningInvoice'])->whereNumber('id')->name('piutang.opening.destroy');
         Route::get('/kas-bank', [\App\Http\Controllers\FinanceController::class, 'kasBank'])->name('kasBank');
         Route::get('/pendapatan-lain-lain', [\App\Http\Controllers\FinanceController::class, 'pendapatanLainLain'])->name('pendapatanLainLain');
         Route::get('/biaya', [\App\Http\Controllers\FinanceController::class, 'biaya'])->name('biaya');
@@ -670,6 +674,7 @@ Route::middleware(['auth', 'role:General Manager|Kasir|Gudang PMI|HO|administrat
         Route::post('/bulk-cash-payment', [\App\Http\Controllers\FinanceController::class, 'assignBulkCashAccount'])->name('cash.bulkAssign');
         Route::post('/piutang-payments', [\App\Http\Controllers\FinanceController::class, 'storePiutangPayment'])->name('piutang.store');
         Route::get('/saldo-awal/estimate', [\App\Http\Controllers\FinanceController::class, 'estimateSaldoAwal'])->name('saldoAwal.estimate');
+        Route::get('/opening-balance-preview', [\App\Http\Controllers\FinanceController::class, 'previewOpeningBalance'])->name('opening.preview');
         Route::post('/saldo-awal', [\App\Http\Controllers\FinanceController::class, 'storeSaldoAwal'])->name('saldoAwal.store');
         Route::post('/kas-bank/adjust-balance', [\App\Http\Controllers\FinanceController::class, 'adjustBalance'])->name('kasBank.adjustBalance');
         Route::post('/kas-bank/backfill-penjualan-tunai', [\App\Http\Controllers\FinanceController::class, 'backfillPenjualanTunai'])->name('kasBank.backfillPenjualanTunai');

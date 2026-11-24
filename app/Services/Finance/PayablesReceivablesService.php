@@ -2,6 +2,7 @@
 
 namespace App\Services\Finance;
 
+use App\Models\FinanceOpeningInvoice;
 use App\Models\MedicineTransactions;
 use App\Models\Receiving;
 use App\Models\Retur;
@@ -111,7 +112,10 @@ class PayablesReceivablesService
             ->orderByDesc('rd.id')
             ->get();
 
-        $allRows = $this->assembleHutangRows($headers);
+        $allRows = array_merge(
+            $this->assembleHutangRows($headers),
+            $this->assembleOpeningHutangRows($pharmacyIds)
+        );
 
         $stats = $this->summarizeHutangStats($allRows);
         $dueStats = $this->computeDueStats($allRows);
@@ -165,12 +169,24 @@ class PayablesReceivablesService
     /**
      * Fetch a single Hutang Dagang invoice with complete items, payments, and purchase return history.
      */
-    public function getHutangDetail(int $detailId, array $pharmacyIds): ?array
+    public function getHutangDetail(int|string $detailId, array $pharmacyIds): ?array
     {
         $pharmacyIds = array_values(array_filter(array_map('intval', $pharmacyIds)));
         if (empty($pharmacyIds)) {
             return null;
         }
+
+        $openingId = FinanceOpeningInvoice::parseCompositeId($detailId);
+        if ($openingId !== null) {
+            $rows = $this->assembleOpeningHutangRows($pharmacyIds, $openingId);
+            if (empty($rows)) {
+                return null;
+            }
+            $hydrated = $this->hydrateHutangDetails($rows);
+            return $hydrated[0] ?? null;
+        }
+
+        $detailId = (int) $detailId;
 
         $headers = DB::table('receiving_details as rd')
             ->join('receiving as r', 'r.id', '=', 'rd.receiving_id')
@@ -260,7 +276,10 @@ class PayablesReceivablesService
             ->toBase()
             ->get();
 
-        $allRows = $this->assemblePiutangRows($headers);
+        $allRows = array_merge(
+            $this->assemblePiutangRows($headers),
+            $this->assembleOpeningPiutangRows($pharmacyIds)
+        );
 
         $stats = $this->summarizePiutangStats($allRows);
         $dueStats = $this->computeDueStats($allRows);
@@ -308,12 +327,24 @@ class PayablesReceivablesService
     /**
      * Fetch a single Piutang transaction with complete items, payments, and return history.
      */
-    public function getPiutangDetail(int $txId, array $pharmacyIds): ?array
+    public function getPiutangDetail(int|string $txId, array $pharmacyIds): ?array
     {
         $pharmacyIds = array_values(array_filter(array_map('intval', $pharmacyIds)));
         if (empty($pharmacyIds)) {
             return null;
         }
+
+        $openingId = FinanceOpeningInvoice::parseCompositeId($txId);
+        if ($openingId !== null) {
+            $rows = $this->assembleOpeningPiutangRows($pharmacyIds, $openingId);
+            if (empty($rows)) {
+                return null;
+            }
+            $hydrated = $this->hydratePiutangDetails($rows);
+            return $hydrated[0] ?? null;
+        }
+
+        $txId = (int) $txId;
 
         $query = MedicineTransactions::query()
             ->where('id', $txId)
@@ -734,12 +765,360 @@ class PayablesReceivablesService
     }
 
     /**
+     * Build Hutang Dagang rows from manual opening balance invoices (without stock mutation).
+     */
+    protected function assembleOpeningHutangRows(array $pharmacyIds, ?int $onlyOpeningId = null): array
+    {
+        if (!Schema::hasTable('finance_opening_invoices')) {
+            return [];
+        }
+
+        $query = DB::table('finance_opening_invoices as oi')
+            ->leftJoin('creditors as c', 'c.code', '=', 'oi.creditor_code')
+            ->leftJoin('pharmacies as p', 'p.id', '=', 'oi.pharmacy_id')
+            ->where('oi.type', 'HUTANG')
+            ->whereIn('oi.pharmacy_id', $pharmacyIds);
+
+        if ($onlyOpeningId !== null) {
+            $query->where('oi.id', $onlyOpeningId);
+        }
+
+        $records = $query->select([
+            'oi.id',
+            'oi.pharmacy_id',
+            'oi.creditor_code',
+            'oi.invoice_number',
+            'oi.invoice_date',
+            'oi.due_date',
+            'oi.amount',
+            'oi.is_submitted',
+            'oi.notes',
+            'oi.created_at',
+            'oi.updated_at',
+            'c.name as creditor_name',
+            'p.name as pharmacy_name',
+        ])->orderByDesc('oi.invoice_date')->orderByDesc('oi.id')->get();
+
+        if ($records->isEmpty()) {
+            return [];
+        }
+
+        $openingIds = $records->pluck('id')->map(fn($v) => (int) $v)->all();
+        $paidByOpening = [];
+        $latestPayByOpening = [];
+
+        if (Schema::hasColumn('finance_payments', 'opening_invoice_id')) {
+            $payRows = DB::table('finance_payments')
+                ->whereIn('opening_invoice_id', $openingIds)
+                ->select([
+                    'opening_invoice_id',
+                    DB::raw('SUM(amount) as total_amount'),
+                    DB::raw('MAX(payment_date) as max_payment_date'),
+                ])
+                ->groupBy('opening_invoice_id')
+                ->get();
+
+            foreach ($payRows as $pr) {
+                $id = (int) $pr->opening_invoice_id;
+                $paidByOpening[$id] = (float) $pr->total_amount;
+                $latestPayByOpening[$id] = $pr->max_payment_date;
+            }
+        }
+
+        $todayEnd = now()->endOfDay();
+        $rows = [];
+        foreach ($records as $rec) {
+            $id = (int) $rec->id;
+            $total = round((float) $rec->amount, 2);
+            $isNegativeAdj = ($total < 0);
+            $paid = $isNegativeAdj ? 0.0 : round(min($total, (float) ($paidByOpening[$id] ?? 0.0)), 2);
+            $sisa = $isNegativeAdj ? $total : round(max(0, $total - $paid), 2);
+            $isLunas = !$isNegativeAdj && ($sisa < 0.005);
+            if ($isLunas) {
+                $sisa = 0.0;
+            }
+            $statusLabel = $isNegativeAdj
+                ? 'Koreksi Saldo Awal'
+                : ($isLunas ? 'Lunas' : ($paid > 0 ? 'Dibayar Sebagian' : 'Belum Dibayar'));
+
+            $invoiceDate = $this->normalizeDate($rec->invoice_date);
+            $dueDate = $this->normalizeDate($rec->due_date);
+            $dueCarbon = $dueDate ? Carbon::parse($dueDate) : null;
+            $isOverdue = ($dueCarbon && !$isLunas && !$isNegativeAdj) ? $dueCarbon->endOfDay()->isPast() : false;
+            $daysOverdue = ($isOverdue && $dueCarbon) ? (int) $dueCarbon->diffInDays($todayEnd) : 0;
+            $daysRemaining = (!$isOverdue && $dueCarbon && !$isLunas && !$isNegativeAdj) ? (int) now()->startOfDay()->diffInDays($dueCarbon->copy()->startOfDay()) : 0;
+
+            $tanggalBayar = '';
+            if ($isLunas) {
+                $maxPay = $latestPayByOpening[$id] ?? null;
+                $tanggalBayar = $maxPay
+                    ? Carbon::parse($maxPay)->format('d/m/Y')
+                    : ($rec->updated_at ? Carbon::parse($rec->updated_at)->format('d/m/Y') : '');
+            }
+
+            $rows[] = [
+                'id' => 'OB-' . $id,
+                'opening_id' => $id,
+                'is_opening' => true,
+                'is_negative_adjustment' => $isNegativeAdj,
+                'receiving_id' => null,
+                'nomor' => $rec->invoice_number,
+                'vendor' => $rec->creditor_name ?? ($rec->creditor_code ?: 'PBF / Vendor'),
+                'vendor_code' => $rec->creditor_code ?: '',
+                'referensi' => 'SALDO AWAL',
+                'tanggal' => $invoiceDate ? Carbon::parse($invoiceDate)->format('d/m/Y') : '-',
+                'raw_tanggal' => $invoiceDate,
+                'raw_tanggal_terima' => $invoiceDate,
+                'jatuhTempo' => $dueCarbon ? $dueCarbon->format('d/m/Y') : '-',
+                'raw_jatuh_tempo' => $dueCarbon ? $dueCarbon->format('Y-m-d') : null,
+                'is_overdue' => $isOverdue,
+                'days_overdue' => $daysOverdue,
+                'days_remaining' => $daysRemaining,
+                'tanggalBayar' => $tanggalBayar,
+                'status' => $statusLabel,
+                'subtotal' => $total,
+                'ppn' => 0.0,
+                'total' => $total,
+                'total_retur' => 0.0,
+                'returs_count' => 0,
+                'net_total' => $total,
+                'terbayar' => $paid,
+                'sisa' => $sisa,
+                'returs' => [],
+                'gudang' => $rec->pharmacy_name ?? 'Gudang Utama',
+                'tglKirim' => $invoiceDate ? Carbon::parse($invoiceDate)->format('d/m/Y') : '-',
+                'items' => [],
+                'payments' => [],
+                'is_submitted' => (bool) ($rec->is_submitted ?? false),
+                'notes' => $rec->notes ?: '',
+                'lastModified' => $rec->updated_at ? Carbon::parse($rec->updated_at)->format('d M Y H:i') : '-',
+                '_ppn_type' => 'TANPA',
+                '_invoice_number_raw' => $rec->invoice_number,
+            ];
+        }
+
+        return $rows;
+    }
+
+    /**
+     * Build Piutang rows from manual opening balance invoices (without stock/LIPH mutation).
+     */
+    protected function assembleOpeningPiutangRows(array $pharmacyIds, ?int $onlyOpeningId = null): array
+    {
+        if (!Schema::hasTable('finance_opening_invoices')) {
+            return [];
+        }
+
+        $query = DB::table('finance_opening_invoices as oi')
+            ->leftJoin('debtors as d', 'd.id', '=', 'oi.debtor_id')
+            ->leftJoin('pharmacies as p', 'p.id', '=', 'oi.pharmacy_id')
+            ->where('oi.type', 'PIUTANG')
+            ->whereIn('oi.pharmacy_id', $pharmacyIds);
+
+        if ($onlyOpeningId !== null) {
+            $query->where('oi.id', $onlyOpeningId);
+        }
+
+        $records = $query->select([
+            'oi.id',
+            'oi.pharmacy_id',
+            'oi.debtor_id',
+            'oi.invoice_number',
+            'oi.invoice_date',
+            'oi.due_date',
+            'oi.amount',
+            'oi.is_submitted',
+            'oi.notes',
+            'oi.created_at',
+            'oi.updated_at',
+            'd.name as debtor_name',
+            'd.code as debtor_code',
+            'p.name as pharmacy_name',
+        ])->orderByDesc('oi.invoice_date')->orderByDesc('oi.id')->get();
+
+        if ($records->isEmpty()) {
+            return [];
+        }
+
+        $openingIds = $records->pluck('id')->map(fn($v) => (int) $v)->all();
+        $paidByOpening = [];
+        $latestPayByOpening = [];
+
+        if (Schema::hasColumn('finance_payments', 'opening_invoice_id')) {
+            $payRows = DB::table('finance_payments')
+                ->whereIn('opening_invoice_id', $openingIds)
+                ->select([
+                    'opening_invoice_id',
+                    DB::raw('SUM(amount) as total_amount'),
+                    DB::raw('MAX(payment_date) as max_payment_date'),
+                ])
+                ->groupBy('opening_invoice_id')
+                ->get();
+
+            foreach ($payRows as $pr) {
+                $id = (int) $pr->opening_invoice_id;
+                $paidByOpening[$id] = (float) $pr->total_amount;
+                $latestPayByOpening[$id] = $pr->max_payment_date;
+            }
+        }
+
+        $todayEnd = now();
+        $rows = [];
+        foreach ($records as $rec) {
+            $id = (int) $rec->id;
+            $total = round((float) $rec->amount, 2);
+            $isNegativeAdj = ($total < 0);
+            $paid = $isNegativeAdj ? 0.0 : round(min($total, (float) ($paidByOpening[$id] ?? 0.0)), 2);
+            $sisa = $isNegativeAdj ? $total : round(max(0, $total - $paid), 2);
+            $isLunas = !$isNegativeAdj && ($sisa < 0.005);
+            if ($isLunas) {
+                $sisa = 0.0;
+            }
+            $statusLabel = $isNegativeAdj
+                ? 'Koreksi Saldo Awal'
+                : ($isLunas ? 'Lunas' : ($paid > 0 ? 'Dibayar Sebagian' : 'Belum Bayar'));
+
+            $invoiceDate = $this->normalizeDate($rec->invoice_date);
+            $createdCarbon = $invoiceDate ? Carbon::parse($invoiceDate) : null;
+            $dueDate = $this->normalizeDate($rec->due_date);
+            $dueCarbon = $dueDate ? Carbon::parse($dueDate) : ($createdCarbon ? $createdCarbon->copy()->addDays(30) : null);
+            $isOverdue = ($dueCarbon && !$isLunas && !$isNegativeAdj) ? $dueCarbon->isPast() : false;
+            $daysOverdue = ($isOverdue && $dueCarbon) ? (int) $dueCarbon->diffInDays($todayEnd) : 0;
+            $daysRemaining = (!$isOverdue && $dueCarbon && !$isLunas && !$isNegativeAdj) ? (int) $todayEnd->diffInDays($dueCarbon) : 0;
+
+            $tanggalLunas = '';
+            if ($isLunas) {
+                $maxPay = $latestPayByOpening[$id] ?? null;
+                $tanggalLunas = $maxPay
+                    ? Carbon::parse($maxPay)->format('d/m/Y')
+                    : ($rec->updated_at ? Carbon::parse($rec->updated_at)->format('d/m/Y') : '');
+            }
+
+            $rows[] = [
+                'id' => 'OB-' . $id,
+                'opening_id' => $id,
+                'is_opening' => true,
+                'is_negative_adjustment' => $isNegativeAdj,
+                'nomor' => $rec->invoice_number,
+                'debtor' => $rec->debtor_name ?? 'Debitur Umum',
+                'debtor_id' => $rec->debtor_id ? (int) $rec->debtor_id : null,
+                'debtor_code' => $rec->debtor_code ?? 'SALDO AWAL',
+                'dokter' => '-',
+                'pasien' => 'Tagihan Saldo Awal',
+                'apotek' => $rec->pharmacy_name ?? 'Apotek Utama',
+                'tanggal' => $createdCarbon ? $createdCarbon->format('d/m/Y') : '-',
+                'raw_created_at' => $createdCarbon ? $createdCarbon->format('Y-m-d 00:00:00') : null,
+                'jatuhTempo' => $dueCarbon ? $dueCarbon->format('d/m/Y') : '-',
+                'raw_jatuh_tempo' => $dueCarbon ? $dueCarbon->format('Y-m-d') : null,
+                'is_overdue' => $isOverdue,
+                'days_overdue' => $daysOverdue,
+                'days_remaining' => $daysRemaining,
+                'status' => $statusLabel,
+                'tanggalLunas' => $tanggalLunas,
+                'subtotal' => $total,
+                'total' => $total,
+                'total_retur' => 0.0,
+                'returs_count' => 0,
+                'net_total' => $total,
+                'terbayar' => $paid,
+                'sisa' => $sisa,
+                'items' => [],
+                'payments' => [],
+                'returs' => [],
+                'is_submitted' => (bool) ($rec->is_submitted ?? false),
+                'notes' => $rec->notes ?: '',
+                'lastModified' => $rec->updated_at ? Carbon::parse($rec->updated_at)->format('d M Y H:i') : '-',
+            ];
+        }
+
+        return $rows;
+    }
+
+    /**
      * Hydrate nested items, payments, and purchase return history only for requested Hutang rows.
      */
     protected function hydrateHutangDetails(array $rows): array
     {
-        $detailIds = array_values(array_unique(array_map(fn($r) => (int) $r['id'], $rows)));
+        $openingIds = [];
+        $detailIds = [];
+        foreach ($rows as $r) {
+            if (!empty($r['is_opening']) && !empty($r['opening_id'])) {
+                $openingIds[] = (int) $r['opening_id'];
+            } else {
+                $detailIds[] = (int) $r['id'];
+            }
+        }
+        $openingIds = array_values(array_unique($openingIds));
+        $detailIds = array_values(array_unique(array_filter($detailIds)));
+
+        $paymentsByOpening = [];
+        if (!empty($openingIds) && Schema::hasColumn('finance_payments', 'opening_invoice_id')) {
+            $hasAccountsTable = Schema::hasTable('finance_accounts');
+            $hasUsersTable = Schema::hasTable('users');
+            $payQuery = DB::table('finance_payments as fp')->whereIn('fp.opening_invoice_id', $openingIds);
+            if ($hasAccountsTable) {
+                $payQuery->leftJoin('finance_accounts as fa', 'fa.id', '=', 'fp.account_id');
+            }
+            if ($hasUsersTable) {
+                $payQuery->leftJoin('users as u', 'u.id', '=', 'fp.created_by');
+            }
+            $payRows = $payQuery->select([
+                'fp.id',
+                'fp.opening_invoice_id',
+                'fp.payment_date',
+                'fp.amount',
+                'fp.payment_type',
+                'fp.reference_number',
+                'fp.notes',
+                'fp.account_id',
+                'fp.created_at',
+                $hasAccountsTable ? 'fa.name as account_name' : DB::raw('NULL as account_name'),
+                $hasAccountsTable ? 'fa.code as account_code' : DB::raw("'' as account_code"),
+                $hasAccountsTable ? 'fa.category as account_category' : DB::raw("'Kas & Bank' as account_category"),
+                $hasUsersTable ? 'u.name as creator_name' : DB::raw('NULL as creator_name'),
+                $hasUsersTable ? 'u.username as creator_username' : DB::raw('NULL as creator_username'),
+            ])->orderBy('fp.id')->get();
+
+            foreach ($payRows as $p) {
+                $isCutoff = $p->payment_type === 'KREDIT CUTOFF';
+                $paymentsByOpening[(int) $p->opening_invoice_id][] = [
+                    'id' => $p->id,
+                    'tanggal' => Carbon::parse($p->payment_date)->format('d/m/Y'),
+                    'nominal' => (float) $p->amount,
+                    'tipe' => $p->payment_type,
+                    'noReferensi' => $p->reference_number ?: '-',
+                    'catatan' => $p->notes ?: '-',
+                    'akunId' => $isCutoff ? null : $p->account_id,
+                    'akunNama' => $isCutoff ? 'Pelunasan Pra-Cut-off (Non-Kas)' : ($p->account_name ?? 'Kas & Bank'),
+                    'akunKode' => $isCutoff ? 'CUTOFF' : ($p->account_code ?? ''),
+                    'akunKategori' => $isCutoff ? 'Cut-off' : ($p->account_category ?? 'Kas & Bank'),
+                    'diprosesOleh' => $p->creator_name ?? ($p->creator_username ?? 'Staf Finance'),
+                    'waktuAudit' => Carbon::parse($p->created_at)->format('d M Y, H:i'),
+                ];
+            }
+        }
+
         if (empty($detailIds)) {
+            foreach ($rows as &$row) {
+                if (!empty($row['is_opening'])) {
+                    $oId = (int) $row['opening_id'];
+                    $row['items'] = [[
+                        'sku' => 'SALDO-AWAL',
+                        'nama' => 'Tagihan Saldo Awal Hutang (Pra-Sistem / Tanpa Mutasi Stok)' . (!empty($row['notes']) ? ' — ' . $row['notes'] : ''),
+                        'qty' => 1,
+                        'satuan' => 'Faktur',
+                        'diskon' => '0%',
+                        'extraDiskon' => '0%',
+                        'harga' => (float) $row['total'],
+                        'pajak' => 'TANPA',
+                        'jumlah' => (float) $row['total'],
+                    ]];
+                    $row['payments'] = $paymentsByOpening[$oId] ?? [];
+                    $row['returs'] = [];
+                }
+                unset($row['_ppn_type'], $row['_invoice_number_raw']);
+            }
+            unset($row);
             return $rows;
         }
 
@@ -832,6 +1211,7 @@ class PayablesReceivablesService
                 ->get();
 
             foreach ($payRows as $p) {
+                $isCutoff = $p->payment_type === 'KREDIT CUTOFF';
                 $paymentsByDetail[(int) $p->receiving_detail_id][] = [
                     'id' => $p->id,
                     'tanggal' => Carbon::parse($p->payment_date)->format('d/m/Y'),
@@ -839,10 +1219,10 @@ class PayablesReceivablesService
                     'tipe' => $p->payment_type,
                     'noReferensi' => $p->reference_number ?: '-',
                     'catatan' => $p->notes ?: '-',
-                    'akunId' => $p->account_id,
-                    'akunNama' => $p->account_name ?? 'Kas & Bank',
-                    'akunKode' => $p->account_code ?? '',
-                    'akunKategori' => $p->account_category ?? 'Kas & Bank',
+                    'akunId' => $isCutoff ? null : $p->account_id,
+                    'akunNama' => $isCutoff ? 'Pelunasan Pra-Cut-off (Non-Kas)' : ($p->account_name ?? 'Kas & Bank'),
+                    'akunKode' => $isCutoff ? 'CUTOFF' : ($p->account_code ?? ''),
+                    'akunKategori' => $isCutoff ? 'Cut-off' : ($p->account_category ?? 'Kas & Bank'),
                     'diprosesOleh' => $p->creator_name ?? ($p->creator_username ?? 'Staf Finance'),
                     'waktuAudit' => Carbon::parse($p->created_at)->format('d M Y, H:i'),
                 ];
@@ -941,6 +1321,24 @@ class PayablesReceivablesService
         }
 
         foreach ($rows as &$row) {
+            if (!empty($row['is_opening'])) {
+                $oId = (int) $row['opening_id'];
+                $row['items'] = [[
+                    'sku' => 'SALDO-AWAL',
+                    'nama' => 'Tagihan Saldo Awal Hutang (Pra-Sistem / Tanpa Mutasi Stok)' . (!empty($row['notes']) ? ' — ' . $row['notes'] : ''),
+                    'qty' => 1,
+                    'satuan' => 'Faktur',
+                    'diskon' => '0%',
+                    'extraDiskon' => '0%',
+                    'harga' => (float) $row['total'],
+                    'pajak' => 'TANPA',
+                    'jumlah' => (float) $row['total'],
+                ]];
+                $row['payments'] = $paymentsByOpening[$oId] ?? [];
+                $row['returs'] = [];
+                unset($row['_ppn_type'], $row['_invoice_number_raw']);
+                continue;
+            }
             $dId = (int) $row['id'];
             $ppnType = $row['_ppn_type'] ?? 'TANPA';
             $formattedItems = [];
@@ -1186,18 +1584,93 @@ class PayablesReceivablesService
      */
     protected function hydratePiutangDetails(array $rows): array
     {
-        $txIds = array_values(array_unique(array_map(fn($r) => (int) $r['id'], $rows)));
+        $openingIds = [];
+        $txIds = [];
+        foreach ($rows as $r) {
+            if (!empty($r['is_opening']) && !empty($r['opening_id'])) {
+                $openingIds[] = (int) $r['opening_id'];
+            } else {
+                $txIds[] = (int) $r['id'];
+            }
+        }
+        $openingIds = array_values(array_unique($openingIds));
+        $txIds = array_values(array_unique(array_filter($txIds)));
+
+        $hasMedicinesTable = Schema::hasTable('medicines');
+        $hasAccountsTable = Schema::hasTable('finance_accounts');
+        $hasUsersTable = Schema::hasTable('users');
+
+        $paymentsByOpening = [];
+        if (!empty($openingIds) && Schema::hasColumn('finance_payments', 'opening_invoice_id')) {
+            $payQuery = DB::table('finance_payments as fp')->whereIn('fp.opening_invoice_id', $openingIds);
+            if ($hasAccountsTable) {
+                $payQuery->leftJoin('finance_accounts as fa', 'fa.id', '=', 'fp.account_id');
+            }
+            if ($hasUsersTable) {
+                $payQuery->leftJoin('users as u', 'u.id', '=', 'fp.created_by');
+            }
+            $payRows = $payQuery->select([
+                'fp.id',
+                'fp.opening_invoice_id',
+                'fp.payment_date',
+                'fp.amount',
+                'fp.payment_type',
+                'fp.reference_number',
+                'fp.notes',
+                'fp.account_id',
+                'fp.created_at',
+                $hasAccountsTable ? 'fa.name as account_name' : DB::raw('NULL as account_name'),
+                $hasAccountsTable ? 'fa.code as account_code' : DB::raw("'-' as account_code"),
+                $hasAccountsTable ? 'fa.category as account_category' : DB::raw("'Kas & Bank' as account_category"),
+                $hasAccountsTable ? 'fa.account_number' : DB::raw("'-' as account_number"),
+                $hasUsersTable ? 'u.name as creator_name' : DB::raw('NULL as creator_name'),
+            ])->orderBy('fp.id')->get();
+
+            foreach ($payRows as $p) {
+                $isCutoff = $p->payment_type === 'PIUTANG CUTOFF';
+                $paymentsByOpening[(int) $p->opening_invoice_id][] = [
+                    'id' => $p->id,
+                    'tanggal' => Carbon::parse($p->payment_date)->format('d/m/Y'),
+                    'nominal' => (float) $p->amount,
+                    'tipe' => $p->payment_type,
+                    'noReferensi' => $p->reference_number ?: '-',
+                    'catatan' => $p->notes ?: '-',
+                    'akunNama' => $isCutoff ? 'Pelunasan Pra-Cut-off (Non-Kas)' : ($p->account_name ?? 'Kas & Bank'),
+                    'akunKode' => $isCutoff ? 'CUTOFF' : ($p->account_code ?? '-'),
+                    'akunKategori' => $isCutoff ? 'Cut-off' : ($p->account_category ?? 'Kas & Bank'),
+                    'noRekening' => $isCutoff ? '-' : ($p->account_number ?? '-'),
+                    'diprosesOleh' => $p->creator_name ?? 'Staf Finance',
+                    'waktuAudit' => Carbon::parse($p->created_at)->format('d M Y H:i'),
+                ];
+            }
+        }
+
         if (empty($txIds)) {
+            foreach ($rows as &$row) {
+                if (!empty($row['is_opening'])) {
+                    $oId = (int) $row['opening_id'];
+                    $row['items'] = [[
+                        'id' => 'opening-' . $oId,
+                        'sku' => 'SALDO-AWAL',
+                        'nama' => 'Tagihan Saldo Awal Piutang (Pra-Sistem / Tanpa Mutasi Stok & Omzet)' . (!empty($row['notes']) ? ' — ' . $row['notes'] : ''),
+                        'qty' => 1,
+                        'satuan' => 'Tagihan',
+                        'diskon' => '0%',
+                        'harga' => (float) $row['total'],
+                        'pajak' => 'NON',
+                        'jumlah' => (float) $row['total'],
+                    ]];
+                    $row['payments'] = $paymentsByOpening[$oId] ?? [];
+                    $row['returs'] = [];
+                }
+            }
+            unset($row);
             return $rows;
         }
 
         $itemsByTx = [];
         $paymentsByTx = [];
         $retursByTx = [];
-
-        $hasMedicinesTable = Schema::hasTable('medicines');
-        $hasAccountsTable = Schema::hasTable('finance_accounts');
-        $hasUsersTable = Schema::hasTable('users');
 
         foreach (array_chunk($txIds, self::CHUNK_SIZE) as $chunkIds) {
             $cartQuery = DB::table('medicine_cart as mc')
@@ -1254,6 +1727,7 @@ class PayablesReceivablesService
                     'fp.medicine_transaction_id',
                     'fp.payment_date',
                     'fp.amount',
+                    'fp.payment_type',
                     'fp.reference_number',
                     'fp.notes',
                     'fp.account_id',
@@ -1268,16 +1742,18 @@ class PayablesReceivablesService
                 ->get();
 
             foreach ($payRows as $p) {
+                $isCutoff = $p->payment_type === 'PIUTANG CUTOFF';
                 $paymentsByTx[(int) $p->medicine_transaction_id][] = [
                     'id' => $p->id,
                     'tanggal' => Carbon::parse($p->payment_date)->format('d/m/Y'),
                     'nominal' => (float) $p->amount,
+                    'tipe' => $p->payment_type,
                     'noReferensi' => $p->reference_number ?: '-',
                     'catatan' => $p->notes ?: '-',
-                    'akunNama' => $p->account_name ?? 'Kas & Bank',
-                    'akunKode' => $p->account_code ?? '-',
-                    'akunKategori' => $p->account_category ?? 'Kas & Bank',
-                    'noRekening' => $p->account_number ?? '-',
+                    'akunNama' => $isCutoff ? 'Pelunasan Pra-Cut-off (Non-Kas)' : ($p->account_name ?? 'Kas & Bank'),
+                    'akunKode' => $isCutoff ? 'CUTOFF' : ($p->account_code ?? '-'),
+                    'akunKategori' => $isCutoff ? 'Cut-off' : ($p->account_category ?? 'Kas & Bank'),
+                    'noRekening' => $isCutoff ? '-' : ($p->account_number ?? '-'),
                     'diprosesOleh' => $p->creator_name ?? 'Staf Finance',
                     'waktuAudit' => Carbon::parse($p->created_at)->format('d M Y H:i'),
                 ];
@@ -1321,6 +1797,23 @@ class PayablesReceivablesService
         }
 
         foreach ($rows as &$row) {
+            if (!empty($row['is_opening'])) {
+                $oId = (int) $row['opening_id'];
+                $row['items'] = [[
+                    'id' => 'opening-' . $oId,
+                    'sku' => 'SALDO-AWAL',
+                    'nama' => 'Tagihan Saldo Awal Piutang (Pra-Sistem / Tanpa Mutasi Stok & Omzet)' . (!empty($row['notes']) ? ' — ' . $row['notes'] : ''),
+                    'qty' => 1,
+                    'satuan' => 'Tagihan',
+                    'diskon' => '0%',
+                    'harga' => (float) $row['total'],
+                    'pajak' => 'NON',
+                    'jumlah' => (float) $row['total'],
+                ]];
+                $row['payments'] = $paymentsByOpening[$oId] ?? [];
+                $row['returs'] = [];
+                continue;
+            }
             $tId = (int) $row['id'];
             $row['items'] = $itemsByTx[$tId] ?? [];
             $row['payments'] = $paymentsByTx[$tId] ?? [];
@@ -1555,6 +2048,9 @@ class PayablesReceivablesService
             $isSettled = $this->isHutangSettled($h);
 
             $totalHutangSisa += $sisa;
+            if ($status === 'Koreksi Saldo Awal') {
+                continue;
+            }
             if (!empty($h['is_submitted']) && !$isSettled) {
                 $countDiajukan++;
             }
@@ -1568,6 +2064,8 @@ class PayablesReceivablesService
                 $countHutangBelumLunas++;
             }
         }
+
+        $totalHutangSisa = max(0.0, $totalHutangSisa);
 
         return [
             'totalHutangCount' => count($rows),
@@ -1601,6 +2099,9 @@ class PayablesReceivablesService
             $status = $p['status'] ?? 'Belum Bayar';
             $sisa = (float) ($p['sisa'] ?? 0);
 
+            if ($status === 'Koreksi Saldo Awal') {
+                continue;
+            }
             if (!empty($p['is_submitted']) && !in_array($status, ['Lunas', 'Diretur Penuh'], true) && $sisa > 0.005) {
                 $countPiutangDiajukan++;
             }
@@ -1613,9 +2114,11 @@ class PayablesReceivablesService
             }
         }
 
+        $totalPiutangSisa = max(0.0, $totalPiutangSisa);
+
         return [
             'totalPiutangCount' => count($rows),
-            'totalPiutangBruto' => round($totalPiutangBruto, 2),
+            'totalPiutangBruto' => round(max(0.0, $totalPiutangBruto), 2),
             'totalPiutangRetur' => round($totalPiutangRetur, 2),
             'totalPiutangTerbayar' => round($totalPiutangTerbayar, 2),
             'totalPiutangSisa' => round($totalPiutangSisa, 2),
@@ -1635,7 +2138,7 @@ class PayablesReceivablesService
         foreach ($rows as $row) {
             $sisa = (float) ($row['sisa'] ?? 0);
             $status = $row['status'] ?? '';
-            if (in_array($status, ['Lunas', 'Lunas (Ada Retur)', 'Diretur Penuh'], true) || $sisa <= 0.005) {
+            if (in_array($status, ['Lunas', 'Lunas (Ada Retur)', 'Diretur Penuh', 'Koreksi Saldo Awal'], true) || $sisa <= 0.005) {
                 continue;
             }
             if (!empty($row['is_overdue']) || ($row['days_overdue'] ?? 0) > 0) {
@@ -1653,12 +2156,12 @@ class PayablesReceivablesService
 
     protected function isHutangSettled(array $item): bool
     {
-        return in_array($item['status'] ?? '', ['Lunas', 'Lunas (Ada Retur)', 'Diretur Penuh'], true);
+        return in_array($item['status'] ?? '', ['Lunas', 'Lunas (Ada Retur)', 'Diretur Penuh', 'Koreksi Saldo Awal'], true);
     }
 
     protected function isPiutangSettled(array $item): bool
     {
-        return in_array($item['status'] ?? '', ['Lunas', 'Lunas (Ada Retur)', 'Diretur Penuh'], true)
+        return in_array($item['status'] ?? '', ['Lunas', 'Lunas (Ada Retur)', 'Diretur Penuh', 'Koreksi Saldo Awal'], true)
             || (float) ($item['sisa'] ?? 0) <= 0.005;
     }
 
