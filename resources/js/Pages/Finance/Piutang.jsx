@@ -339,8 +339,8 @@ export default function Piutang({
     const handleOpeningSubmit = (e) => {
         e.preventDefault();
         const amt = parseFloat(openingForm.amount);
-        if (isNaN(amt) || amt <= 0) {
-            alert('Nominal piutang harus lebih dari 0.');
+        if (isNaN(amt) || Math.abs(amt) < 0.01) {
+            alert('Nominal tidak boleh 0.');
             return;
         }
         setIsSubmittingOpening(true);
@@ -2521,8 +2521,7 @@ export default function Piutang({
                                     <input
                                         type="number"
                                         step="any"
-                                        min="0.01"
-                                        placeholder="0"
+                                        placeholder="0 (gunakan minus - untuk pengurang/koreksi)"
                                         value={openingForm.amount}
                                         onChange={(e) => setOpeningForm({ ...openingForm, amount: e.target.value })}
                                         required
@@ -2531,9 +2530,9 @@ export default function Piutang({
                                 </div>
                             </div>
 
-                            {openingPreviewBalance !== null && parsedInvoiceAmt > 0 && (
+                            {openingPreviewBalance !== null && Math.abs(parsedInvoiceAmt) >= 0.01 && (
                                 <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 text-[11px] flex items-center justify-between text-slate-700">
-                                    <span>Saldo Awal Neraca akan menjadi:</span>
+                                    <span>Saldo Neraca (per {openingForm.invoice_date || '-'}) akan menjadi:</span>
                                     <strong className="text-indigo-700 text-xs">{formatRupiah(openingPreviewBalance + parsedInvoiceAmt)}</strong>
                                 </div>
                             )}

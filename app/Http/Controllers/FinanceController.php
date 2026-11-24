@@ -294,14 +294,14 @@ class FinanceController extends Controller
             'invoice_number' => 'required|string|max:150',
             'invoice_date' => 'required|date',
             'due_date' => 'nullable|date',
-            'amount' => 'required|numeric|gt:0',
+            'amount' => ['required', 'numeric', 'not_in:0'],
             'notes' => 'nullable|string|max:500',
         ], [
             'creditor_code.exists' => 'PBF / Supplier yang dipilih tidak ditemukan.',
             'invoice_number.required' => 'Nomor faktur wajib diisi.',
             'invoice_date.required' => 'Tanggal faktur / cut-off wajib diisi.',
             'amount.required' => 'Nominal sisa hutang wajib diisi.',
-            'amount.gt' => 'Nominal sisa hutang harus lebih dari 0.',
+            'amount.not_in' => 'Nominal tidak boleh 0.',
         ]);
 
         $dueDate = !empty($validated['due_date'])
@@ -339,14 +339,14 @@ class FinanceController extends Controller
             'invoice_number' => 'required|string|max:150',
             'invoice_date' => 'required|date',
             'due_date' => 'nullable|date',
-            'amount' => 'required|numeric|gt:0',
+            'amount' => ['required', 'numeric', 'not_in:0'],
             'notes' => 'nullable|string|max:500',
         ], [
             'debtor_id.exists' => 'Debitur / Instansi yang dipilih tidak ditemukan.',
             'invoice_number.required' => 'Nomor tagihan / faktur wajib diisi.',
             'invoice_date.required' => 'Tanggal tagihan / cut-off wajib diisi.',
             'amount.required' => 'Nominal sisa piutang wajib diisi.',
-            'amount.gt' => 'Nominal sisa piutang harus lebih dari 0.',
+            'amount.not_in' => 'Nominal tidak boleh 0.',
         ]);
 
         $dueDate = !empty($validated['due_date'])
