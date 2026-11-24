@@ -2549,7 +2549,7 @@ class FinanceController extends Controller
         return $this->payablesReceivablesService()->getHutangDataset(
             $this->getTargetPharmacyIds(),
             [],
-            true,
+            false,
             null,
             1
         )['rows'];
@@ -2670,7 +2670,7 @@ class FinanceController extends Controller
         return $this->payablesReceivablesService()->getPiutangDataset(
             $this->getTargetPharmacyIds(),
             [],
-            true,
+            false,
             null,
             1
         )['rows'];
@@ -2696,7 +2696,7 @@ class FinanceController extends Controller
     {
         $targetPharmacyIds = $this->getTargetPharmacyIds();
 
-        $query = FinancePayment::with([
+        $relations = [
             'account',
             'expenseAccount',
             'incomeAccount',
@@ -2706,9 +2706,13 @@ class FinanceController extends Controller
             'receivingDetail.creditor',
             'transaction.debtors',
             'transaction.patients',
-            'openingInvoice.creditor',
-            'openingInvoice.debtor',
-        ])
+        ];
+        if (Schema::hasTable('finance_opening_invoices') && Schema::hasColumn('finance_payments', 'opening_invoice_id')) {
+            $relations[] = 'openingInvoice.creditor';
+            $relations[] = 'openingInvoice.debtor';
+        }
+
+        $query = FinancePayment::with($relations)
             ->whereHas('account', function ($q) {
                 $q->where('category', 'Kas & Bank');
                 $q->where('pharmacy_id', getActivePharmacyId());
@@ -2912,21 +2916,27 @@ class FinanceController extends Controller
      */
     protected function applyMutasiBranchScope($query, array $targetPharmacyIds)
     {
+        $hasOpeningCol = Schema::hasColumn('finance_payments', 'opening_invoice_id');
+
         return $query
             ->whereNotIn('payment_type', ['KREDIT CUTOFF', 'PIUTANG CUTOFF', 'RETUR'])
-            ->where(function ($q) use ($targetPharmacyIds) {
+            ->where(function ($q) use ($targetPharmacyIds, $hasOpeningCol) {
             $q
                 ->whereHas('receiving', function ($sub) use ($targetPharmacyIds) {
                     $sub->whereIn('pharmacy_id', $targetPharmacyIds);
                 })
                 ->orWhereHas('transaction', function ($sub) use ($targetPharmacyIds) {
                     $sub->whereIn('pharmacy_id', $targetPharmacyIds);
-                })
-                ->orWhere(function ($sub) use ($targetPharmacyIds) {
+                });
+
+            if ($hasOpeningCol) {
+                $q->orWhere(function ($sub) use ($targetPharmacyIds) {
                     $sub->whereNotNull('opening_invoice_id')
                         ->whereIn('pharmacy_id', $targetPharmacyIds);
-                })
-                ->orWhere(function ($sub) use ($targetPharmacyIds) {
+                });
+            }
+
+            $q->orWhere(function ($sub) use ($targetPharmacyIds) {
                     $sub
                         ->where('payment_type', 'BIAYA')
                         ->where(function ($sub2) use ($targetPharmacyIds) {

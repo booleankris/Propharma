@@ -311,45 +311,53 @@ class PermissionCatalog
      */
     public static function ensureSynced(): void
     {
-        $definitions = self::allDefinitions();
-        $existingNames = Permission::where('guard_name', 'web')
-            ->whereIn('name', array_keys($definitions))
-            ->pluck('name')
-            ->all();
+        try {
+            $definitions = self::allDefinitions();
+            $existingNames = Permission::where('guard_name', 'web')
+                ->whereIn('name', array_keys($definitions))
+                ->pluck('name')
+                ->all();
 
-        if (count($existingNames) === count($definitions)) {
-            self::ensureOnlineRolesHaveTransfersPermission();
-            return;
-        }
+            if (count($existingNames) === count($definitions)) {
+                self::ensureOnlineRolesHaveTransfersPermission();
+                return;
+            }
 
-        app(PermissionRegistrar::class)->forgetCachedPermissions();
-        $existingRoles = Role::where('guard_name', 'web')->get();
+            try {
+                app(PermissionRegistrar::class)->forgetCachedPermissions();
+            } catch (\Throwable $e) {
+                // Ignore cache permission mismatch
+            }
+            $existingRoles = Role::where('guard_name', 'web')->get();
 
-        foreach ($definitions as $permName => $meta) {
-            $wasMissing = !in_array($permName, $existingNames, true);
-            $permission = Permission::firstOrCreate([
-                'name' => $permName,
-                'guard_name' => 'web',
-            ]);
+            foreach ($definitions as $permName => $meta) {
+                $wasMissing = !in_array($permName, $existingNames, true);
+                $permission = Permission::firstOrCreate([
+                    'name' => $permName,
+                    'guard_name' => 'web',
+                ]);
 
-            if ($wasMissing) {
-                $targetRolesLower = array_map('strtolower', $meta['roles']);
-                foreach ($existingRoles as $role) {
-                    if (in_array(strtolower($role->name), $targetRolesLower, true)) {
-                        if (!$role->hasPermissionTo($permission)) {
-                            $role->givePermissionTo($permission);
+                if ($wasMissing) {
+                    $targetRolesLower = array_map('strtolower', $meta['roles']);
+                    foreach ($existingRoles as $role) {
+                        if (in_array(strtolower($role->name), $targetRolesLower, true)) {
+                            if (!$role->hasPermissionTo($permission)) {
+                                $role->givePermissionTo($permission);
+                            }
                         }
                     }
                 }
             }
-        }
 
-        try {
-            app(PermissionRegistrar::class)->forgetCachedPermissions();
+            try {
+                app(PermissionRegistrar::class)->forgetCachedPermissions();
+            } catch (\Throwable $e) {
+                // Ignore cache permission mismatch
+            }
+            self::ensureOnlineRolesHaveTransfersPermission();
         } catch (\Throwable $e) {
-            // Ignore cache permission mismatch
+            // Never block request if permission sync or cache encounters an error
         }
-        self::ensureOnlineRolesHaveTransfersPermission();
     }
 
     /**

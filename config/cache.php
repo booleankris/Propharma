@@ -51,9 +51,10 @@ return [
 
         'file' => [
             'driver' => 'file',
-            'path' => storage_path('framework/cache/data/u_' . (function_exists('posix_geteuid') ? posix_geteuid() : PHP_SAPI)),
-            'lock_path' => storage_path('framework/cache/data/u_' . (function_exists('posix_geteuid') ? posix_geteuid() : PHP_SAPI)),
-            'permission' => 0664,
+            'path' => (is_writable(storage_path('framework/cache/data'))
+                ? storage_path('framework/cache/data')
+                : sys_get_temp_dir())
+                . '/v2_' . (function_exists('posix_geteuid') ? posix_geteuid() : PHP_SAPI),
         ],
 
         'memcached' => [
