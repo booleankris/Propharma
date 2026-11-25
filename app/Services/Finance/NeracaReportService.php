@@ -139,7 +139,7 @@ class NeracaReportService
             'label' => 'HUTANG DAGANG',
             'awal' => $hutangAwal,
             'akhir' => $hutangAkhir,
-            'selisih' => round($hutangAkhir - $hutangAwal, 2),
+            'selisih' => round($hutangAwal - $hutangAkhir, 2), // Hutang: AWAL - AKHIR
             'is_liability' => true,
         ];
 
@@ -251,59 +251,87 @@ class NeracaReportService
 
     public function receivableBalanceAtDate(array $pharmacyIds, string $asOfDate): float
     {
-        $transactions = MedicineTransactions::query()
-            ->with(['transactions' => fn ($query) => $query->where('status', 1)])
-            ->withSum(['payments as finance_paid' => fn ($query) => $query
-                ->whereIn('payment_type', ['PIUTANG', 'PIUTANG CUTOFF'])
-                ->whereDate('payment_date', '<=', $asOfDate)], 'amount')
-            ->withSum(['payments as finance_paid_total' => fn ($query) => $query
-                ->whereIn('payment_type', ['PIUTANG', 'PIUTANG CUTOFF'])], 'amount')
+        // Logika identik dengan halaman Piutang & Ringkasan (PayablesReceivablesService::assemblePiutangRows):
+        // per faktur kredit -> total (subtotal / fallback medicine_cart) - retur (tabel retur) - pembayaran.
+        $endExclusive = FinanceShift::endExclusive($asOfDate);
+        $headerQuery = MedicineTransactions::query()
+            ->whereIn('transaction_type', ['KREDIT', 'RESEP KREDIT'])
             ->whereIn('pharmacy_id', $pharmacyIds)
-            ->whereIn('transaction_type', ['KREDIT', 'RESEP KREDIT', 'RETUR KREDIT'])
-            ->where(function ($period) use ($asOfDate) {
-                $period->where('created_at', '<', FinanceShift::endExclusive($asOfDate))
-                    ->orWhere(function ($legacy) use ($asOfDate) {
-                        $legacy->whereNull('created_at')->where('updated_at', '<', FinanceShift::endExclusive($asOfDate));
+            ->where(function ($period) use ($endExclusive) {
+                $period->where('created_at', '<', $endExclusive)
+                    ->orWhere(function ($legacy) use ($endExclusive) {
+                        $legacy->whereNull('created_at')->where('updated_at', '<', $endExclusive);
                     });
-            })
-            ->tap(fn ($query) => LiphTransactionScope::applySalesStatus($query))
-            ->get(['id', 'debtor_id', 'transaction_type', 'subtotal', 'discount', 'paid']);
+            });
+        LiphTransactionScope::applySalesStatus($headerQuery);
+        $headers = $headerQuery->select(['id', 'subtotal', 'paid'])->toBase()->get();
 
-        $balancesByDebtor = [];
-        $returnsByDebtor = [];
+        $totalBalance = 0.0;
+        foreach ($headers->chunk(500) as $chunk) {
+            $txIds = $chunk->pluck('id')->map(fn ($v) => (int) $v)->all();
 
-        foreach ($transactions as $transaction) {
-            $debtorKey = (string) ((int) ($transaction->debtor_id ?? 0));
-
-            if (strtoupper(trim((string) $transaction->transaction_type)) === 'RETUR KREDIT') {
-                $returnsByDebtor[$debtorKey] = ($returnsByDebtor[$debtorKey] ?? 0)
-                    + abs((float) ($transaction->subtotal ?? 0));
-                continue;
+            $fallbackIds = $chunk->filter(fn ($tx) => (float) ($tx->subtotal ?? 0) <= 0)
+                ->pluck('id')->map(fn ($v) => (int) $v)->all();
+            $cartSubtotal = [];
+            if (!empty($fallbackIds)) {
+                $cartRows = DB::table('medicine_cart')
+                    ->whereIn('transaction_id', $fallbackIds)
+                    ->select(['transaction_id', 'quantity', 'item_price', 'total_price', 'final_price'])
+                    ->get();
+                foreach ($cartRows as $c) {
+                    $qty = (float) ($c->quantity ?? 0);
+                    $harga = (float) ($c->item_price ?? 0);
+                    $final = (float) ($c->final_price ?: ($c->total_price ?: ($qty * $harga)));
+                    $cartSubtotal[(int) $c->transaction_id] = ($cartSubtotal[(int) $c->transaction_id] ?? 0.0) + $final;
+                }
             }
 
-            $total = (float) ($transaction->subtotal ?? 0);
-            if ($total <= 0) {
-                $total = (float) $transaction->transactions->sum(
-                    fn ($item) => (float) ($item->final_price ?: $item->total_price)
-                );
-                $total = max(0, $total - (float) ($transaction->discount ?? 0));
-            }
+            $paidAsOf = DB::table('finance_payments')
+                ->whereIn('medicine_transaction_id', $txIds)
+                ->whereDate('payment_date', '<=', $asOfDate)
+                ->groupBy('medicine_transaction_id')
+                ->select('medicine_transaction_id', DB::raw('SUM(amount) as total_amount'))
+                ->pluck('total_amount', 'medicine_transaction_id')
+                ->all();
+            $paidAll = DB::table('finance_payments')
+                ->whereIn('medicine_transaction_id', $txIds)
+                ->groupBy('medicine_transaction_id')
+                ->select('medicine_transaction_id', DB::raw('SUM(amount) as total_amount'))
+                ->pluck('total_amount', 'medicine_transaction_id')
+                ->all();
 
-            $total = max(0, $total);
-            // Pisahkan pembayaran historis (legacy paid sebelum tabel finance_payments) agar pelunasan
-            // yang baru terjadi setelah $asOfDate tidak ikut melunasi saldo piutang per tanggal $asOfDate.
-            $legacyPaid = max(0, (float) ($transaction->paid ?? 0) - (float) ($transaction->finance_paid_total ?? 0));
-            $paid = min($total, max(0, (float) ($transaction->finance_paid ?? 0) + $legacyPaid));
-            $balancesByDebtor[$debtorKey] = ($balancesByDebtor[$debtorKey] ?? 0) + max(0, $total - $paid);
+            $returByTx = DB::table('retur')
+                ->whereIn('transaction_id', $txIds)
+                ->where(function ($q) use ($endExclusive) {
+                    $q->whereNull('created_at')->orWhere('created_at', '<', $endExclusive);
+                })
+                ->groupBy('transaction_id')
+                ->select('transaction_id', DB::raw('SUM(total_retur) as sum_retur'))
+                ->pluck('sum_retur', 'transaction_id')
+                ->all();
+
+            foreach ($chunk as $tx) {
+                $txId = (int) $tx->id;
+                $rawSub = (float) ($tx->subtotal ?? 0);
+                $total = round($rawSub > 0 ? $rawSub : (float) ($cartSubtotal[$txId] ?? 0.0), 2);
+                $netTotal = round(max(0, $total - round((float) ($returByTx[$txId] ?? 0), 2)), 2);
+
+                $financeAsOf = (float) ($paidAsOf[$txId] ?? 0);
+                $financeAll = (float) ($paidAll[$txId] ?? 0);
+                $legacyPaid = (float) ($tx->paid ?? 0);
+                // Sama dengan halaman Piutang: terbayar = max(pembayaran Finance, kolom paid legacy).
+                // Untuk tanggal historis, pembayaran Finance setelah $asOfDate dikeluarkan.
+                $paid = ($financeAsOf + 0.005 >= $financeAll)
+                    ? max($financeAll, $legacyPaid)
+                    : $financeAsOf + max(0, $legacyPaid - $financeAll);
+                $paid = round(min($netTotal, $paid), 2);
+
+                $sisa = round(max(0, $netTotal - $paid), 2);
+                if ($sisa >= 0.005) {
+                    $totalBalance += $sisa;
+                }
+            }
         }
-
-        foreach ($returnsByDebtor as $debtorKey => $returnAmount) {
-            if (isset($balancesByDebtor[$debtorKey])) {
-                $balancesByDebtor[$debtorKey] = max(0, $balancesByDebtor[$debtorKey] - $returnAmount);
-            }
-        }
-
-        $totalBalance = (float) array_sum($balancesByDebtor);
 
         if (Schema::hasTable('finance_opening_invoices')) {
             $openingReceivables = FinanceOpeningInvoice::query()
