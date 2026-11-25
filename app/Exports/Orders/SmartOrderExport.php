@@ -6,15 +6,19 @@ use Carbon\Carbon;
 use Maatwebsite\Excel\Concerns\FromArray;
 use Maatwebsite\Excel\Concerns\ShouldAutoSize;
 use Maatwebsite\Excel\Concerns\WithColumnFormatting;
+use Maatwebsite\Excel\Concerns\WithCustomValueBinder;
 use Maatwebsite\Excel\Concerns\WithStyles;
 use Maatwebsite\Excel\Concerns\WithTitle;
+use PhpOffice\PhpSpreadsheet\Cell\Cell;
+use PhpOffice\PhpSpreadsheet\Cell\DataType;
+use PhpOffice\PhpSpreadsheet\Cell\DefaultValueBinder;
 use PhpOffice\PhpSpreadsheet\Style\Alignment;
 use PhpOffice\PhpSpreadsheet\Style\Border;
 use PhpOffice\PhpSpreadsheet\Style\Fill;
 use PhpOffice\PhpSpreadsheet\Style\NumberFormat;
 use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
 
-class SmartOrderExport implements FromArray, ShouldAutoSize, WithStyles, WithTitle, WithColumnFormatting
+class SmartOrderExport extends DefaultValueBinder implements FromArray, ShouldAutoSize, WithStyles, WithTitle, WithColumnFormatting, WithCustomValueBinder
 {
     protected array $items;
     protected array $filters;
@@ -23,6 +27,16 @@ class SmartOrderExport implements FromArray, ShouldAutoSize, WithStyles, WithTit
     {
         $this->items = $items;
         $this->filters = $filters;
+    }
+
+    public function bindValue(Cell $cell, $value): bool
+    {
+        if ($cell->getColumn() === 'B' && $cell->getRow() >= 7) {
+            $cell->setValueExplicit((string) $value, DataType::TYPE_STRING);
+            return true;
+        }
+
+        return parent::bindValue($cell, $value);
     }
 
     public function title(): string
@@ -95,6 +109,8 @@ class SmartOrderExport implements FromArray, ShouldAutoSize, WithStyles, WithTit
         }
 
         $no = 1;
+        $totalStocks = 0;
+        $totalMinStock = 0;
         $totalSoldRange = 0;
         $totalSold1Month = 0;
         $totalSold3Months = 0;
@@ -109,6 +125,8 @@ class SmartOrderExport implements FromArray, ShouldAutoSize, WithStyles, WithTit
             $sold1M = (int) ($item['sold_1_month'] ?? 0);
             $sold3M = (int) ($item['sold_3_months'] ?? 0);
 
+            $totalStocks += $stocks;
+            $totalMinStock += $minStock;
             $totalSoldRange += $totalSold;
             $totalSold1Month += $sold1M;
             $totalSold3Months += $sold3M;
@@ -139,8 +157,8 @@ class SmartOrderExport implements FromArray, ShouldAutoSize, WithStyles, WithTit
             '',
             '',
             '',
-            '',
-            '',
+            $totalStocks,
+            $totalMinStock,
             '',
             $totalSoldRange,
             $totalSold1Month,

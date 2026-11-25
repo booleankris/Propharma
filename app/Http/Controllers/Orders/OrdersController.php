@@ -1151,19 +1151,26 @@ class OrdersController extends Controller
         $salesPharmacyId = $isWarehouse ? 1 : $pharmacyId;
         $warehousePharmacyId = getWarehousePharmacyId();
 
+        $yesterday = now()->subDay()->format('Y-m-d');
+        $dateFrom = $request->date_from ?: $yesterday;
+        $dateTo = $request->date_to ?: $yesterday;
+        $rangeStart = "{$dateFrom} 00:00:00";
+        $rangeEnd = "{$dateTo} 23:59:59";
+
         $oneMonthAgo = now()->subDays(30)->toDateTimeString();
         $threeMonthsAgo = now()->subDays(90)->toDateTimeString();
+        $earliestQueryDate = min($rangeStart, $threeMonthsAgo);
         $search = trim((string) $request->search);
 
-        // Subquery: Sales in 3 months & 1 month
+        // Subquery: Sales in selected date range, 1 month (30 days), & 3 months (90 days)
         $salesAggQuery = MedicineCart::select('medicine_cart.medicine_id')
+            ->selectRaw('COALESCE(SUM(CASE WHEN medicine_transactions.created_at BETWEEN ? AND ? THEN medicine_cart.quantity ELSE 0 END), 0) as total_sold', [$rangeStart, $rangeEnd])
             ->selectRaw('COALESCE(SUM(CASE WHEN medicine_transactions.created_at >= ? THEN medicine_cart.quantity ELSE 0 END), 0) as sold_1_month', [$oneMonthAgo])
-            ->selectRaw('COALESCE(SUM(medicine_cart.quantity), 0) as sold_3_months')
+            ->selectRaw('COALESCE(SUM(CASE WHEN medicine_transactions.created_at >= ? THEN medicine_cart.quantity ELSE 0 END), 0) as sold_3_months', [$threeMonthsAgo])
             ->join('medicine_transactions', 'medicine_transactions.id', '=', 'medicine_cart.transaction_id')
             ->where('medicine_transactions.pharmacy_id', $salesPharmacyId)
             ->where('medicine_transactions.status', 1)
-            ->where('medicine_cart.status', 1)
-            ->where('medicine_transactions.created_at', '>=', $threeMonthsAgo)
+            ->where('medicine_transactions.created_at', '>=', $earliestQueryDate)
             ->groupBy('medicine_cart.medicine_id')
             ->havingRaw('SUM(medicine_cart.quantity) > 0');
 
@@ -1175,6 +1182,8 @@ class OrdersController extends Controller
             'pharmacy_name' => $pharmacy?->name ?? 'Apotek',
             'order_code' => $order?->code ?? '-',
             'stock_scope_label' => $stockScopeLabel,
+            'date_from' => $dateFrom,
+            'date_to' => $dateTo,
         ];
 
         if (empty($medicineIds)) {
@@ -1184,18 +1193,14 @@ class OrdersController extends Controller
 
         $salesMap = $salesAggRows->keyBy('medicine_id');
 
-        // Stock Calculation:
-        // If PMI: Storage stock in warehouse (pharmacy 9) + Counter stock in PMI pelayanan (pharmacy 1)
-        // If Branch: Counter stock in branch (pharmacy_id)
-        $storageStockMap = [];
-        if ($isWarehouse) {
-            $storageStockMap = \App\Models\Batches::where('pharmacy_id', $warehousePharmacyId)
-                ->whereIn('medicine_id', $medicineIds)
-                ->selectRaw('medicine_id, SUM(stock) as total')
-                ->groupBy('medicine_id')
-                ->pluck('total', 'medicine_id')
-                ->all();
-        }
+        // Stock Calculation (selaras dengan modal Smart Order):
+        $batchTargetPharmacyId = $isWarehouse ? $warehousePharmacyId : $pharmacyId;
+        $storageStockMap = \App\Models\Batches::where('pharmacy_id', $batchTargetPharmacyId)
+            ->whereIn('medicine_id', $medicineIds)
+            ->selectRaw('medicine_id, SUM(stock) as total')
+            ->groupBy('medicine_id')
+            ->pluck('total', 'medicine_id')
+            ->all();
 
         $counterStockMap = \App\Models\MedicineTransferItems::join('batches', 'batches.id', '=', 'medicine_transfer_items.batches_id')
             ->where('batches.pharmacy_id', $counterPharmacyId)
@@ -1220,6 +1225,7 @@ class OrdersController extends Controller
                 'medicines.code',
                 'medicines.content',
                 'medicines.raw_price',
+                'medicines.minimal_stock',
                 'medicines.factory_id',
                 DB::raw("COALESCE(factories.name, 'Tanpa Pabrik') as factory_name"),
             ]);
@@ -1233,14 +1239,15 @@ class OrdersController extends Controller
 
         $medicines = $medicinesQuery->get();
 
-        $items = $medicines->map(function ($med) use ($salesMap, $storageStockMap, $counterStockMap, $isWarehouse) {
+        $items = $medicines->map(function ($med) use ($salesMap, $storageStockMap, $counterStockMap) {
             $medId = $med->id;
+            $totalSoldRange = isset($salesMap[$medId]) ? (int) $salesMap[$medId]->total_sold : 0;
             $sold1M = isset($salesMap[$medId]) ? (int) $salesMap[$medId]->sold_1_month : 0;
             $sold3M = isset($salesMap[$medId]) ? (int) $salesMap[$medId]->sold_3_months : 0;
 
             $storageStock = (int) ($storageStockMap[$medId] ?? 0);
             $counterStock = (int) ($counterStockMap[$medId] ?? 0);
-            $totalStock = $isWarehouse ? ($storageStock + $counterStock) : $counterStock;
+            $totalStock = $storageStock + $counterStock;
 
             return [
                 'name' => $med->name,
@@ -1248,9 +1255,11 @@ class OrdersController extends Controller
                 'factory_name' => $med->factory_name,
                 'content' => (float) ($med->content ?: 1),
                 'raw_price' => (float) ($med->raw_price ?? 0),
+                'stocks' => $totalStock,
+                'min_stock' => (int) ($med->minimal_stock ?? 0),
+                'total_sold' => $totalSoldRange,
                 'sold_1_month' => $sold1M,
                 'sold_3_months' => $sold3M,
-                'stocks' => $totalStock,
             ];
         })->toArray();
 

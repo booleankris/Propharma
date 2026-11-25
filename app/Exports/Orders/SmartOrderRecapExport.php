@@ -55,6 +55,8 @@ class SmartOrderRecapExport extends DefaultValueBinder implements FromArray, Sho
             'G' => '#,##0',
             'H' => '#,##0',
             'I' => '#,##0',
+            'J' => '#,##0',
+            'K' => '#,##0',
         ];
     }
 
@@ -63,12 +65,18 @@ class SmartOrderRecapExport extends DefaultValueBinder implements FromArray, Sho
         $now = Carbon::now()->translatedFormat('d F Y H:i');
         $pharmacyName = $this->filters['pharmacy_name'] ?? 'Apotek';
         $orderCode = $this->filters['order_code'] ?? '-';
-        $stockScopeLabel = $this->filters['stock_scope_label'] ?? 'Stok Sekarang';
+        $stockScopeLabel = $this->filters['stock_scope_label'] ?? 'Sisa Stok';
+        $dateFromFmt = !empty($this->filters['date_from'])
+            ? Carbon::parse($this->filters['date_from'])->format('d/m/Y')
+            : '-';
+        $dateToFmt = !empty($this->filters['date_to'])
+            ? Carbon::parse($this->filters['date_to'])->format('d/m/Y')
+            : '-';
 
         $rows = [
             ['SMART ORDER - REKAPITULASI PENJUALAN & STOK PER PABRIK'],
             ["Apotek: {$pharmacyName} | No. Pesanan / SP: {$orderCode} | Cakupan Stok: {$stockScopeLabel}"],
-            ["Urutan: Nama Pabrik (A - Z) & Penjualan 3 Bulan Terbanyak | Filter: Semua Obat Berpenjualan"],
+            ["Rentang Tanggal: {$dateFromFmt} s/d {$dateToFmt} | Urutan: Nama Pabrik (A - Z) & Penjualan 3 Bulan Terbanyak"],
             ["Waktu Unduh: {$now} | Total: " . count($this->items) . ' obat'],
             [''], // Baris kosong pemisah
             [
@@ -78,30 +86,38 @@ class SmartOrderRecapExport extends DefaultValueBinder implements FromArray, Sho
                 'Nama Pabrik',
                 'Isi',
                 'HNA',
+                'Sisa Stok',
+                'Min. Stok',
+                'Jual (Rentang)',
                 'Terjual 1 Bulan',
                 'Terjual 3 Bulan',
-                'Stok Sekarang',
             ],
         ];
 
         if (empty($this->items)) {
-            $rows[] = ['Tidak ada data barang dengan histori penjualan.', '', '', '', '', '', '', '', ''];
+            $rows[] = ['Tidak ada data barang dengan histori penjualan.', '', '', '', '', '', '', '', '', '', ''];
             return $rows;
         }
 
         $no = 1;
+        $totalCurrentStock = 0;
+        $totalMinStock = 0;
+        $totalSoldRange = 0;
         $totalSold1Month = 0;
         $totalSold3Months = 0;
-        $totalCurrentStock = 0;
 
         foreach ($this->items as $item) {
+            $currentStock = (int) ($item['stocks'] ?? 0);
+            $minStock = (int) ($item['min_stock'] ?? 0);
+            $soldRange = (int) ($item['total_sold'] ?? 0);
             $sold1M = (int) ($item['sold_1_month'] ?? 0);
             $sold3M = (int) ($item['sold_3_months'] ?? 0);
-            $currentStock = (int) ($item['stocks'] ?? 0);
 
+            $totalCurrentStock += $currentStock;
+            $totalMinStock += $minStock;
+            $totalSoldRange += $soldRange;
             $totalSold1Month += $sold1M;
             $totalSold3Months += $sold3M;
-            $totalCurrentStock += $currentStock;
 
             $rows[] = [
                 $no++,
@@ -110,9 +126,11 @@ class SmartOrderRecapExport extends DefaultValueBinder implements FromArray, Sho
                 (string) ($item['factory_name'] ?? 'Tanpa Pabrik'),
                 (float) ($item['content'] ?? 1),
                 (float) ($item['raw_price'] ?? 0),
+                $currentStock,
+                $minStock,
+                $soldRange,
                 $sold1M,
                 $sold3M,
-                $currentStock,
             ];
         }
 
@@ -124,9 +142,11 @@ class SmartOrderRecapExport extends DefaultValueBinder implements FromArray, Sho
             '',
             '',
             '',
+            $totalCurrentStock,
+            $totalMinStock,
+            $totalSoldRange,
             $totalSold1Month,
             $totalSold3Months,
-            $totalCurrentStock,
         ];
 
         return $rows;
@@ -136,7 +156,7 @@ class SmartOrderRecapExport extends DefaultValueBinder implements FromArray, Sho
     {
         $lastRow = $sheet->getHighestRow();
         $headerRow = $this->headerRow;
-        $lastCol = 'I';
+        $lastCol = 'K';
 
         // Title styling
         foreach (range(1, 4) as $r) {
@@ -181,7 +201,7 @@ class SmartOrderRecapExport extends DefaultValueBinder implements FromArray, Sho
             $sheet->getStyle("C{$startDataRow}:C{$lastRow}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
             $sheet->getStyle("D{$startDataRow}:D{$lastRow}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_LEFT);
             $sheet->getStyle("E{$startDataRow}:E{$lastRow}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
-            $sheet->getStyle("F{$startDataRow}:I{$lastRow}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_RIGHT);
+            $sheet->getStyle("F{$startDataRow}:{$lastCol}{$lastRow}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_RIGHT);
 
             // Total row styling
             $sheet->getStyle("A{$lastRow}:{$lastCol}{$lastRow}")->applyFromArray([

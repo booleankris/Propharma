@@ -1995,11 +1995,14 @@
         }
 
         function exportSmartOrderRecap() {
+            const dates = smartRange ? smartRange.selectedDates : [];
             const searchVal = document.getElementById('smartSearch')?.value || '';
 
             const params = new URLSearchParams({
                 order_id: orderid,
                 search: searchVal,
+                date_from: dates[0] ? flatpickr.formatDate(dates[0], 'Y-m-d') : '',
+                date_to: dates[1] ? flatpickr.formatDate(dates[1], 'Y-m-d') : (dates[0] ? flatpickr.formatDate(dates[0], 'Y-m-d') : ''),
             });
 
             const btnExport1 = document.getElementById('smartBtnExportRecap');
