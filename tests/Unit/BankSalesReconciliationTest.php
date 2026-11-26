@@ -583,4 +583,62 @@ class BankSalesReconciliationTest extends TestCase
         $this->assertEquals($bankExportBank, $days['2026-11-05']['sales']['bank']['morning']);
         $this->assertEquals($bankExportKredit, $days['2026-11-05']['sales']['credit']['morning'][10]);
     }
+
+    public function test_recap_sheet_displays_jasa_and_ongkir_as_non_accumulated_notes(): void
+    {
+        $allBanksData = [
+            'CASH' => [
+                'struk_count' => 3,
+                'qty_sum' => 17,
+                'gross_sum' => 42000,
+                'discount_sum' => 0,
+                'net_sum' => 42000,
+                'jasa_note_sum' => 250000,
+                'shipping_note_sum' => 0,
+            ],
+            'QRIS BNI' => [
+                'struk_count' => 1,
+                'qty_sum' => 11,
+                'gross_sum' => 27000,
+                'discount_sum' => 0,
+                'net_sum' => 27000,
+                'jasa_note_sum' => 0,
+                'shipping_note_sum' => 15000,
+            ],
+        ];
+
+        $sheet = new BankSalesSheetExport(
+            1,
+            '2026-11-26',
+            '2026-11-26',
+            'SAHABAT MULAWARMAN',
+            '',
+            null,
+            'semua',
+            null,
+            true,
+            $allBanksData,
+            []
+        );
+
+        $buildMethod = new \ReflectionMethod(BankSalesSheetExport::class, 'buildRecapRows');
+        $buildMethod->setAccessible(true);
+        $rows = $buildMethod->invoke($sheet);
+
+        $this->assertSame(['No', 'Pembayaran', 'Jumlah Struk', 'Total Qty Obat', 'Subtotal Kotor', 'Diskon Transaksi', 'Total Netto', 'Jasa (Note)', 'Ongkir (Note)'], $rows[0]);
+        $this->assertSame(42000, $rows[1][6]);
+        $this->assertSame(250000, $rows[1][7]);
+        $this->assertSame(0, $rows[1][8]);
+
+        $this->assertSame(27000, $rows[2][6]);
+        $this->assertSame(0, $rows[2][7]);
+        $this->assertSame(15000, $rows[2][8]);
+
+        // Baris TOTAL tidak mengakumulasikan Jasa & Ongkir (tetap '-' dan Net tidak berubah)
+        $totalKeseluruhan = end($rows);
+        $this->assertSame('TOTAL KESELURUHAN', $totalKeseluruhan[1]);
+        $this->assertSame(69000, $totalKeseluruhan[6]);
+        $this->assertSame('-', $totalKeseluruhan[7]);
+        $this->assertSame('-', $totalKeseluruhan[8]);
+    }
 }

@@ -26,6 +26,7 @@ class BankSalesSheetExport implements FromArray, WithStyles, WithColumnWidths, W
     protected $isRecap;
     protected $allBanksData;
     protected $transactions;
+    protected $shippingTransactions;
     protected $hasTrxDiscount = false;
 
     /**
@@ -44,19 +45,21 @@ class BankSalesSheetExport implements FromArray, WithStyles, WithColumnWidths, W
         $bankName = null,
         $isRecap = false,
         $allBanksData = [],
-        $transactions = null
+        $transactions = null,
+        $shippingTransactions = []
     ) {
-        $this->pharmacyId      = $pharmacyId;
-        $this->startDate       = Carbon::parse($startDate)->startOfDay();
-        $this->endDate         = Carbon::parse($endDate)->endOfDay();
-        $this->pharmacyName    = $pharmacyName ?: 'APOTEK SAHABAT';
-        $this->pharmacyAddress = $pharmacyAddress ?: '';
-        $this->shift           = $shift;
-        $this->shiftType       = $shiftType;
-        $this->bankName        = $bankName;
-        $this->isRecap         = $isRecap;
-        $this->allBanksData    = $allBanksData;
-        $this->transactions    = $transactions;
+        $this->pharmacyId           = $pharmacyId;
+        $this->startDate            = Carbon::parse($startDate)->startOfDay();
+        $this->endDate              = Carbon::parse($endDate)->endOfDay();
+        $this->pharmacyName         = $pharmacyName ?: 'APOTEK SAHABAT';
+        $this->pharmacyAddress      = $pharmacyAddress ?: '';
+        $this->shift                = $shift;
+        $this->shiftType            = $shiftType;
+        $this->bankName             = $bankName;
+        $this->isRecap              = $isRecap;
+        $this->allBanksData         = $allBanksData;
+        $this->transactions         = $transactions;
+        $this->shippingTransactions = $shippingTransactions;
     }
 
     public function title(): string
@@ -83,7 +86,7 @@ class BankSalesSheetExport implements FromArray, WithStyles, WithColumnWidths, W
             [''],
             [$this->isRecap ? 'REKAPITULASI PENJUALAN PER PEMBAYARAN' : 'LAPORAN PENJUALAN : ' . strtoupper($this->bankName ?: 'METODE BAYAR')],
             ['Periode : ' . $this->startDate->format('d/m/Y') . ' s/d ' . $this->endDate->format('d/m/Y') . ($this->shiftType === 'shift' && $this->shift ? ' (Shift ' . $this->shift . ')' : '')],
-            [''],
+            [$this->isRecap ? '* Catatan: Kolom Jasa (Note) dan Ongkir (Note) hanya sebagai informasi catatan dan tidak diakumulasikan ke perhitungan total manapun.' : ''],
         ];
 
         $body = $this->isRecap ? $this->buildRecapRows() : $this->buildDetailRows();
@@ -128,6 +131,8 @@ class BankSalesSheetExport implements FromArray, WithStyles, WithColumnWidths, W
             'Subtotal Kotor',
             'Diskon Transaksi',
             'Total Netto',
+            'Jasa (Note)',
+            'Ongkir (Note)',
         ];
 
         $rows = [];
@@ -144,11 +149,13 @@ class BankSalesSheetExport implements FromArray, WithStyles, WithColumnWidths, W
         $bankTotals = [];
 
         foreach ($this->allBanksData as $paymentMethod => $data) {
-            $strukCount = $data['struk_count'] ?? 0;
-            $qtySum     = $data['qty_sum'] ?? 0;
-            $grossSum   = $data['gross_sum'] ?? 0;
-            $discSum    = $data['discount_sum'] ?? 0;
-            $netSum     = $data['net_sum'] ?? 0;
+            $strukCount  = $data['struk_count'] ?? 0;
+            $qtySum      = $data['qty_sum'] ?? 0;
+            $grossSum    = $data['gross_sum'] ?? 0;
+            $discSum     = $data['discount_sum'] ?? 0;
+            $netSum      = $data['net_sum'] ?? 0;
+            $jasaNote    = (int) ($data['jasa_note_sum'] ?? 0);
+            $ongkirNote  = (int) ($data['shipping_note_sum'] ?? 0);
 
             $rows[] = [
                 $no++,
@@ -158,6 +165,8 @@ class BankSalesSheetExport implements FromArray, WithStyles, WithColumnWidths, W
                 $grossSum,
                 $discSum,
                 $netSum,
+                $jasaNote,
+                $ongkirNote,
             ];
 
             $methodUpper = strtoupper(trim((string) $paymentMethod));
@@ -210,7 +219,7 @@ class BankSalesSheetExport implements FromArray, WithStyles, WithColumnWidths, W
         $totalBankNet      = (int) array_sum(array_column($orderedBankTotals, 'net'));
 
         if (count($this->allBanksData) === 0) {
-            $rows[] = ['-', 'Tidak ada transaksi pembayaran pada periode ini', 0, 0, 0, 0, 0];
+            $rows[] = ['-', 'Tidak ada transaksi pembayaran pada periode ini', 0, 0, 0, 0, 0, 0, 0];
         }
 
         $grandTotalStruk    = $totalKasStruk + $totalBankStruk;
@@ -219,7 +228,7 @@ class BankSalesSheetExport implements FromArray, WithStyles, WithColumnWidths, W
         $grandTotalDiscount = $totalKasDiscount + $totalBankDiscount;
         $grandTotalNet      = $totalKasNet + $totalBankNet;
 
-        // Total Kas Row (100% samakan dengan tipe pembayaran "CASH")
+        // Total Kas Row (100% samakan dengan tipe pembayaran "CASH"; Jasa & Ongkir adalah note dan tidak diakumulasikan)
         $rows[] = [
             '',
             'TOTAL KAS',
@@ -228,6 +237,8 @@ class BankSalesSheetExport implements FromArray, WithStyles, WithColumnWidths, W
             $totalKasGross,
             $totalKasDiscount,
             $totalKasNet,
+            '-',
+            '-',
         ];
 
         // Total per jenis bank (Total Mandiri, Total BCA, dst)
@@ -241,6 +252,8 @@ class BankSalesSheetExport implements FromArray, WithStyles, WithColumnWidths, W
                 (int) $bankTotal['gross'],
                 (int) $bankTotal['discount'],
                 (int) $bankTotal['net'],
+                '-',
+                '-',
             ];
         }
 
@@ -253,6 +266,8 @@ class BankSalesSheetExport implements FromArray, WithStyles, WithColumnWidths, W
             $totalBankGross,
             $totalBankDiscount,
             $totalBankNet,
+            '-',
+            '-',
         ];
 
         // Grand Total Row (Total Kas + Total Bank)
@@ -264,6 +279,8 @@ class BankSalesSheetExport implements FromArray, WithStyles, WithColumnWidths, W
             $grandTotalGross,
             $grandTotalDiscount,
             $grandTotalNet,
+            '-',
+            '-',
         ];
 
         return $rows;
@@ -488,7 +505,60 @@ class BankSalesSheetExport implements FromArray, WithStyles, WithColumnWidths, W
             }
         }
 
-        if ($transactions->isEmpty()) {
+        $shippingNoteRows = is_array($this->shippingTransactions) ? collect($this->shippingTransactions) : ($this->shippingTransactions ?? collect());
+        if ($this->transactions === null && $shippingNoteRows->isEmpty()) {
+            $shipQuery = MedicineTransactions::with(['patients', 'doctors', 'user', 'shift_logs'])
+                ->where('pharmacy_id', $this->pharmacyId)
+                ->where('has_doctor_shipping_fee', 1)
+                ->where('doctor_shipping_fee', '>', 0);
+
+            \App\Support\LiphTransactionScope::applySalesStatus($shipQuery);
+            \App\Support\LiphTransactionScope::applyPeriod(
+                $shipQuery,
+                $this->startDate,
+                $this->endDate,
+                $this->shiftType,
+                $this->shift
+            );
+
+            $shippingNoteRows = $shipQuery->orderByRaw('COALESCE(created_at, updated_at) ASC')->get()
+                ->filter(fn ($trx) => BankSalesExport::resolveShippingCategory($trx) === $this->bankName);
+        }
+
+        foreach ($shippingNoteRows as $shipTrx) {
+            $shipFee = (int) round((float) ($shipTrx->doctor_shipping_fee ?? 0));
+            if ($shipFee <= 0) {
+                continue;
+            }
+            $dateCol = $shipTrx->created_at ?? $shipTrx->updated_at;
+            $tgl = $dateCol ? $dateCol->format('d/m/Y H:i') : '-';
+            $code = $shipTrx->transaction_code ?? '-';
+            $type = $shipTrx->transaction_type ?? '-';
+            $pasien = $shipTrx->patients->name ?? '-';
+            $dokter = $shipTrx->doctors->name ?? '-';
+            $kasir = $shipTrx->user->name ?? '-';
+            $shift = $shipTrx->shift_logs->shift_name ?? ($shipTrx->shift_logs_id ? 'Shift ' . $shipTrx->shift_logs_id : '-');
+
+            // Hanya sebagai note/catatan informasi, tidak diakumulasikan ke $totalItemAmount / Total Netto
+            $rows[] = [
+                $no++,
+                $tgl,
+                $code,
+                $type,
+                '-',
+                '[CATATAN ONGKIR - Tidak Diakumulasikan]',
+                0,
+                $shipFee,
+                0,
+                '-',
+                $pasien,
+                $dokter,
+                $kasir,
+                $shift,
+            ];
+        }
+
+        if ($transactions->isEmpty() && $shippingNoteRows->isEmpty()) {
             $rows[] = ['-', '-', '-', '-', '-', 'Tidak ada transaksi untuk pembayaran ini', 0, 0, 0, 0, '-', '-', '-', '-'];
         }
 
@@ -576,6 +646,15 @@ class BankSalesSheetExport implements FromArray, WithStyles, WithColumnWidths, W
         $sheet->getStyle('A2')->getFont()->setSize(10);
         $sheet->getStyle('A4')->getFont()->setBold(true)->setSize(12);
         $sheet->getStyle('A5')->getFont()->setItalic(true)->setSize(10);
+        if ($this->isRecap) {
+            $sheet->getStyle('A6')->applyFromArray([
+                'font' => [
+                    'italic' => true,
+                    'size'   => 9,
+                    'color'  => ['rgb' => '64748B'],
+                ],
+            ]);
+        }
 
         // 2. Table Header Row (Row 7)
         $headerRow = 7;
@@ -613,33 +692,34 @@ class BankSalesSheetExport implements FromArray, WithStyles, WithColumnWidths, W
 
             // Number Formats
             if ($this->isRecap) {
-                // Column C..G numeric
+                // Column C..I numeric
                 $sheet->getStyle("A8:A{$highestRow}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
                 $sheet->getStyle("C8:C{$highestRow}")->getNumberFormat()->setFormatCode('#,##0');
                 $sheet->getStyle("D8:D{$highestRow}")->getNumberFormat()->setFormatCode('#,##0');
-                $sheet->getStyle("E8:G{$highestRow}")->getNumberFormat()->setFormatCode('#,##0');
+                $sheet->getStyle("E8:I{$highestRow}")->getNumberFormat()->setFormatCode('#,##0');
+                $sheet->getStyle("H8:I{$highestRow}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_RIGHT);
 
                 for ($row = 8; $row <= $highestRow; $row++) {
                     $label = strtoupper(trim((string) $sheet->getCell("B{$row}")->getValue()));
 
                     if ($label === 'KREDIT' || $label === 'CASH') {
-                        $sheet->getStyle("A{$row}:G{$row}")->getFont()->setBold(true);
+                        $sheet->getStyle("A{$row}:{$highestColumn}{$row}")->getFont()->setBold(true);
                     } elseif ($label === 'TOTAL KAS') {
-                        $sheet->getStyle("A{$row}:G{$row}")->applyFromArray([
+                        $sheet->getStyle("A{$row}:{$highestColumn}{$row}")->applyFromArray([
                             'font' => ['bold' => true],
                             'borders' => [
                                 'top' => ['borderStyle' => Border::BORDER_THIN, 'color' => ['rgb' => '94A3B8']],
                             ],
                         ]);
                     } elseif ($label === 'TOTAL BANK') {
-                        $sheet->getStyle("A{$row}:G{$row}")->applyFromArray([
+                        $sheet->getStyle("A{$row}:{$highestColumn}{$row}")->applyFromArray([
                             'font' => ['bold' => true],
                             'borders' => [
                                 'top' => ['borderStyle' => Border::BORDER_THIN, 'color' => ['rgb' => 'CBD5E1']],
                             ],
                         ]);
                     } elseif ($label === 'TOTAL KESELURUHAN') {
-                        $sheet->getStyle("A{$row}:G{$row}")->applyFromArray([
+                        $sheet->getStyle("A{$row}:{$highestColumn}{$row}")->applyFromArray([
                             'font' => ['bold' => true],
                             'fill' => [
                                 'fillType'   => \PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID,
@@ -652,7 +732,7 @@ class BankSalesSheetExport implements FromArray, WithStyles, WithColumnWidths, W
                         ]);
                     } elseif (str_starts_with($label, 'TOTAL ')) {
                         // Baris total per jenis bank: TOTAL MANDIRI, TOTAL BCA, dst.
-                        $sheet->getStyle("A{$row}:G{$row}")->applyFromArray([
+                        $sheet->getStyle("A{$row}:{$highestColumn}{$row}")->applyFromArray([
                             'font' => ['bold' => true, 'italic' => true],
                         ]);
                     }
@@ -668,10 +748,11 @@ class BankSalesSheetExport implements FromArray, WithStyles, WithColumnWidths, W
                 $sheet->getStyle("E8:E{$highestRow}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
                 $sheet->getStyle("G8:G{$highestRow}")->getNumberFormat()->setFormatCode('#,##0');
                 $sheet->getStyle("H8:J{$highestRow}")->getNumberFormat()->setFormatCode('#,##0');
+                $sheet->getStyle("J8:J{$highestRow}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_RIGHT);
                 $sheet->getStyle("N8:N{$highestRow}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
             }
 
-            // Total Bottom Row Highlight
+            // Total Bottom Row Highlight (Detail Sheets Only)
             if (! $this->isRecap && $this->hasTrxDiscount && $highestRow >= 10) {
                 $subtotalRow = $highestRow - 2;
                 $discRow     = $highestRow - 1;
@@ -708,7 +789,7 @@ class BankSalesSheetExport implements FromArray, WithStyles, WithColumnWidths, W
                         ],
                     ],
                 ]);
-            } else {
+            } elseif (! $this->isRecap) {
                 $sheet->getStyle("A{$highestRow}:{$highestColumn}{$highestRow}")->applyFromArray([
                     'font' => [
                         'bold' => true,
@@ -745,6 +826,8 @@ class BankSalesSheetExport implements FromArray, WithStyles, WithColumnWidths, W
                 'E' => 20,
                 'F' => 20,
                 'G' => 22,
+                'H' => 18,
+                'I' => 18,
             ];
         }
 

@@ -115,8 +115,12 @@
                 @else
                     <tr class="{{ $isHeader ? 'bg-slate-100 font-bold text-slate-900 border-b border-slate-300 sticky top-0' : '' }} {{ $isSubTotal || $isGrandTotal ? 'bg-slate-50 font-bold text-slate-900 border-t-2 border-slate-400' : '' }} {{ $isGroupHeader ? 'bg-slate-50 font-bold text-slate-800' : '' }} {{ $isTitle ? 'font-bold text-[14px] text-slate-900' : '' }}">
                         @if(!is_array($row) || count($row) === 1)
-                            <td class="px-3 py-1.5 border border-slate-200" colspan="{{ $maxCols }}">
-                                {{ is_array($row) ? ($row[0] ?? '') : $row }}
+                            @php
+                                $singleText = trim((string) (is_array($row) ? ($row[0] ?? '') : $row));
+                                $isNoteLine = str_starts_with($singleText, '* Catatan:');
+                            @endphp
+                            <td class="px-3 py-1.5 border border-slate-200 {{ $isNoteLine ? 'italic text-slate-500 bg-slate-50/70 text-[11px]' : '' }}" colspan="{{ $maxCols }}">
+                                {{ $singleText }}
                             </td>
                         @else
                             @foreach($row as $colIndex => $col)
@@ -165,7 +169,7 @@
                                     $isNumeric = is_numeric($col) && $colStr !== '' && !$shouldNotFormat;
                                     $isNoCol = ($colIndex === 0 && !$isHeader && $colStr !== '' && in_array(strtolower($headerMap[0] ?? ''), ['no', 'no.', 'no ', 'id']));
                                     $isCenterCol = $isHeader || $isNoCol || stripos($colHeader, 'struk') !== false || stripos($colHeader, 'tanggal') !== false || stripos($colHeader, 'tgl') !== false || stripos($colHeader, 'shift') !== false || stripos($colHeader, 'tempo') !== false || stripos($colHeader, 'wkt') !== false || stripos($colHeader, 'jns') !== false || stripos($colHeader, 'no_terima') !== false || stripos($colHeader, 'no terima') !== false;
-                                    $isRightCol = $isNumeric || stripos($colHeader, 'faktur') !== false;
+                                    $isRightCol = $isNumeric || stripos($colHeader, 'faktur') !== false || ($colStr === '-' && (stripos($colHeader, 'jasa') !== false || stripos($colHeader, 'ongkir') !== false || stripos($colHeader, 'total') !== false));
                                 @endphp
                                 <td @if(isset($mergedCellSpans[$rowIndex][$colIndex])) rowspan="{{ $mergedCellSpans[$rowIndex][$colIndex] }}" @endif class="px-3 py-1.5 border border-slate-200 align-middle {{ $isCenterCol ? 'text-center' : ($isRightCol ? 'text-right' : 'text-left') }} {{ $isNumeric && (float)$col < 0 ? 'text-red-600' : '' }}">
                                     @if($shouldNotFormat)

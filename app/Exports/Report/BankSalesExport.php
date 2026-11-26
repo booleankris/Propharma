@@ -45,6 +45,22 @@ class BankSalesExport implements WithMultipleSheets
         return \App\Support\PaymentMethod::label($trx->payment_method ?? null, $trx->transfer_bank_name ?? null);
     }
 
+    public static function resolveShippingCategory($trx): ?string
+    {
+        if (empty($trx->has_doctor_shipping_fee) || (float) ($trx->doctor_shipping_fee ?? 0) <= 0) {
+            return null;
+        }
+
+        $method = !empty($trx->doctor_shipping_payment_method)
+            ? $trx->doctor_shipping_payment_method
+            : ($trx->payment_method ?? null);
+        $bank = !empty($trx->doctor_shipping_payment_method)
+            ? ($trx->doctor_shipping_bank_name ?? null)
+            : ($trx->transfer_bank_name ?? null);
+
+        return \App\Support\PaymentMethod::label($method, $bank) ?: 'Transfer Lainnya';
+    }
+
     public static function calculateTransactionAmount(object $trx): float
     {
         // Nilai jasa (transaksi tipe JASA) ikut dihitung sebagai bagian transaksi.
@@ -111,6 +127,10 @@ class BankSalesExport implements WithMultipleSheets
             'transaction_type',
             'payment_method',
             'transfer_bank_name',
+            'has_doctor_shipping_fee',
+            'doctor_shipping_fee',
+            'doctor_shipping_payment_method',
+            'doctor_shipping_bank_name',
             'subtotal',
             'discount',
             'paid',
@@ -159,6 +179,9 @@ class BankSalesExport implements WithMultipleSheets
 
         // 2. Classify transactions by bank/category
         $grouped = [];
+        $shippingNotesByBank = [];
+        $shippingTrxByBank = [];
+
         foreach ($allTransactions as $trx) {
             $cat = self::resolveCategory($trx) ?: 'Transfer Lainnya';
             $typeGroup = LiphExport::TYPE_MAP[$trx->transaction_type][0] ?? 'tunai';
@@ -167,10 +190,23 @@ class BankSalesExport implements WithMultipleSheets
             if ($paymentClass !== 'KREDIT') {
                 $grouped[$cat][] = $trx;
             }
+
+            // Catatan Ongkir dicatat sesuai metode pembayaran ongkirnya (tanpa mengubah akumulasi penjualan)
+            $shipCat = self::resolveShippingCategory($trx);
+            if ($shipCat !== null && strtoupper(trim($shipCat)) !== 'KREDIT') {
+                $shipAmt = (int) round((float) ($trx->doctor_shipping_fee ?? 0));
+                if ($shipAmt > 0) {
+                    $shippingNotesByBank[$shipCat] = ($shippingNotesByBank[$shipCat] ?? 0) + $shipAmt;
+                    $shippingTrxByBank[$shipCat][] = $trx;
+                }
+            }
         }
 
         // 3. Prepare master bank list
-        $activeCategories = array_keys($grouped);
+        $activeCategories = array_values(array_unique(array_merge(
+            array_keys($grouped),
+            array_keys($shippingNotesByBank)
+        )));
         $banksList = array_values(array_unique(array_merge(self::STANDARD_BANKS, $activeCategories)));
 
         // 4. Build one flat recap from cash and payment methods only.
@@ -179,9 +215,14 @@ class BankSalesExport implements WithMultipleSheets
 
         foreach ($banksList as $bank) {
             $bankTransactions = collect($grouped[$bank] ?? []);
-            $allBanksData[$bank] = self::summarizeTransactions($bankTransactions);
+            $summary = self::summarizeTransactions($bankTransactions);
+            $summary['shipping_note_sum'] = (int) ($shippingNotesByBank[$bank] ?? 0);
+            $allBanksData[$bank] = $summary;
 
-            if ($bank !== 'KREDIT' && ($bankTransactions->isNotEmpty() || in_array($bank, self::STANDARD_BANKS, true))) {
+            if (
+                $bank !== 'KREDIT'
+                && ($bankTransactions->isNotEmpty() || !empty($shippingTrxByBank[$bank]) || in_array($bank, self::STANDARD_BANKS, true))
+            ) {
                 $activeBanksWithData[] = $bank;
             }
         }
@@ -218,7 +259,8 @@ class BankSalesExport implements WithMultipleSheets
                 $bank,
                 false, // isRecap
                 [],
-                $grouped[$bank] ?? []
+                $grouped[$bank] ?? [],
+                $shippingTrxByBank[$bank] ?? []
             );
         }
 
@@ -227,17 +269,34 @@ class BankSalesExport implements WithMultipleSheets
 
     private static function summarizeTransactions($transactions): array
     {
-        $summary = ['struk_count' => $transactions->count(), 'qty_sum' => 0, 'gross_sum' => 0, 'discount_sum' => 0, 'net_sum' => 0];
+        $summary = [
+            'struk_count' => $transactions->count(),
+            'qty_sum' => 0,
+            'gross_sum' => 0,
+            'discount_sum' => 0,
+            'net_sum' => 0,
+            'jasa_note_sum' => 0,
+            'shipping_note_sum' => 0,
+        ];
 
         foreach ($transactions as $trx) {
             $items = $trx->transactions;
             // Nilai jasa (transaksi tipe JASA) ikut menambah total pembayaran.
             $serviceAmount = (float) ($trx->service->price ?? 0);
+            $isServiceTrx = strtoupper(trim((string) ($trx->transaction_type ?? ''))) === 'JASA';
             $originalMap = LiphExport::TYPE_MAP[$trx->transaction_type] ?? null;
             $originalLabel = $originalMap[1] ?? '';
             $isReturnTrx = in_array($originalLabel, ['Retur Tunai', 'Retur Kredit'], true)
                 || in_array(strtoupper(trim((string) $trx->transaction_type)), ['RETUR JUAL', 'RETUR KREDIT'], true)
                 || str_starts_with(strtoupper(trim((string) ($trx->transaction_code ?? ''))), 'RT');
+
+            if (!$isReturnTrx) {
+                if ($serviceAmount > 0) {
+                    $summary['jasa_note_sum'] += (int) round($serviceAmount);
+                } elseif ($isServiceTrx && $items->isEmpty() && is_numeric($trx->subtotal)) {
+                    $summary['jasa_note_sum'] += (int) round((float) $trx->subtotal);
+                }
+            }
 
             $trxDiscount = (!$isReturnTrx && is_numeric($trx->discount)) ? (int) round((float) $trx->discount) : 0;
             $summary['discount_sum'] += $trxDiscount;
