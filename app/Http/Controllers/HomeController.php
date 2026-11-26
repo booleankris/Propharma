@@ -73,22 +73,36 @@ class HomeController extends Controller
             \App\Support\LiphTransactionScope::applyOnlineScope($baseQuery, $onlineRoles);
         }
 
-        $isReturnSql = "UPPER(TRIM(COALESCE(transaction_type, ''))) IN ('RETUR JUAL', 'RETUR KREDIT', 'RETUR TUNAI', 'RETUR') OR UPPER(TRIM(COALESCE(transaction_code, ''))) LIKE 'RT%'";
+        $isReturnSql = "UPPER(TRIM(COALESCE(medicine_transactions.transaction_type, ''))) IN ('RETUR JUAL', 'RETUR KREDIT', 'RETUR TUNAI', 'RETUR') OR UPPER(TRIM(COALESCE(medicine_transactions.transaction_code, ''))) LIKE 'RT%'";
 
-        $calcNetSales = function ($query) use ($isReturnSql) {
-            return (float) (clone $query)->selectRaw("
-                COALESCE(SUM(
-                    CASE 
-                        WHEN {$isReturnSql} THEN -ABS(COALESCE(subtotal, 0)) 
-                        ELSE GREATEST(
-                            0,
-                            COALESCE(subtotal, 0)
-                            - COALESCE(discount, 0)
-                            - COALESCE((SELECT SUM(ts.price) FROM transaction_services ts WHERE ts.medicine_transaction_id = medicine_transactions.id), 0)
-                        )
-                    END
-                ), 0) as net_sales
-            ")->value('net_sales');
+        // Agregasi per-item dengan pembulatan per baris keranjang (identik 100% dengan LiphExport::safeItemNettoSum)
+        $cartNetSub = DB::table('medicine_cart')
+            ->where('status', 1)
+            ->groupBy('transaction_id')
+            ->selectRaw('
+                transaction_id,
+                COUNT(*) as item_count,
+                SUM(ROUND(COALESCE(final_price, total_price, ROUND(COALESCE(item_price, 0)) * COALESCE(quantity, 0) - ROUND(COALESCE(discount, 0))))) as items_netto
+            ');
+
+        $calcNetSales = function ($query) use ($isReturnSql, $cartNetSub) {
+            return (float) (clone $query)
+                ->leftJoinSub($cartNetSub, 'mc_agg', 'mc_agg.transaction_id', '=', 'medicine_transactions.id')
+                ->selectRaw("
+                    COALESCE(SUM(
+                        CASE 
+                            WHEN {$isReturnSql} THEN
+                                -ABS(CASE
+                                    WHEN ROUND(COALESCE(medicine_transactions.subtotal, 0)) != 0 THEN ROUND(COALESCE(medicine_transactions.subtotal, 0))
+                                    ELSE COALESCE(mc_agg.items_netto, 0)
+                                END)
+                            WHEN COALESCE(mc_agg.item_count, 0) > 0 THEN
+                                COALESCE(mc_agg.items_netto, 0) - ROUND(COALESCE(medicine_transactions.discount, 0))
+                            ELSE
+                                ROUND(COALESCE(medicine_transactions.subtotal, 0)) - ROUND(COALESCE(medicine_transactions.discount, 0))
+                        END
+                    ), 0) as net_sales
+                ")->value('net_sales');
         };
 
         $total_sales = $calcNetSales($baseQuery);
