@@ -241,7 +241,8 @@ class BankSalesReconciliationTest extends TestCase
         // Summary row 4: row 10 (TOTAL BRI)
         // Summary row 5: row 11 (TOTAL BANK)
         // Summary row 6: row 12 (TOTAL KESELURUHAN)
-        $this->assertCount(13, $rows);
+        // Summary row 7: row 13 (TOTAL JASA & ONGKIR)
+        $this->assertCount(14, $rows);
 
         $totalKasRow = $rows[7];
         $this->assertSame('', $totalKasRow[0]);
@@ -288,6 +289,7 @@ class BankSalesReconciliationTest extends TestCase
             'TOTAL BRI',
             'TOTAL BANK',
             'TOTAL KESELURUHAN',
+            'TOTAL JASA & ONGKIR',
         ], $summaryLabels);
 
         $totalBankRow = $rows[11];
@@ -377,6 +379,7 @@ class BankSalesReconciliationTest extends TestCase
             'TOTAL BTN',
             'TOTAL BANK',
             'TOTAL KESELURUHAN',
+            'TOTAL JASA & ONGKIR',
         ], $summaryLabels);
 
         $totalKasRow = $rows[9];
@@ -625,20 +628,19 @@ class BankSalesReconciliationTest extends TestCase
         $buildMethod->setAccessible(true);
         $rows = $buildMethod->invoke($sheet);
 
-        $this->assertSame(['No', 'Pembayaran', 'Jumlah Struk', 'Total Qty Obat', 'Subtotal Kotor', 'Diskon Transaksi', 'Total Netto', 'Jasa (Note)', 'Ongkir (Note)'], $rows[0]);
+        $this->assertSame(['No', 'Pembayaran', 'Jumlah Struk', 'Total Qty Obat', 'Subtotal Kotor', 'Diskon Transaksi', 'Total Netto'], $rows[0]);
+        $this->assertCount(7, $rows[1]);
         $this->assertSame(42000, $rows[1][6]);
-        $this->assertSame(250000, $rows[1][7]);
-        $this->assertSame(0, $rows[1][8]);
-
         $this->assertSame(27000, $rows[2][6]);
-        $this->assertSame(0, $rows[2][7]);
-        $this->assertSame(15000, $rows[2][8]);
 
-        // Baris TOTAL tidak mengakumulasikan Jasa & Ongkir (tetap '-' dan Net tidak berubah)
-        $totalKeseluruhan = end($rows);
+        $totalKeseluruhan = $rows[count($rows) - 2];
         $this->assertSame('TOTAL KESELURUHAN', $totalKeseluruhan[1]);
         $this->assertSame(69000, $totalKeseluruhan[6]);
-        $this->assertSame('-', $totalKeseluruhan[7]);
-        $this->assertSame('-', $totalKeseluruhan[8]);
+
+        // Baris paling bawah adalah TOTAL JASA & ONGKIR (terpisah & tidak mengubah Total Keseluruhan)
+        $noteRow = end($rows);
+        $this->assertSame('TOTAL JASA & ONGKIR', $noteRow[1]);
+        $this->assertSame('Jasa: 250.000', $noteRow[5]);
+        $this->assertSame('Ongkir: 15.000', $noteRow[6]);
     }
 }

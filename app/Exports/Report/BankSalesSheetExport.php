@@ -86,7 +86,7 @@ class BankSalesSheetExport implements FromArray, WithStyles, WithColumnWidths, W
             [''],
             [$this->isRecap ? 'REKAPITULASI PENJUALAN PER PEMBAYARAN' : 'LAPORAN PENJUALAN : ' . strtoupper($this->bankName ?: 'METODE BAYAR')],
             ['Periode : ' . $this->startDate->format('d/m/Y') . ' s/d ' . $this->endDate->format('d/m/Y') . ($this->shiftType === 'shift' && $this->shift ? ' (Shift ' . $this->shift . ')' : '')],
-            [$this->isRecap ? '* Catatan: Kolom Jasa (Note) dan Ongkir (Note) hanya sebagai informasi catatan dan tidak diakumulasikan ke perhitungan total manapun.' : ''],
+            [''],
         ];
 
         $body = $this->isRecap ? $this->buildRecapRows() : $this->buildDetailRows();
@@ -131,8 +131,6 @@ class BankSalesSheetExport implements FromArray, WithStyles, WithColumnWidths, W
             'Subtotal Kotor',
             'Diskon Transaksi',
             'Total Netto',
-            'Jasa (Note)',
-            'Ongkir (Note)',
         ];
 
         $rows = [];
@@ -144,6 +142,8 @@ class BankSalesSheetExport implements FromArray, WithStyles, WithColumnWidths, W
         $totalKasGross = 0;
         $totalKasDiscount = 0;
         $totalKasNet = 0;
+        $grandTotalJasaNote = 0;
+        $grandTotalOngkirNote = 0;
 
         // Akumulasi per jenis bank (MANDIRI, BCA, BNI, BRI, BTN, ...)
         $bankTotals = [];
@@ -165,11 +165,13 @@ class BankSalesSheetExport implements FromArray, WithStyles, WithColumnWidths, W
                 $grossSum,
                 $discSum,
                 $netSum,
-                $jasaNote,
-                $ongkirNote,
             ];
 
             $methodUpper = strtoupper(trim((string) $paymentMethod));
+            if (!in_array($methodUpper, ['KREDIT', 'BELUM BAYAR'], true)) {
+                $grandTotalJasaNote   += $jasaNote;
+                $grandTotalOngkirNote += $ongkirNote;
+            }
             if ($methodUpper === 'CASH') {
                 $totalKasStruk    += $strukCount;
                 $totalKasQty      += $qtySum;
@@ -219,7 +221,7 @@ class BankSalesSheetExport implements FromArray, WithStyles, WithColumnWidths, W
         $totalBankNet      = (int) array_sum(array_column($orderedBankTotals, 'net'));
 
         if (count($this->allBanksData) === 0) {
-            $rows[] = ['-', 'Tidak ada transaksi pembayaran pada periode ini', 0, 0, 0, 0, 0, 0, 0];
+            $rows[] = ['-', 'Tidak ada transaksi pembayaran pada periode ini', 0, 0, 0, 0, 0];
         }
 
         $grandTotalStruk    = $totalKasStruk + $totalBankStruk;
@@ -228,7 +230,7 @@ class BankSalesSheetExport implements FromArray, WithStyles, WithColumnWidths, W
         $grandTotalDiscount = $totalKasDiscount + $totalBankDiscount;
         $grandTotalNet      = $totalKasNet + $totalBankNet;
 
-        // Total Kas Row (100% samakan dengan tipe pembayaran "CASH"; Jasa & Ongkir adalah note dan tidak diakumulasikan)
+        // Total Kas Row (100% samakan dengan tipe pembayaran "CASH")
         $rows[] = [
             '',
             'TOTAL KAS',
@@ -237,8 +239,6 @@ class BankSalesSheetExport implements FromArray, WithStyles, WithColumnWidths, W
             $totalKasGross,
             $totalKasDiscount,
             $totalKasNet,
-            '-',
-            '-',
         ];
 
         // Total per jenis bank (Total Mandiri, Total BCA, dst)
@@ -252,8 +252,6 @@ class BankSalesSheetExport implements FromArray, WithStyles, WithColumnWidths, W
                 (int) $bankTotal['gross'],
                 (int) $bankTotal['discount'],
                 (int) $bankTotal['net'],
-                '-',
-                '-',
             ];
         }
 
@@ -266,8 +264,6 @@ class BankSalesSheetExport implements FromArray, WithStyles, WithColumnWidths, W
             $totalBankGross,
             $totalBankDiscount,
             $totalBankNet,
-            '-',
-            '-',
         ];
 
         // Grand Total Row (Total Kas + Total Bank)
@@ -279,8 +275,17 @@ class BankSalesSheetExport implements FromArray, WithStyles, WithColumnWidths, W
             $grandTotalGross,
             $grandTotalDiscount,
             $grandTotalNet,
+        ];
+
+        // Note Row: Total Jasa & Ongkir (terpisah, tidak diakumulasikan ke Total Keseluruhan)
+        $rows[] = [
+            '',
+            'TOTAL JASA & ONGKIR',
             '-',
             '-',
+            '-',
+            'Jasa: ' . number_format($grandTotalJasaNote, 0, ',', '.'),
+            'Ongkir: ' . number_format($grandTotalOngkirNote, 0, ',', '.'),
         ];
 
         return $rows;
@@ -692,34 +697,33 @@ class BankSalesSheetExport implements FromArray, WithStyles, WithColumnWidths, W
 
             // Number Formats
             if ($this->isRecap) {
-                // Column C..I numeric
+                // Column C..G numeric
                 $sheet->getStyle("A8:A{$highestRow}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
                 $sheet->getStyle("C8:C{$highestRow}")->getNumberFormat()->setFormatCode('#,##0');
                 $sheet->getStyle("D8:D{$highestRow}")->getNumberFormat()->setFormatCode('#,##0');
-                $sheet->getStyle("E8:I{$highestRow}")->getNumberFormat()->setFormatCode('#,##0');
-                $sheet->getStyle("H8:I{$highestRow}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_RIGHT);
+                $sheet->getStyle("E8:G{$highestRow}")->getNumberFormat()->setFormatCode('#,##0');
 
                 for ($row = 8; $row <= $highestRow; $row++) {
                     $label = strtoupper(trim((string) $sheet->getCell("B{$row}")->getValue()));
 
                     if ($label === 'KREDIT' || $label === 'CASH') {
-                        $sheet->getStyle("A{$row}:{$highestColumn}{$row}")->getFont()->setBold(true);
+                        $sheet->getStyle("A{$row}:G{$row}")->getFont()->setBold(true);
                     } elseif ($label === 'TOTAL KAS') {
-                        $sheet->getStyle("A{$row}:{$highestColumn}{$row}")->applyFromArray([
+                        $sheet->getStyle("A{$row}:G{$row}")->applyFromArray([
                             'font' => ['bold' => true],
                             'borders' => [
                                 'top' => ['borderStyle' => Border::BORDER_THIN, 'color' => ['rgb' => '94A3B8']],
                             ],
                         ]);
                     } elseif ($label === 'TOTAL BANK') {
-                        $sheet->getStyle("A{$row}:{$highestColumn}{$row}")->applyFromArray([
+                        $sheet->getStyle("A{$row}:G{$row}")->applyFromArray([
                             'font' => ['bold' => true],
                             'borders' => [
                                 'top' => ['borderStyle' => Border::BORDER_THIN, 'color' => ['rgb' => 'CBD5E1']],
                             ],
                         ]);
                     } elseif ($label === 'TOTAL KESELURUHAN') {
-                        $sheet->getStyle("A{$row}:{$highestColumn}{$row}")->applyFromArray([
+                        $sheet->getStyle("A{$row}:G{$row}")->applyFromArray([
                             'font' => ['bold' => true],
                             'fill' => [
                                 'fillType'   => \PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID,
@@ -730,9 +734,19 @@ class BankSalesSheetExport implements FromArray, WithStyles, WithColumnWidths, W
                                 'bottom' => ['borderStyle' => Border::BORDER_DOUBLE, 'color' => ['rgb' => '64748B']],
                             ],
                         ]);
+                    } elseif ($label === 'TOTAL JASA & ONGKIR') {
+                        $sheet->getStyle("A{$row}:G{$row}")->applyFromArray([
+                            'font' => ['bold' => true, 'italic' => true],
+                            'fill' => [
+                                'fillType'   => \PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID,
+                                'startColor' => ['rgb' => 'F8FAFC'],
+                            ],
+                        ]);
+                        $sheet->getStyle("C{$row}:E{$row}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+                        $sheet->getStyle("F{$row}:G{$row}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_RIGHT);
                     } elseif (str_starts_with($label, 'TOTAL ')) {
                         // Baris total per jenis bank: TOTAL MANDIRI, TOTAL BCA, dst.
-                        $sheet->getStyle("A{$row}:{$highestColumn}{$row}")->applyFromArray([
+                        $sheet->getStyle("A{$row}:G{$row}")->applyFromArray([
                             'font' => ['bold' => true, 'italic' => true],
                         ]);
                     }
@@ -824,10 +838,8 @@ class BankSalesSheetExport implements FromArray, WithStyles, WithColumnWidths, W
                 'C' => 16,
                 'D' => 16,
                 'E' => 20,
-                'F' => 20,
-                'G' => 22,
-                'H' => 18,
-                'I' => 18,
+                'F' => 22,
+                'G' => 24,
             ];
         }
 
