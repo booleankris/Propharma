@@ -45,12 +45,24 @@ class HomeController extends Controller
         }
 
 
-        // Dashboard
+        // Dashboard (mengikuti hari operasional LIPH 07:30 s/d 07:29:59 & rumus Netto Akhir LIPH)
         $pharmacyId = getActivePharmacyId();
-        $startToday = Carbon::today()->startOfDay();
-        $endToday = Carbon::today()->endOfDay();
-        $startMonth = Carbon::now()->startOfMonth();
-        $endMonth = Carbon::now()->endOfMonth();
+        $operationalToday = Carbon::parse(\App\Support\FinanceShift::operationalDate(now()));
+        $startMonth = $operationalToday->copy()->startOfMonth();
+        $endMonth = $operationalToday->copy()->endOfMonth();
+
+        $allowedTypes = array_merge(array_keys(\App\Exports\Report\LiphExport::TYPE_MAP), ['JASA']);
+
+        $baseQuery = MedicineTransactions::query()
+            ->where('pharmacy_id', $pharmacyId)
+            ->whereIn('transaction_type', $allowedTypes)
+            ->where(function ($q) {
+                // Transaksi JASA murni tanpa item obat tidak masuk LIPH
+                $q->whereRaw("UPPER(TRIM(COALESCE(transaction_type, ''))) != 'JASA'")
+                    ->orWhereHas('transactions', fn ($cart) => $cart->where('status', 1));
+            });
+
+        \App\Support\LiphTransactionScope::applySalesStatus($baseQuery);
 
         if (isOnlineRole()) {
             $user = auth()->user();
@@ -58,35 +70,22 @@ class HomeController extends Controller
             if (empty($onlineRoles)) {
                 $onlineRoles = ['Online', 'Online Grab', 'Online Shopee', 'Digital'];
             }
-
-            $baseQuery = MedicineTransactions::where('status', 1)
-                ->where('pharmacy_id', $pharmacyId)
-                ->where(function ($query) use ($onlineRoles, $user) {
-                    $query->where('user_id', $user->id)
-                        ->orWhereHas('user', function ($q) use ($onlineRoles) {
-                            $q->whereHas('roles', function ($rq) use ($onlineRoles) {
-                                $rq->whereIn('name', $onlineRoles);
-                            });
-                        })
-                        ->orWhereHas('transactions.user', function ($q) use ($onlineRoles) {
-                            $q->whereHas('roles', function ($rq) use ($onlineRoles) {
-                                $rq->whereIn('name', $onlineRoles);
-                            });
-                        });
-                });
-        } else {
-            $baseQuery = MedicineTransactions::where('status', 1)
-                ->where('pharmacy_id', $pharmacyId);
+            \App\Support\LiphTransactionScope::applyOnlineScope($baseQuery, $onlineRoles);
         }
 
-        $isReturnSql = "UPPER(TRIM(COALESCE(transaction_type, ''))) IN ('RETUR JUAL', 'RETUR KREDIT', 'RETUR TUNAI', 'RETUR') OR UPPER(TRIM(COALESCE(transaction_code, ''))) = 'RT'";
+        $isReturnSql = "UPPER(TRIM(COALESCE(transaction_type, ''))) IN ('RETUR JUAL', 'RETUR KREDIT', 'RETUR TUNAI', 'RETUR') OR UPPER(TRIM(COALESCE(transaction_code, ''))) LIKE 'RT%'";
 
         $calcNetSales = function ($query) use ($isReturnSql) {
             return (float) (clone $query)->selectRaw("
                 COALESCE(SUM(
                     CASE 
                         WHEN {$isReturnSql} THEN -ABS(COALESCE(subtotal, 0)) 
-                        ELSE COALESCE(subtotal, 0) 
+                        ELSE GREATEST(
+                            0,
+                            COALESCE(subtotal, 0)
+                            - COALESCE(discount, 0)
+                            - COALESCE((SELECT SUM(ts.price) FROM transaction_services ts WHERE ts.medicine_transaction_id = medicine_transactions.id), 0)
+                        )
                     END
                 ), 0) as net_sales
             ")->value('net_sales');
@@ -95,25 +94,20 @@ class HomeController extends Controller
         $total_sales = $calcNetSales($baseQuery);
         $qty_sales   = (clone $baseQuery)
             ->whereNotIn('transaction_type', ['RETUR JUAL', 'RETUR KREDIT', 'RETUR TUNAI', 'RETUR'])
-            ->where('transaction_code', '!=', 'RT')
+            ->whereRaw("UPPER(TRIM(COALESCE(transaction_code, ''))) NOT LIKE 'RT%'")
             ->count('id');
 
-        // Tangkap transaksi selesai baik berdasarkan updated_at (waktu checkout) maupun created_at
-        $todayQuery = (clone $baseQuery)->where(function ($q) use ($startToday, $endToday) {
-            $q->whereBetween('updated_at', [$startToday, $endToday])
-              ->orWhereBetween('created_at', [$startToday, $endToday]);
-        });
+        $todayQuery = clone $baseQuery;
+        \App\Support\LiphTransactionScope::applyPeriod($todayQuery, $operationalToday, $operationalToday);
 
         $today_sales     = $calcNetSales($todayQuery);
         $today_qty_sales = (clone $todayQuery)
             ->whereNotIn('transaction_type', ['RETUR JUAL', 'RETUR KREDIT', 'RETUR TUNAI', 'RETUR'])
-            ->where('transaction_code', '!=', 'RT')
+            ->whereRaw("UPPER(TRIM(COALESCE(transaction_code, ''))) NOT LIKE 'RT%'")
             ->count('id');
 
-        $monthQuery = (clone $baseQuery)->where(function ($q) use ($startMonth, $endMonth) {
-            $q->whereBetween('updated_at', [$startMonth, $endMonth])
-              ->orWhereBetween('created_at', [$startMonth, $endMonth]);
-        });
+        $monthQuery = clone $baseQuery;
+        \App\Support\LiphTransactionScope::applyPeriod($monthQuery, $startMonth, $endMonth);
 
         $month_sales = $calcNetSales($monthQuery);
 
