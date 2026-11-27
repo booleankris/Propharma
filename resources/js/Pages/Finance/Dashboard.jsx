@@ -146,11 +146,11 @@ export default function Dashboard({
     const pembelian = realtime.pembelian || { total: 0, fakturBruto: 0, retur: 0, pbf: 0, cash: 0, konsinyasi: 0, akumulasi: 0 };
     const biaya = realtime.biaya || { total: 0, akumulasi: 0 };
     const pendapatan = realtime.pendapatan || { total: 0, pendapatanLain: 0, diskonOff: 0, akumulasi: 0 };
-    const laba = realtime.laba || { total: 0, labaTanpaStok: 0, selisihPersediaan: 0, marginPersen: 0, akumulasi: 0 };
+    const laba = realtime.laba || { total: 0, labaDenganStok: 0, selisihPersediaan: 0, marginPersen: 0, akumulasi: 0 };
     const hpp = realtime.hpp || { persen: 0, total: 0, persenAkumulasi: 0, totalAkumulasi: 0 };
     const isProfitable = Number(laba.total || 0) >= 0;
     const isAccumulationProfitable = Number(laba.akumulasi || 0) >= 0;
-    const labaTanpaStok = Number(laba.labaTanpaStok || 0);
+    const labaDenganStok = Number(laba.labaDenganStok || 0);
     const selisihPersediaan = Number(laba.selisihPersediaan || 0);
     const netCashflow = Number(stats.netCashflow || 0);
 
@@ -336,9 +336,9 @@ export default function Dashboard({
                         )}
                         rows={[
                             {
-                                label: 'Laba Tanpa Stok',
-                                value: `${labaTanpaStok >= 0 ? '' : '−'}${formatRupiah(Math.abs(labaTanpaStok))}`,
-                                valueClassName: labaTanpaStok >= 0 ? 'text-slate-700' : 'text-rose-600',
+                                label: 'Laba Dengan Stok',
+                                value: `${labaDenganStok >= 0 ? '' : '−'}${formatRupiah(Math.abs(labaDenganStok))}`,
+                                valueClassName: labaDenganStok >= 0 ? 'text-slate-700' : 'text-rose-600',
                             },
                             {
                                 label: 'Selisih Persediaan',
@@ -351,7 +351,7 @@ export default function Dashboard({
                                 valueClassName: isProfitable ? 'text-emerald-700' : 'text-rose-600',
                             },
                         ]}
-                        formula="Selisih Laba Dengan Stok (Neraca)"
+                        formula="Selisih Laba Tanpa Stok (Neraca)"
                     />
 
                     <DashboardCard
