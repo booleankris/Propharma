@@ -14,6 +14,7 @@ const categories = {
     'SALDO AWAL': { label: 'Saldo Awal', color: 'bg-indigo-50 text-indigo-700 border-indigo-200' },
     'PENYESUAIAN SALDO': { label: 'Opname / Penyesuaian', color: 'bg-purple-50 text-purple-700 border-purple-200' },
     'RETUR PENJUALAN': { label: 'Retur Jual (Refund)', color: 'bg-rose-50 text-rose-700 border-rose-200' },
+    ONGKIR: { label: 'Ongkir', color: 'bg-orange-50 text-orange-700 border-orange-200' },
 };
 
 export default function TransactionCategory({ type }) {

@@ -167,7 +167,7 @@ class KasBankExport implements FromArray, WithStyles, WithColumnWidths, WithTitl
                     })
                     ->orWhere(function ($sub) {
                         $sub
-                            ->whereIn('payment_type', ['PENJUALAN TUNAI', 'PENJUALAN NON TUNAI', 'RETUR PENJUALAN'])
+                            ->whereIn('payment_type', ['PENJUALAN TUNAI', 'PENJUALAN NON TUNAI', 'RETUR PENJUALAN', 'ONGKIR'])
                             ->whereIn('pharmacy_id', $this->targetPharmacyIds);
                     })
                     ->orWhere('payment_type', 'SALDO AWAL')
@@ -210,7 +210,7 @@ class KasBankExport implements FromArray, WithStyles, WithColumnWidths, WithTitl
             });
         } elseif ($filterDirection === 'OUT') {
             $query->where(function ($q) use ($filterAccountId) {
-                $q->whereIn('payment_type', ['KREDIT', 'CASH', 'KONSINYASI', 'BIAYA', 'RETUR PENJUALAN']);
+                $q->whereIn('payment_type', ['KREDIT', 'CASH', 'KONSINYASI', 'BIAYA', 'RETUR PENJUALAN', 'ONGKIR']);
                 if ($filterAccountId && $filterAccountId !== 'all') {
                     $q->orWhere(function ($sub) use ($filterAccountId) {
                         $sub
@@ -232,7 +232,6 @@ class KasBankExport implements FromArray, WithStyles, WithColumnWidths, WithTitl
                     ->orWhereHas('transaction', function ($sub) use ($s) {
                         $sub
                             ->where('transaction_code', 'like', "%{$s}%")
-                            ->orWhere('invoice_number', 'like', "%{$s}%")
                             ->orWhereHas('debtors', fn($d) => $d->where('name', 'like', "%{$s}%"))
                             ->orWhereHas('patients', fn($p) => $p->where('name', 'like', "%{$s}%"));
                     })
@@ -240,6 +239,9 @@ class KasBankExport implements FromArray, WithStyles, WithColumnWidths, WithTitl
                         $sub
                             ->where('invoice_number', 'like', "%{$s}%")
                             ->orWhereHas('creditor', fn($c) => $c->where('name', 'like', "%{$s}%"));
+                    })
+                    ->orWhereHas('openingInvoice', function ($sub) use ($s) {
+                        $sub->where('invoice_number', 'like', "%{$s}%");
                     })
                     ->orWhereHas('account', function ($sub) use ($s) {
                         $sub
@@ -384,6 +386,9 @@ class KasBankExport implements FromArray, WithStyles, WithColumnWidths, WithTitl
         } elseif ($p->payment_type === 'RETUR PENJUALAN') {
             $direction = 'OUT';
             $catLabel = 'Retur Jual (Refund Kasir)';
+        } elseif ($p->payment_type === 'ONGKIR') {
+            $direction = 'OUT';
+            $catLabel = 'Ongkir';
         } else {
             $direction = $isMasuk ? 'IN' : 'OUT';
             $catLabel = match ($p->payment_type) {
@@ -473,6 +478,12 @@ class KasBankExport implements FromArray, WithStyles, WithColumnWidths, WithTitl
                 $noDokumen = $doc;
             if (!$deskripsi)
                 $deskripsi = 'Pengembalian dana retur penjualan tunai kasir';
+        } elseif ($p->payment_type === 'ONGKIR') {
+            $pihakTerkait = $p->transaction->debtors->name ?? ($p->transaction->patients->name ?? 'Pelanggan Umum');
+            $doc = $p->transaction->transaction_code ?? $p->reference_number;
+            $noDokumen = $doc ?: ('ONG-' . str_pad($p->id, 5, '0', STR_PAD_LEFT));
+            if (!$deskripsi)
+                $deskripsi = 'Pengeluaran talangan ongkir dari Kas Apotek';
         } elseif ($isSaldoAwal) {
             $pihakTerkait = $p->account->name ?? 'Kas / Bank';
             $noDokumen = 'SA-' . str_pad($p->id, 5, '0', STR_PAD_LEFT);

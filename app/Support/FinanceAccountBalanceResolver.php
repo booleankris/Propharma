@@ -25,6 +25,7 @@ class FinanceAccountBalanceResolver
         'SETOR',
         'TARIK TUNAI',
         'RETUR PENJUALAN',
+        'ONGKIR',
     ];
 
     /**

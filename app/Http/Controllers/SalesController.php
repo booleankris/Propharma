@@ -1474,7 +1474,12 @@ class SalesController extends Controller
             }
 
             // Penerimaan talangan Jasa Dokter & Ongkir ke kas / rekening bank apotek cabang transaksi
+            // serta pengeluaran talangan ongkir dari Kas Apotek (drawer) sebagai mutasi kategori ONGKIR (tidak masuk Biaya).
             if ($hasDoctorShippingFee && $doctorShippingFee > 0) {
+                $shipBankShort = $doctorShippingBankName
+                    ? FinanceAccount::extractShortBankName($doctorShippingBankName)
+                    : null;
+
                 if ($doctorShippingPaymentMethod === 'CASH') {
                     $shippingCashAccount = FinanceAccount::resolveBranchCashAccount($txPharmacyId, true);
 
@@ -1511,7 +1516,28 @@ class SalesController extends Controller
                         $shippingBankAccount->increment('balance', $doctorShippingFee);
                     }
                 }
+
+                $shippingDrawerAccount = FinanceAccount::resolveBranchCashAccount($txPharmacyId, true);
+                if ($shippingDrawerAccount) {
+                    $drawerShipLabel = $shipBankShort
+                        ? "{$doctorShippingPaymentMethod} melalui {$shipBankShort}"
+                        : ($doctorShippingPaymentMethod ?: 'Non-Tunai');
+                    FinancePayment::create([
+                        'pharmacy_id' => $txPharmacyId,
+                        'medicine_transaction_id' => $transaction->id,
+                        'account_id' => $shippingDrawerAccount->id,
+                        'payment_type' => 'ONGKIR',
+                        'payment_date' => Carbon::now()->toDateString(),
+                        'amount' => $doctorShippingFee,
+                        'reference_number' => $transaction->transaction_code,
+                        'notes' => "Pengeluaran talangan ongkir dari Kas Apotek ({$drawerShipLabel})",
+                        'created_by' => Auth::id(),
+                    ]);
+                    $shippingDrawerAccount->decrement('balance', $doctorShippingFee);
+                }
+
                 Cache::forget('finance_stats_summary_branch_' . $txPharmacyId . '_' . $txPharmacyId);
+                Cache::forget('finance_stats_summary_branch_v3_' . $txPharmacyId . '_' . $txPharmacyId);
             }
 
             MedicineCart::where('transaction_id', $validated['transaction_id'])

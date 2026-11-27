@@ -1409,10 +1409,38 @@ class FinanceController extends Controller
         $createdCount = 0;
         $skippedCount = 0;
         $createdGrossTotal = 0.0;
-        $balanceAdditions = [];
+        $balanceDeltas = [];
         $touchedAccountIds = [];
 
-        DB::transaction(function () use ($validated, $pharmacyId, &$createdCount, &$skippedCount, &$createdGrossTotal, &$balanceAdditions, &$touchedAccountIds) {
+        DB::transaction(function () use ($validated, $pharmacyId, &$createdCount, &$skippedCount, &$createdGrossTotal, &$balanceDeltas, &$touchedAccountIds) {
+            $drawerAccounts = [];
+            $openingDates = [];
+
+            $resolveDrawerAndAnchor = function (int $branchId) use (&$drawerAccounts, &$openingDates) {
+                if (!array_key_exists($branchId, $drawerAccounts)) {
+                    $drawer = FinanceAccount::resolveBranchCashAccount($branchId, true)
+                        ?? FinanceAccount::where('pharmacy_id', $branchId)
+                            ->where('category', 'Kas & Bank')
+                            ->where('account_type', 'kas_apotek')
+                            ->lockForUpdate()
+                            ->first();
+                    $drawerAccounts[$branchId] = $drawer;
+                    if ($drawer) {
+                        $opening = FinancePayment::where('payment_type', 'SALDO AWAL')
+                            ->where('account_id', $drawer->id)
+                            ->first();
+                        $opname = !$opening
+                            ? FinanceAccountBalanceResolver::latestOpnameOnOrBefore($drawer->id, now()->toDateString())
+                            : null;
+                        $openingDates[$branchId] = [
+                            'date' => $opening?->payment_date?->format('Y-m-d') ?? $opname?->adjustment_date?->format('Y-m-d'),
+                            'inclusive' => (bool) $opening,
+                        ];
+                    }
+                }
+                return [$drawerAccounts[$branchId], $openingDates[$branchId] ?? ['date' => null, 'inclusive' => true]];
+            };
+
             MedicineTransactions::query()
                 ->where('pharmacy_id', $pharmacyId)
                 ->where('status', 1)
@@ -1430,7 +1458,7 @@ class FinanceController extends Controller
                         });
                 })
                 ->orderBy('id')
-                ->chunkById(500, function ($transactions) use ($pharmacyId, &$createdCount, &$skippedCount, &$createdGrossTotal, &$balanceAdditions, &$touchedAccountIds) {
+                ->chunkById(500, function ($transactions) use ($pharmacyId, $resolveDrawerAndAnchor, &$createdCount, &$skippedCount, &$createdGrossTotal, &$balanceDeltas, &$touchedAccountIds) {
                     foreach ($transactions as $transaction) {
                         $txPharmacyId = (int) ($transaction->pharmacy_id ?: $pharmacyId);
                         $paymentDate = $transaction->created_at?->toDateString() ?? now()->toDateString();
@@ -1472,7 +1500,7 @@ class FinanceController extends Controller
                                             ->where('account_id', $account->id)
                                             ->first();
                                         if (!$opening || $paymentDate >= $opening->payment_date?->format('Y-m-d')) {
-                                            $balanceAdditions[$account->id] = ($balanceAdditions[$account->id] ?? 0) + $amount;
+                                            $balanceDeltas[$account->id] = ($balanceDeltas[$account->id] ?? 0) + $amount;
                                         }
                                         $touchedAccountIds[$account->id] = $account->id;
                                         $createdCount++;
@@ -1481,7 +1509,7 @@ class FinanceController extends Controller
                             }
                         }
 
-                        // 2. Talangan jasa dokter & ongkir non-tunai (jika ada)
+                        // 2. Talangan jasa dokter & ongkir non-tunai (masuk rekening bank & keluar Kas Apotek)
                         $shipFee = round((float) ($transaction->doctor_shipping_fee ?? 0), 2);
                         $shipMethod = strtoupper(trim((string) ($transaction->doctor_shipping_payment_method ?? '')));
                         if ($transaction->has_doctor_shipping_fee && $shipFee > 0 && in_array($shipMethod, ['QRIS', 'DEBIT', 'TRANSFER', 'EDC'], true)) {
@@ -1512,10 +1540,26 @@ class FinanceController extends Controller
                                         ->where('account_id', $shipAccount->id)
                                         ->first();
                                     if (!$opening || $paymentDate >= $opening->payment_date?->format('Y-m-d')) {
-                                        $balanceAdditions[$shipAccount->id] = ($balanceAdditions[$shipAccount->id] ?? 0) + $shipFee;
+                                        $balanceDeltas[$shipAccount->id] = ($balanceDeltas[$shipAccount->id] ?? 0) + $shipFee;
                                     }
                                     $touchedAccountIds[$shipAccount->id] = $shipAccount->id;
                                     $createdCount++;
+                                }
+                            }
+
+                            [$drawerAccount, $anchor] = $resolveDrawerAndAnchor($txPharmacyId);
+                            if ($drawerAccount) {
+                                $drawerRes = $this->recordShippingDrawerOutflowForTransaction(
+                                    $transaction,
+                                    $drawerAccount,
+                                    $anchor['date'],
+                                    $anchor['inclusive']
+                                );
+                                if ($drawerRes['created']) {
+                                    if ($drawerRes['affects_balance']) {
+                                        $balanceDeltas[$drawerAccount->id] = ($balanceDeltas[$drawerAccount->id] ?? 0) - $drawerRes['amount'];
+                                    }
+                                    $touchedAccountIds[$drawerAccount->id] = $drawerAccount->id;
                                 }
                             }
                         }
@@ -1530,12 +1574,15 @@ class FinanceController extends Controller
                 $opening = FinancePayment::where('payment_type', 'SALDO AWAL')
                     ->where('account_id', $account->id)
                     ->first();
+                $delta = (float) ($balanceDeltas[$account->id] ?? 0);
                 if ($opening) {
                     $account->update([
                         'balance' => $this->calculateBalanceFromOpening($account->id, $opening, now()->toDateString()),
                     ]);
-                } elseif (($balanceAdditions[$account->id] ?? 0) > 0) {
-                    $account->increment('balance', $balanceAdditions[$account->id]);
+                } elseif ($delta > 0) {
+                    $account->increment('balance', $delta);
+                } elseif ($delta < 0) {
+                    $account->decrement('balance', abs($delta));
                 }
             }
 
@@ -1549,6 +1596,148 @@ class FinanceController extends Controller
             $message .= " {$skippedCount} transaksi dilewati karena belum memiliki nama bank tujuan.";
         }
         return back()->with('success', $message);
+    }
+
+    /**
+     * Catat ulang pengeluaran talangan ongkir dari Kas Apotek (drawer) dengan kategori mutasi ONGKIR.
+     */
+    public function backfillOngkirTalangan(Request $request)
+    {
+        $validated = $request->validate([
+            'from_date' => 'required|date|before_or_equal:to_date',
+            'to_date' => 'required|date|before_or_equal:today',
+        ], [
+            'from_date.before_or_equal' => 'Tanggal mulai harus sebelum atau sama dengan tanggal akhir.',
+            'to_date.before_or_equal' => 'Tanggal akhir tidak boleh melewati hari ini.',
+        ]);
+
+        $pharmacyId = (int) getActivePharmacyId();
+        FinanceAccount::ensureBranchDefaultAccounts($pharmacyId);
+
+        $createdCount = 0;
+        $createdGrossTotal = 0.0;
+        $balanceDeduction = 0.0;
+
+        DB::transaction(function () use ($validated, $pharmacyId, &$createdCount, &$createdGrossTotal, &$balanceDeduction) {
+            $drawerAccount = FinanceAccount::resolveBranchCashAccount($pharmacyId, true)
+                ?? $this->branchKasBankAccountsQuery()->where('account_type', 'kas_apotek')->lockForUpdate()->firstOrFail();
+
+            $opening = FinancePayment::where('payment_type', 'SALDO AWAL')
+                ->where('account_id', $drawerAccount->id)
+                ->first();
+            $opname = !$opening
+                ? FinanceAccountBalanceResolver::latestOpnameOnOrBefore($drawerAccount->id, now()->toDateString())
+                : null;
+            $anchorDate = $opening?->payment_date?->format('Y-m-d') ?? $opname?->adjustment_date?->format('Y-m-d');
+            $anchorInclusive = (bool) $opening;
+
+            MedicineTransactions::query()
+                ->where('pharmacy_id', $pharmacyId)
+                ->where('status', 1)
+                ->whereRaw("UPPER(COALESCE(transaction_type, '')) NOT IN ('KREDIT', 'RESEP KREDIT')")
+                ->whereRaw("UPPER(COALESCE(transaction_type, '')) NOT LIKE 'RETUR%'")
+                ->where('has_doctor_shipping_fee', 1)
+                ->where('doctor_shipping_fee', '>', 0)
+                ->whereBetween(DB::raw('DATE(created_at)'), [$validated['from_date'], $validated['to_date']])
+                ->whereDoesntHave('payments', fn($query) => $query->where('payment_type', 'ONGKIR'))
+                ->orderBy('id')
+                ->chunkById(500, function ($transactions) use ($drawerAccount, $anchorDate, $anchorInclusive, &$createdCount, &$createdGrossTotal, &$balanceDeduction) {
+                    foreach ($transactions as $transaction) {
+                        $result = $this->recordShippingDrawerOutflowForTransaction(
+                            $transaction,
+                            $drawerAccount,
+                            $anchorDate,
+                            $anchorInclusive
+                        );
+                        if ($result['created']) {
+                            $createdCount++;
+                            $createdGrossTotal += $result['amount'];
+                            if ($result['affects_balance']) {
+                                $balanceDeduction += $result['amount'];
+                            }
+                        }
+                    }
+                });
+
+            if ($createdCount > 0) {
+                if ($opening) {
+                    $drawerAccount->update([
+                        'balance' => $this->calculateBalanceFromOpening($drawerAccount->id, $opening, now()->toDateString()),
+                    ]);
+                } elseif ($balanceDeduction > 0) {
+                    $drawerAccount->decrement('balance', $balanceDeduction);
+                }
+            }
+
+            $this->clearStatsCache();
+        });
+
+        return back()->with('success', $createdCount
+            ? "Berhasil menyinkronkan {$createdCount} mutasi Ongkir talangan dari Kas Apotek senilai Rp " . number_format($createdGrossTotal, 0, ',', '.') . '.'
+            : 'Tidak ada transaksi ongkir talangan yang perlu disinkronkan pada rentang tanggal tersebut.');
+    }
+
+    /**
+     * Helper bersama untuk mencatat mutasi keluar kategori ONGKIR pada Kas Apotek (drawer) secara idempoten.
+     *
+     * @return array{created: bool, affects_balance: bool, amount: float}
+     */
+    protected function recordShippingDrawerOutflowForTransaction(
+        MedicineTransactions $transaction,
+        FinanceAccount $drawerAccount,
+        ?string $anchorDate,
+        bool $anchorInclusive
+    ): array {
+        $shipFee = round((float) ($transaction->doctor_shipping_fee ?? 0), 2);
+        if (!$transaction->has_doctor_shipping_fee || $shipFee <= 0) {
+            return ['created' => false, 'affects_balance' => false, 'amount' => 0.0];
+        }
+
+        $alreadyRecorded = FinancePayment::where('medicine_transaction_id', $transaction->id)
+            ->where('payment_type', 'ONGKIR')
+            ->exists();
+        if ($alreadyRecorded) {
+            return ['created' => false, 'affects_balance' => false, 'amount' => 0.0];
+        }
+
+        $txPharmacyId = (int) ($transaction->pharmacy_id ?: ($drawerAccount->pharmacy_id ?: getActivePharmacyId()));
+        $paymentDate = $transaction->created_at?->toDateString() ?? now()->toDateString();
+        $shipMethod = strtoupper(trim((string) ($transaction->doctor_shipping_payment_method ?? '')));
+        $shipBankName = trim((string) ($transaction->doctor_shipping_bank_name ?: ($transaction->transfer_bank_name ?? '')));
+        $shipBankShort = $shipBankName !== '' ? FinanceAccount::extractShortBankName($shipBankName) : '';
+
+        if ($shipMethod !== '' && $shipBankShort !== '') {
+            $methodLabel = "{$shipMethod} melalui {$shipBankShort}";
+        } elseif ($shipMethod !== '') {
+            $methodLabel = $shipMethod;
+        } else {
+            $methodLabel = 'Non-Tunai';
+        }
+
+        FinancePayment::create([
+            'pharmacy_id' => $txPharmacyId,
+            'medicine_transaction_id' => $transaction->id,
+            'account_id' => $drawerAccount->id,
+            'payment_type' => 'ONGKIR',
+            'payment_date' => $paymentDate,
+            'amount' => $shipFee,
+            'reference_number' => $transaction->transaction_code,
+            'notes' => "Pengeluaran talangan ongkir dari Kas Apotek ({$methodLabel})",
+            'created_by' => Auth::id(),
+        ]);
+
+        $affectsBalance = true;
+        if ($anchorDate) {
+            $affectsBalance = $anchorInclusive
+                ? ($paymentDate >= $anchorDate)
+                : ($paymentDate > $anchorDate);
+        }
+
+        return [
+            'created' => true,
+            'affects_balance' => $affectsBalance,
+            'amount' => $shipFee,
+        ];
     }
 
     public function storePendapatanLainLain(Request $request)
@@ -2778,6 +2967,9 @@ class FinanceController extends Controller
         } elseif ($p->payment_type === 'RETUR PENJUALAN') {
             $direction = 'OUT';
             $tipeLabel = 'Retur Jual (Refund)';
+        } elseif ($p->payment_type === 'ONGKIR') {
+            $direction = 'OUT';
+            $tipeLabel = 'Ongkir';
         } else {
             $direction = $isMasuk ? 'IN' : 'OUT';
             $tipeLabel = $isMasuk ? 'Masuk (Debit)' : 'Keluar (Kredit)';
@@ -2857,6 +3049,12 @@ class FinanceController extends Controller
                 $noDokumen = $doc;
             if (!$deskripsi)
                 $deskripsi = 'Pengembalian dana retur penjualan tunai kasir';
+        } elseif ($p->payment_type === 'ONGKIR') {
+            $pihakTerkait = $p->transaction->debtors->name ?? ($p->transaction->patients->name ?? 'Pelanggan Umum');
+            $doc = $p->transaction->transaction_code ?? $p->reference_number;
+            $noDokumen = $doc ?: ('ONG-' . str_pad($p->id, 5, '0', STR_PAD_LEFT));
+            if (!$deskripsi)
+                $deskripsi = 'Pengeluaran talangan ongkir dari Kas Apotek';
         } elseif ($isSaldoAwal) {
             $pihakTerkait = $p->account->name ?? 'Kas / Bank';
             $noDokumen = 'SA-' . str_pad($p->id, 5, '0', STR_PAD_LEFT);
@@ -2946,7 +3144,7 @@ class FinanceController extends Controller
                 })
                 ->orWhere(function ($sub) use ($targetPharmacyIds) {
                     $sub
-                        ->whereIn('payment_type', ['PENJUALAN TUNAI', 'PENJUALAN NON TUNAI', 'RETUR PENJUALAN'])
+                        ->whereIn('payment_type', ['PENJUALAN TUNAI', 'PENJUALAN NON TUNAI', 'RETUR PENJUALAN', 'ONGKIR'])
                         ->whereIn('pharmacy_id', $targetPharmacyIds);
                 })
                 ->orWhere('payment_type', 'SALDO AWAL')
@@ -3007,11 +3205,11 @@ class FinanceController extends Controller
             }
         }
 
-        // 2. Outflows: KREDIT, CASH, KONSINYASI, BIAYA, RETUR PENJUALAN
+        // 2. Outflows: KREDIT, CASH, KONSINYASI, BIAYA, RETUR PENJUALAN, ONGKIR
         $regularOutflowsQuery = FinancePayment::query()
             ->select('account_id', DB::raw('SUM(amount) as total_amount'), DB::raw('COUNT(*) as total_count'))
             ->whereIn('account_id', $accountIds)
-            ->whereIn('payment_type', ['KREDIT', 'CASH', 'KONSINYASI', 'BIAYA', 'RETUR PENJUALAN'])
+            ->whereIn('payment_type', ['KREDIT', 'CASH', 'KONSINYASI', 'BIAYA', 'RETUR PENJUALAN', 'ONGKIR'])
             ->whereBetween('payment_date', [$monthStart, $monthEnd]);
         $this->applyMutasiBranchScope($regularOutflowsQuery, $targetPharmacyIds);
         $regularOutflows = $regularOutflowsQuery->groupBy('account_id')->get();
@@ -3176,7 +3374,7 @@ class FinanceController extends Controller
             });
         } elseif ($filterDirection === 'OUT') {
             $query->where(function ($q) use ($filterAccountId) {
-                $q->whereIn('payment_type', ['KREDIT', 'CASH', 'KONSINYASI', 'BIAYA', 'RETUR PENJUALAN']);
+                $q->whereIn('payment_type', ['KREDIT', 'CASH', 'KONSINYASI', 'BIAYA', 'RETUR PENJUALAN', 'ONGKIR']);
                 if ($filterAccountId) {
                     $q->orWhere(function ($sub) use ($filterAccountId) {
                         $sub
@@ -3197,7 +3395,6 @@ class FinanceController extends Controller
                     ->orWhereHas('transaction', function ($sub) use ($search) {
                         $sub
                             ->where('transaction_code', 'like', "%{$search}%")
-                            ->orWhere('invoice_number', 'like', "%{$search}%")
                             ->orWhereHas('debtors', fn($d) => $d->where('name', 'like', "%{$search}%"))
                             ->orWhereHas('patients', fn($p) => $p->where('name', 'like', "%{$search}%"));
                     })
@@ -3205,6 +3402,9 @@ class FinanceController extends Controller
                         $sub
                             ->where('invoice_number', 'like', "%{$search}%")
                             ->orWhereHas('creditor', fn($c) => $c->where('name', 'like', "%{$search}%"));
+                    })
+                    ->orWhereHas('openingInvoice', function ($sub) use ($search) {
+                        $sub->where('invoice_number', 'like', "%{$search}%");
                     })
                     ->orWhereHas('account', function ($sub) use ($search) {
                         $sub
@@ -3905,7 +4105,11 @@ class FinanceController extends Controller
             ->whereIn('pharmacy_id', $targetPharmacyIds)
             ->sum('amount');
 
-        $kasKeluar = $kasKeluarHutangCash + $kasKeluarBiaya + $kasKeluarReturJual;
+        $kasKeluarOngkir = (float) FinancePayment::where('payment_type', 'ONGKIR')
+            ->whereIn('pharmacy_id', $targetPharmacyIds)
+            ->sum('amount');
+
+        $kasKeluar = $kasKeluarHutangCash + $kasKeluarBiaya + $kasKeluarReturJual + $kasKeluarOngkir;
 
         $netCashflow = $kasMasuk - $kasKeluar;
 

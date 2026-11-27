@@ -309,6 +309,9 @@ export default function KasBank({
     const [isBackfillNonCashModalOpen, setIsBackfillNonCashModalOpen] = useState(false);
     const [isBackfillingNonCash, setIsBackfillingNonCash] = useState(false);
     const [backfillNonCashForm, setBackfillNonCashForm] = useState({ from_date: '', to_date: localToday() });
+    const [isBackfillOngkirModalOpen, setIsBackfillOngkirModalOpen] = useState(false);
+    const [isBackfillingOngkir, setIsBackfillingOngkir] = useState(false);
+    const [backfillOngkirForm, setBackfillOngkirForm] = useState({ from_date: '', to_date: localToday() });
     const selectedOpening = openingBalances[openingForm.account_id];
 
     const submitDeposit = (event) => {
@@ -510,6 +513,21 @@ export default function KasBank({
             onSuccess: () => setIsBackfillNonCashModalOpen(false),
             onFinish: () => setIsBackfillingNonCash(false),
             onError: (errors) => alert(Object.values(errors)[0] || 'Gagal mencatat transaksi non-tunai lama.'),
+        });
+    };
+
+    const submitBackfillOngkir = (event) => {
+        event.preventDefault();
+        if (!backfillOngkirForm.from_date || !backfillOngkirForm.to_date) return alert('Pilih rentang tanggal transaksi ongkir yang akan disinkronkan.');
+        const confirmed = window.confirm(`Catat pengeluaran talangan ongkir ke Kas Apotek (Drawer) untuk ${backfillOngkirForm.from_date} sampai ${backfillOngkirForm.to_date}? Transaksi yang sudah memiliki mutasi Ongkir akan dilewati.`);
+        if (!confirmed) return;
+
+        setIsBackfillingOngkir(true);
+        router.post('/finance/kas-bank/backfill-ongkir', backfillOngkirForm, {
+            preserveScroll: true,
+            onSuccess: () => setIsBackfillOngkirModalOpen(false),
+            onFinish: () => setIsBackfillingOngkir(false),
+            onError: (errors) => alert(Object.values(errors)[0] || 'Gagal menyinkronkan ongkir talangan.'),
         });
     };
 
@@ -1152,6 +1170,24 @@ export default function KasBank({
                                         <div>
                                             <div className="text-xs font-semibold text-slate-800">Catat Non-Tunai Lama</div>
                                             <div className="text-[10px] text-slate-500">Sinkron QRIS, Debit &amp; Transfer lama</div>
+                                        </div>
+                                    </button>
+                                    <button
+                                        type="button"
+                                        role="menuitem"
+                                        onClick={() => {
+                                            setOpenToolbarMenu(null);
+                                            setBackfillOngkirForm({ from_date: '', to_date: localToday() });
+                                            setIsBackfillOngkirModalOpen(true);
+                                        }}
+                                        className="flex w-full items-start gap-2.5 rounded-lg px-3 py-2 text-left hover:bg-orange-50/70 transition"
+                                    >
+                                        <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-orange-100 text-orange-700">
+                                            <History className="w-4 h-4" />
+                                        </span>
+                                        <div>
+                                            <div className="text-xs font-semibold text-slate-800">Sinkron Ongkir Talangan</div>
+                                            <div className="text-[10px] text-slate-500">Potong Kas Apotek (mutasi Ongkir)</div>
                                         </div>
                                     </button>
                                     <div className="my-1 border-t border-slate-100" />
@@ -1840,6 +1876,31 @@ export default function KasBank({
                         <div className="flex justify-end gap-2 border-t border-slate-100 px-5 py-4">
                             <button type="button" onClick={() => setIsBackfillNonCashModalOpen(false)} className="rounded-xl border border-slate-200 px-4 py-2 text-xs font-semibold text-slate-600">Batal</button>
                             <button type="submit" disabled={isBackfillingNonCash || !backfillNonCashForm.from_date || !kasBankAccounts.some((account) => account.account_type === 'bank')} className="inline-flex items-center gap-2 rounded-xl bg-violet-600 px-4 py-2 text-xs font-bold text-white hover:bg-violet-700 disabled:opacity-50"><History size={15} />{isBackfillingNonCash ? 'Memproses…' : 'Catat yang Belum Masuk'}</button>
+                        </div>
+                    </form>
+                </div>
+            )}
+
+            {isBackfillOngkirModalOpen && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-xs p-4">
+                    <form onSubmit={submitBackfillOngkir} className="w-full max-w-lg overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl">
+                        <div className="flex items-center justify-between border-b border-slate-100 px-6 py-4">
+                            <div>
+                                <h3 className="text-base font-bold text-slate-900">Sinkronkan Pengeluaran Ongkir Talangan</h3>
+                                <p className="mt-0.5 text-[11px] text-slate-500">Mencatat mutasi keluar kategori Ongkir dari Kas Apotek (Drawer).</p>
+                            </div>
+                            <button type="button" onClick={() => setIsBackfillOngkirModalOpen(false)} className="rounded-lg p-1 text-slate-400 hover:bg-slate-100" aria-label="Tutup modal"><X className="h-5 w-5" /></button>
+                        </div>
+                        <div className="grid gap-3 p-5">
+                            <label className="text-xs font-semibold text-slate-600">Dari tanggal<input required type="date" max={backfillOngkirForm.to_date || localToday()} value={backfillOngkirForm.from_date} onChange={(event) => setBackfillOngkirForm({ ...backfillOngkirForm, from_date: event.target.value })} className="mt-1.5 w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm font-normal" /></label>
+                            <label className="text-xs font-semibold text-slate-600">Sampai tanggal<input required type="date" min={backfillOngkirForm.from_date || undefined} max={localToday()} value={backfillOngkirForm.to_date} onChange={(event) => setBackfillOngkirForm({ ...backfillOngkirForm, to_date: event.target.value })} className="mt-1.5 w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm font-normal" /></label>
+                            <div className="rounded-xl border border-orange-200 bg-orange-50 px-3.5 py-3 text-[11px] leading-relaxed text-orange-800">
+                                Hanya transaksi selesai dengan ongkir talangan yang belum memiliki mutasi keluar kategori <strong>Ongkir</strong> yang diproses. Mutasi ini mengurangi saldo <strong>Kas Apotek (Drawer)</strong> tanpa masuk ke Biaya Operasional. Transaksi sebelum tanggal Saldo Awal tetap dicatat sebagai riwayat mutasi tanpa mengubah saldo aktual.
+                            </div>
+                        </div>
+                        <div className="flex justify-end gap-2 border-t border-slate-100 px-5 py-4">
+                            <button type="button" onClick={() => setIsBackfillOngkirModalOpen(false)} className="rounded-xl border border-slate-200 px-4 py-2 text-xs font-semibold text-slate-600">Batal</button>
+                            <button type="submit" disabled={isBackfillingOngkir || !backfillOngkirForm.from_date || !kasBankAccounts.some((account) => account.account_type === 'kas_apotek' || account.code === '1-10001')} className="inline-flex items-center gap-2 rounded-xl bg-orange-600 px-4 py-2 text-xs font-bold text-white hover:bg-orange-700 disabled:opacity-50"><History size={15} />{isBackfillingOngkir ? 'Memproses…' : 'Sinkronkan Ongkir'}</button>
                         </div>
                     </form>
                 </div>

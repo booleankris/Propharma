@@ -679,6 +679,7 @@ Route::middleware(['auth', 'role:General Manager|Kasir|Gudang PMI|HO|administrat
         Route::post('/kas-bank/adjust-balance', [\App\Http\Controllers\FinanceController::class, 'adjustBalance'])->name('kasBank.adjustBalance');
         Route::post('/kas-bank/backfill-penjualan-tunai', [\App\Http\Controllers\FinanceController::class, 'backfillPenjualanTunai'])->name('kasBank.backfillPenjualanTunai');
         Route::post('/kas-bank/backfill-penjualan-non-tunai', [\App\Http\Controllers\FinanceController::class, 'backfillPenjualanNonTunai'])->name('kasBank.backfillPenjualanNonTunai');
+        Route::post('/kas-bank/backfill-ongkir', [\App\Http\Controllers\FinanceController::class, 'backfillOngkirTalangan'])->name('kasBank.backfillOngkir');
         Route::post('/pendapatan-lain-lain', [\App\Http\Controllers\FinanceController::class, 'storePendapatanLainLain'])->name('pendapatanLainLain.store');
         Route::put('/pendapatan-lain-lain/{id}', [\App\Http\Controllers\FinanceController::class, 'updatePendapatanLainLain'])->name('pendapatanLainLain.update');
         Route::delete('/pendapatan-lain-lain/{id}', [\App\Http\Controllers\FinanceController::class, 'destroyPendapatanLainLain'])->name('pendapatanLainLain.destroy');

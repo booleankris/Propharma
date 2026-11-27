@@ -4,10 +4,14 @@ import { CircleHelp } from 'lucide-react';
 function formatNeracaNumber(val, showZero = false) {
     if (val === '-' || val === null || val === undefined) return showZero ? '0' : '-';
     const num = Number(val || 0);
-    if (Math.abs(num) < 0.01) return showZero ? '0' : '-';
+    if (Math.abs(num) < 0.005) return showZero ? '0' : '-';
     const isNegative = num < 0;
-    const absVal = Math.round(Math.abs(num));
-    const formatted = new Intl.NumberFormat('id-ID').format(absVal);
+    const absVal = Math.abs(num);
+    const hasDecimals = Math.abs(absVal - Math.trunc(absVal)) >= 0.005;
+    const formatted = new Intl.NumberFormat('id-ID', {
+        minimumFractionDigits: hasDecimals ? 2 : 0,
+        maximumFractionDigits: 2,
+    }).format(absVal);
     return isNegative ? `(${formatted})` : formatted;
 }
 

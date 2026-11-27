@@ -221,12 +221,23 @@ class NeracaExport implements FromArray, WithStyles, WithColumnWidths, WithTitle
             $sheet->getStyle("A{$bRow}:E{$bRow}")->getFont()->setBold(true);
         }
 
-        // 7. Number format: #,##0;(#,##0);"-" (baris Laba menampilkan 0, bukan "-")
-        $numFormat = '#,##0;(#,##0);"-"';
-        $labaNumFormat = '#,##0;(#,##0);0';
+        // 7. Number format: tampilkan desimal apa adanya jika ada pecahan (tanpa dibulatkan ke integer)
+        $numFormatInt = '#,##0;(#,##0);"-"';
+        $numFormatDec = '#,##0.00;(#,##0.00);"-"';
+        $labaNumFormatInt = '#,##0;(#,##0);0';
+        $labaNumFormatDec = '#,##0.00;(#,##0.00);0';
         for ($r = $dataStartRow; $r <= $this->lastRow; $r++) {
-            $fmt = in_array($r, $this->yellowRows, true) ? $labaNumFormat : $numFormat;
-            $sheet->getStyle("C{$r}:E{$r}")->getNumberFormat()->setFormatCode($fmt);
+            $isYellow = in_array($r, $this->yellowRows, true);
+            foreach (['C', 'D', 'E'] as $col) {
+                $val = $sheet->getCell("{$col}{$r}")->getValue();
+                $hasDecimals = is_numeric($val) && abs((float) $val - round((float) $val)) >= 0.005;
+                if ($isYellow) {
+                    $fmt = $hasDecimals ? $labaNumFormatDec : $labaNumFormatInt;
+                } else {
+                    $fmt = $hasDecimals ? $numFormatDec : $numFormatInt;
+                }
+                $sheet->getStyle("{$col}{$r}")->getNumberFormat()->setFormatCode($fmt);
+            }
         }
 
         return [];
