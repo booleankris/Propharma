@@ -3744,7 +3744,7 @@ class FinanceController extends Controller
      * 2. Pembelian: 100% sesuai Laporan Pembelian Faktur (InvoiceSingleSheetExport::queryDailyInvoices) dikurangi Retur Pembelian
      * 3. Biaya: Data dari Finance > Biaya (payment_type = BIAYA)
      * 4. Pendapatan: Data dari Finance > Pendapatan Lain-lain (payment_type IN [PENDAPATAN, DISKON])
-     * 5. Laba: Penjualan - Pembelian - Biaya + Pendapatan
+     * 5. Laba: Disamakan dengan Selisih Laba Dengan Stok pada Neraca (NeracaReportService)
      * 6. HPP %: (Pembelian Netto / Penjualan) * 100
      */
     protected function buildRealtimeSummaryMetrics(
@@ -3808,8 +3808,13 @@ class FinanceController extends Controller
         // Pendapatan = Pendapatan Lain-lain + Diskon Off
         $pendapatanTotal = $pendapatanLainTotal + $diskonOffTotal;
 
-        // Laba = Penjualan - Pembelian - Biaya + Pendapatan
-        $labaTotal = $penjualanTotal - $pembelianNetto - $biayaTotal + $pendapatanTotal;
+        // Laba disamakan dengan rumus Neraca (Selisih Laba Dengan Stok = Selisih Laba Tanpa Stok + Selisih Persediaan)
+        $activePharmacyId = (int) getActivePharmacyId();
+        $neracaService = new NeracaReportService();
+        $neracaPeriod = $neracaService->build($pharmacyIds, $startDate, $endDate, $activePharmacyId);
+        $labaTanpaStok = (float) ($neracaPeriod['laba_tanpa_stok']['selisih'] ?? 0);
+        $selisihPersediaan = (float) ($neracaPeriod['persediaan']['selisih'] ?? 0);
+        $labaTotal = (float) ($neracaPeriod['laba_dengan_stok']['selisih'] ?? 0);
 
         $marginPersen = $penjualanTotal > 0
             ? round(($labaTotal / $penjualanTotal) * 100, 1)
@@ -3847,7 +3852,13 @@ class FinanceController extends Controller
             }
         }
 
-        $labaAkumulasi = $penjualanAkumulasi - $pembelianAkumulasi - $biayaAkumulasi + $pendapatanAkumulasi;
+        $ytdStartDate = sprintf('%04d-01-01', $selectedYear);
+        if ($startDate === $ytdStartDate) {
+            $labaAkumulasi = $labaTotal;
+        } else {
+            $neracaYtd = $neracaService->build($pharmacyIds, $ytdStartDate, $endDate, $activePharmacyId);
+            $labaAkumulasi = (float) ($neracaYtd['laba_dengan_stok']['selisih'] ?? 0);
+        }
         $hppPersenAkumulasi = $penjualanAkumulasi > 0
             ? round(($pembelianAkumulasi / $penjualanAkumulasi) * 100, 1)
             : 0.0;
@@ -3884,6 +3895,8 @@ class FinanceController extends Controller
             ],
             'laba' => [
                 'total' => round($labaTotal, 2),
+                'labaTanpaStok' => round($labaTanpaStok, 2),
+                'selisihPersediaan' => round($selisihPersediaan, 2),
                 'marginPersen' => $marginPersen,
                 'akumulasi' => round($labaAkumulasi, 2),
             ],
