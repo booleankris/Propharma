@@ -806,8 +806,39 @@
         let d_price = {{ $d_price }};
         let d_ppn = {{ $d_ppn }};
         let d_total = {{ $d_total }};
+        let draftFakturSummaries = @json($draftFakturSummaries ?? []);
         let total_received = '';
         let isAddingItem = false;
+
+        function syncActiveDraftFakturSummary() {
+            const credEl = document.getElementById('creditor');
+            const invEl = document.getElementById('invoice_number');
+            const cred = (credEl ? credEl.value : '').toString().trim().toUpperCase();
+            const inv = (invEl ? invEl.value : '').toString().trim();
+            let summary = { price_item: 0, price_ppn: 0, price_total: 0 };
+
+            if (cred && inv) {
+                const key = `${cred}||${inv}`;
+                if (draftFakturSummaries && draftFakturSummaries[key]) {
+                    summary = draftFakturSummaries[key];
+                }
+            } else if (cred) {
+                const prefix = `${cred}||`;
+                const matchingKey = Object.keys(draftFakturSummaries || {}).find(k => k.startsWith(prefix));
+                if (matchingKey) {
+                    summary = draftFakturSummaries[matchingKey];
+                }
+            } else {
+                const allKeys = Object.keys(draftFakturSummaries || {});
+                if (allKeys.length > 0) {
+                    summary = draftFakturSummaries[allKeys[0]];
+                }
+            }
+
+            $('#d_price').val(formatRupiah(summary.price_item || 0));
+            $('#d_ppn').val(formatRupiah(summary.price_ppn || 0));
+            $('#d_total').val(formatRupiah(summary.price_total || 0));
+        }
 
         function updateBoxPriceInfo() {
             const boxInfo = document.getElementById('box_price_info');
@@ -1100,6 +1131,7 @@
             if (lastVisibleOptionVal !== '') {
                 $printFaktur.val(lastVisibleOptionVal).trigger('change');
             }
+            syncActiveDraftFakturSummary();
         });
 
         $('#print_faktur').on('change', function () {
@@ -1108,6 +1140,7 @@
             if (invNum) {
                 $('#invoice_number').val(invNum);
             }
+            syncActiveDraftFakturSummary();
         });
 
         function printReceivingFaktur(receivingDetailsId, creditorCode) {
@@ -1449,6 +1482,7 @@
                             ?.trim() || response.data.creditor?.ppn_type?.trim() || 'TANPA';
                         syncPaymentTerms();
                         calculateVisualTotal();
+                        syncActiveDraftFakturSummary();
                     })
                     .catch(console.error);
             }
@@ -1595,10 +1629,15 @@
                         message: res.data.message ?? 'Item berhasil dihapus',
                         position: 'topRight'
                     });
+                    if (res.data.draft_summaries) {
+                        draftFakturSummaries = res.data.draft_summaries;
+                    }
                     if (res.data.summary) {
                         $('#d_price').val(formatRupiah(res.data.summary.price_item));
                         $('#d_ppn').val(formatRupiah(res.data.summary.price_ppn));
                         $('#d_total').val(formatRupiah(res.data.summary.price_total));
+                    } else {
+                        syncActiveDraftFakturSummary();
                     }
                     orderItemsTable.ajax.reload(null, false);
                     selectedRowData = null;
@@ -1924,6 +1963,9 @@
                             });
                         }
 
+                        if (res.data.draft_summaries) {
+                            draftFakturSummaries = res.data.draft_summaries;
+                        }
                         let item = res.data.summary;
                         $('#d_price').val(formatRupiah(item.price_item));
                         $('#d_ppn').val(formatRupiah(item.price_ppn));
@@ -2004,6 +2046,10 @@
 
                         orderItemsTable.ajax.reload(null, false);
                         resetInputs();
+                        draftFakturSummaries = {};
+                        $('#d_price').val(formatRupiah(0));
+                        $('#d_ppn').val(formatRupiah(0));
+                        $('#d_total').val(formatRupiah(0));
                         selectedRowData = null;
                         selectedRowIndex = null;
                     }
@@ -2269,6 +2315,8 @@
                 addItem();
             }
         });
+        invoice_number.addEventListener('input', syncActiveDraftFakturSummary);
+        invoice_number.addEventListener('change', syncActiveDraftFakturSummary);
         invoice_number.addEventListener('keydown', function (e) {
             if (e.key == 'Enter') {
                 invoice_date.focus();

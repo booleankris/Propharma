@@ -65,8 +65,9 @@ class ReceivingController extends Controller
             $hasSavedBatches = \App\Models\ReceivingItems::whereHas('receiving_details', fn($q) => $q->where('receiving_id', $transaction->id))
                 ->whereNotNull('batches_id')
                 ->exists();
+            $draftFakturSummaries = [];
 
-            return view('orders.receiving', compact('order_code', 'transaction', 'now', 'order_exist', 'receiving_id', 'receiving_code', 'order_id', 'd_price', 'd_ppn', 'd_total', 'datenow', 'creditorOption', 'allFakturs', 'hasSavedBatches'));
+            return view('orders.receiving', compact('order_code', 'transaction', 'now', 'order_exist', 'receiving_id', 'receiving_code', 'order_id', 'd_price', 'd_ppn', 'd_total', 'datenow', 'creditorOption', 'allFakturs', 'hasSavedBatches', 'draftFakturSummaries'));
         } else {
             $receiving_code = $this->generateReceivingCode();
 
@@ -2334,14 +2335,19 @@ class ReceivingController extends Controller
 
             DB::commit();
 
-            $summary = $orderId
-                ? self::summarizeReceivingDetailsByPrintRule($this->getOrderInputtedReceivingDetails((int) $orderId))
-                : ['price_item' => 0, 'price_ppn' => 0, 'price_total' => 0];
+            $activeDraftDetails = $orderId
+                ? $this->getActiveDraftFakturReceivingDetails((int) $orderId, $detailId ? (int) $detailId : null)
+                : collect();
+            $summary = self::summarizeReceivingDetailsByPrintRule($activeDraftDetails);
+            $draftFakturSummaries = $orderId
+                ? $this->buildDraftFakturSummariesForOrder((int) $orderId)
+                : [];
 
             return response()->json([
                 'success' => true,
                 'message' => 'Item berhasil dihapus',
                 'summary' => $summary,
+                'draft_summaries' => $draftFakturSummaries,
             ]);
         } catch (\Throwable $e) {
             DB::rollBack();
@@ -3427,18 +3433,19 @@ class ReceivingController extends Controller
         $order_id = $getOrder->id;
         $order_code = $getOrder->code;
 
-        $receivingDetails = $allFakturs;
-
-        $summary = self::summarizeReceivingDetailsByPrintRule($receivingDetails);
+        // Ringkasan bawah hanya menampilkan total per faktur yang sedang di-input (sebelum Simpan Draft)
+        $activeDraftDetails = $this->getActiveDraftFakturReceivingDetails((int) $id);
+        $summary = self::summarizeReceivingDetailsByPrintRule($activeDraftDetails);
         $d_price = $summary['price_item'];
         $d_ppn = $summary['price_ppn'];
         $d_total = $summary['price_total'];
+        $draftFakturSummaries = $this->buildDraftFakturSummariesForOrder((int) $id);
 
         $hasSavedBatches = \App\Models\ReceivingItems::whereHas('order_items', fn($q) => $q->where('order_id', $id))
             ->whereNotNull('batches_id')
             ->exists();
 
-        return view('orders.receiving', compact('order_id', 'd_price', 'd_ppn', 'd_total', 'order_code', 'creditorOption', 'receiving_code', 'transaction', 'now', 'datenow', 'receiving_id', 'allFakturs', 'hasSavedBatches'));
+        return view('orders.receiving', compact('order_id', 'd_price', 'd_ppn', 'd_total', 'order_code', 'creditorOption', 'receiving_code', 'transaction', 'now', 'datenow', 'receiving_id', 'allFakturs', 'hasSavedBatches', 'draftFakturSummaries'));
     }
 
     public function addReceivingItem(Request $request)
@@ -3599,16 +3606,17 @@ class ReceivingController extends Controller
 
             DB::commit();
 
-            $receivingDetails = $this->getOrderInputtedReceivingDetails((int) $sourceOrder->id);
-
-            $summary = self::summarizeReceivingDetailsByPrintRule($receivingDetails);
+            $activeDraftDetails = $this->getActiveDraftFakturReceivingDetails((int) $sourceOrder->id, (int) $details->id);
+            $summary = self::summarizeReceivingDetailsByPrintRule($activeDraftDetails);
+            $draftFakturSummaries = $this->buildDraftFakturSummariesForOrder((int) $sourceOrder->id);
 
             return response()->json([
                 'success' => true,
                 'receiving' => $receiving,
                 'receiving_details_code' => $details->receiving_details_code,
                 'item' => $item,
-                'summary' => $summary
+                'summary' => $summary,
+                'draft_summaries' => $draftFakturSummaries,
             ]);
         } catch (\Exception $e) {
             DB::rollBack();
@@ -4239,6 +4247,67 @@ class ReceivingController extends Controller
             ->filter(fn($d) => $d->receiving_items->isNotEmpty())
             ->unique('id')
             ->values();
+    }
+
+    /**
+     * Ambil daftar faktur (ReceivingDetails) yang sedang di-input (belum Simpan Draft / batches_id masih NULL)
+     * khusus untuk pesanan (BPBA) tertentu.
+     */
+    private function getOrderDraftReceivingDetails(int $orderId, ?int $receivingDetailsId = null)
+    {
+        return ReceivingDetails::whereHas('receiving_items', function ($q) use ($orderId) {
+            $q->whereNull('batches_id')
+                ->where('qty_received', '>', 0)
+                ->whereHas('order_items', function ($sub) use ($orderId) {
+                    $sub->where('order_id', $orderId);
+                });
+        })
+            ->when($receivingDetailsId !== null, fn($q) => $q->where('id', $receivingDetailsId))
+            ->with([
+                'receiving_items' => function ($q) use ($orderId) {
+                    $q->whereNull('batches_id')
+                        ->where('qty_received', '>', 0)
+                        ->whereHas('order_items', function ($sub) use ($orderId) {
+                            $sub->where('order_id', $orderId);
+                        })
+                        ->with('order_items.medicines');
+                },
+                'creditor',
+            ])
+            ->orderByDesc('updated_at')
+            ->orderByDesc('id')
+            ->get()
+            ->filter(fn($d) => $d->receiving_items->isNotEmpty())
+            ->unique('id')
+            ->values();
+    }
+
+    /**
+     * Ambil 1 faktur aktif yang sedang di-input sekarang (sebelum Simpan Draft) untuk ringkasan transaksi.
+     */
+    private function getActiveDraftFakturReceivingDetails(int $orderId, ?int $receivingDetailsId = null)
+    {
+        return $this->getOrderDraftReceivingDetails($orderId, $receivingDetailsId)->take(1);
+    }
+
+    /**
+     * Bangun peta ringkasan per faktur draft (belum Simpan Draft) dengan key "CREDITOR_CODE||INVOICE_NUMBER".
+     *
+     * @return array<string, array{price_item: float, price_ppn: float, price_total: float}>
+     */
+    private function buildDraftFakturSummariesForOrder(int $orderId): array
+    {
+        $draftDetails = $this->getOrderDraftReceivingDetails($orderId);
+        $map = [];
+
+        foreach ($draftDetails as $detail) {
+            $cred = strtoupper(trim((string) ($detail->creditor_code ?? '')));
+            $inv = trim((string) ($detail->invoice_number ?? ''));
+            $key = "{$cred}||{$inv}";
+            $map[$key] = self::summarizeReceivingDetailsByPrintRule([$detail]);
+        }
+
+        return $map;
     }
 
     /**
