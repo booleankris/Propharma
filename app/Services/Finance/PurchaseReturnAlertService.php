@@ -117,36 +117,14 @@ class PurchaseReturnAlertService
         // 2. Pre-load Master Ketentuan Retur
         $policies = ReturnPolicy::all();
 
-        // 3. Pre-load obat/batch yang sudah pernah diajukan returnya (kecuali dibatalkan)
-        $submittedReturnItems = PurchaseReturnItem::query()
-            ->join('purchase_returns', 'purchase_return_items.purchase_return_id', '=', 'purchase_returns.id')
-            ->when($pharmacyId, fn ($q) => $q->where('purchase_returns.pharmacy_id', $pharmacyId))
-            ->where(function ($q) {
-                $q->whereNull('purchase_return_items.status')
-                    ->orWhere('purchase_return_items.status', '!=', 'dibatalkan');
-            })
-            ->where(function ($q) {
-                $q->whereNull('purchase_returns.status')
-                    ->orWhere('purchase_returns.status', '!=', 'dibatalkan');
-            })
-            ->get([
-                'purchase_return_items.batch_id',
-                'purchase_return_items.medicine_id',
-                'purchase_return_items.batch_number',
-                'purchase_returns.pharmacy_id',
-            ]);
+        // 3. Pre-load obat/batch yang sedang dalam proses pengajuan retur aktif
+        $activeReturnItems = PurchaseReturnItem::whereIn('status', ['diajukan', 'dikonfirmasi'])
+            ->get(['medicine_id', 'batch_number', 'status', 'qty']);
 
-        $submittedBatchIds = [];
-        $submittedMedBatchKeys = [];
-        foreach ($submittedReturnItems as $sri) {
-            if (!empty($sri->batch_id)) {
-                $submittedBatchIds[(int) $sri->batch_id] = true;
-            }
-            $normBatch = strtoupper(trim((string) ($sri->batch_number ?? '')));
-            if (!empty($sri->medicine_id) && $normBatch !== '' && $normBatch !== '-') {
-                $pKey = (int) ($sri->pharmacy_id ?? 0);
-                $submittedMedBatchKeys["{$pKey}_{$sri->medicine_id}_{$normBatch}"] = true;
-            }
+        $activeReturnKeys = [];
+        foreach ($activeReturnItems as $ari) {
+            $key = ($ari->medicine_id ?: '') . '_' . strtoupper(trim($ari->batch_number ?: ''));
+            $activeReturnKeys[$key] = $ari->status;
         }
 
         // 4. Proses pencocokan ketentuan retur
@@ -155,18 +133,6 @@ class PurchaseReturnAlertService
         foreach ($batches as $b) {
             $med = $b->medicines;
             if (!$med) continue;
-
-            // Hanya tampilkan obat/batch yang belum pernah diajukan returnya
-            $batchPharmacyId = (int) ($b->pharmacy_id ?? 0);
-            $normBatchName = strtoupper(trim((string) ($b->name ?? '')));
-            $isAlreadyReturned = isset($submittedBatchIds[(int) $b->id])
-                || ($normBatchName !== '' && $normBatchName !== '-' && (
-                    isset($submittedMedBatchKeys["{$batchPharmacyId}_{$med->id}_{$normBatchName}"])
-                    || isset($submittedMedBatchKeys["0_{$med->id}_{$normBatchName}"])
-                ));
-            if ($isAlreadyReturned) {
-                continue;
-            }
 
             $ri = $b->receivingItems->first();
             $rd = $ri ? $ri->receiving_details : null;
@@ -231,6 +197,10 @@ class PurchaseReturnAlertService
 
             // Batas akhir pengajuan retur
             $deadlineDate = $ed->copy()->subMonths($monthsBefore)->endOfMonth();
+
+            // Cek apakah sudah pernah diajukan
+            $batchKey = ($med->id ?: '') . '_' . strtoupper(trim($b->name ?: ''));
+            $activeReturnStatus = $activeReturnKeys[$batchKey] ?? null;
 
             $stockUnit = $med->unit ?: 'PCS';
             $content = (int) ($med->content ?: 1);
@@ -308,7 +278,7 @@ class PurchaseReturnAlertService
                 'price_per_unit' => $pricePerUnit,
                 'pack_price' => $packPrice,
                 'estimated_value' => $estimatedValue,
-                'active_return_status' => null,
+                'active_return_status' => $activeReturnStatus,
             ]);
         }
 

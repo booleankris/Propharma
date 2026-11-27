@@ -484,7 +484,7 @@ class FinanceController extends Controller
             return Excel::download(new CashflowExport($reportDays), $fileName);
         }
         $kinerjaDays = $kinerjaOmzet->build($pharmacyIds, $startDate, $endDate);
-        $neracaData = $neracaReport->build($pharmacyIds, $startDate, $endDate, (int) getActivePharmacyId(), $kinerjaDays['days'] ?? []);
+        $neracaData = $neracaReport->build($pharmacyIds, $startDate, $endDate, (int) getActivePharmacyId());
         $drawerAccount = $this->branchKasBankAccountsQuery()->where('account_type', 'kas_apotek')->first();
         $openingBalance = $drawerAccount
             ? FinancePayment::where('payment_type', 'SALDO AWAL')->where('account_id', $drawerAccount->id)->first()
@@ -3744,22 +3744,23 @@ class FinanceController extends Controller
      * Helper: Hitung nilai stok aktual (tidak termasuk barang titipan / Konsinyasi).
      * Cabang lain: stok etalase (medicine_transfer_items)
      * PMI: stok etalase (medicine_transfer_items) + stok gudang (batches)
-     * Formula: Nilai stok = (raw_price * 1.11) * stok
+     * Hanya menyertakan obat aktif (status = 1) dengan harga HNA (raw_price) * 1.11.
      */
     protected function getStockValuation(): array
     {
         $activePharmacyId = (int) getActivePharmacyId();
-        $cacheKey = 'finance_stock_valuation_v2_' . $activePharmacyId;
+        $cacheKey = 'finance_stock_valuation_v3_' . $activePharmacyId;
 
         $computeValuation = function () use ($activePharmacyId) {
             $isPmi = ($activePharmacyId <= 0 || $activePharmacyId === 1 || $activePharmacyId === 9);
             $counterPharmacyId = $isPmi ? 1 : $activePharmacyId;
             $warehouseId = function_exists('getWarehousePharmacyId') ? (int) getWarehousePharmacyId() : 9;
 
-            // 1. Nilai Stok Etalase (medicine_transfer_items, kecualikan Konsinyasi)
+            // 1. Nilai Stok Etalase (medicine_transfer_items, obat aktif status = 1, kecualikan Konsinyasi)
             $counterQuery = DB::table('medicine_transfer_items as mti')
                 ->join('batches as b', 'b.id', '=', 'mti.batches_id')
                 ->join('medicines as m', 'm.id', '=', 'b.medicine_id')
+                ->where('m.status', 1)
                 ->where('b.pharmacy_id', $counterPharmacyId)
                 ->where('mti.status', 1)
                 ->where('mti.qty', '>', 0)
@@ -3770,18 +3771,18 @@ class FinanceController extends Controller
             ConsignmentService::excludeConsignmentFromTransferItemsQuery($counterQuery, 'mti', 'b');
 
             $counterRow = $counterQuery
-                ->selectRaw('
-                    COALESCE(SUM(mti.qty * CAST(REPLACE(COALESCE(NULLIF(m.raw_price, ""), NULLIF(m.pharmacy_net_price, ""), "0"), ",", ".") AS DECIMAL(15, 4)) * 1.11), 0) as total_val,
+                ->selectRaw("
+                    COALESCE(SUM(mti.qty * CAST(REPLACE(COALESCE(NULLIF(m.raw_price, ''), '0'), ',', '.') AS DECIMAL(15, 4)) * 1.11), 0) as total_val,
                     COALESCE(SUM(mti.qty), 0) as total_qty,
                     COUNT(DISTINCT b.medicine_id) as total_items
-                ')
+                ")
                 ->first();
 
             $counterVal = (float) ($counterRow->total_val ?? 0);
             $counterQty = (float) ($counterRow->total_qty ?? 0);
             $counterItems = (int) ($counterRow->total_items ?? 0);
 
-            // 2. Nilai Stok Gudang (hanya jika PMI, kecualikan Konsinyasi)
+            // 2. Nilai Stok Gudang (hanya jika PMI, obat aktif status = 1, kecualikan Konsinyasi)
             $storageVal = 0.0;
             $storageQty = 0.0;
             $storageItems = 0;
@@ -3789,17 +3790,18 @@ class FinanceController extends Controller
             if ($isPmi) {
                 $storageQuery = DB::table('batches as b')
                     ->join('medicines as m', 'm.id', '=', 'b.medicine_id')
+                    ->where('m.status', 1)
                     ->where('b.pharmacy_id', $warehouseId)
-                    ->whereRaw('CAST(REPLACE(COALESCE(NULLIF(b.stock, ""), "0"), ",", ".") AS DECIMAL(15, 2)) > 0');
+                    ->whereRaw("CAST(REPLACE(COALESCE(NULLIF(b.stock, ''), '0'), ',', '.') AS DECIMAL(15, 2)) > 0");
 
                 ConsignmentService::excludeConsignmentFromBatchesQuery($storageQuery, 'b');
 
                 $storageRow = $storageQuery
-                    ->selectRaw('
-                        COALESCE(SUM(CAST(REPLACE(COALESCE(NULLIF(b.stock, ""), "0"), ",", ".") AS DECIMAL(15, 2)) * CAST(REPLACE(COALESCE(NULLIF(m.raw_price, ""), NULLIF(m.pharmacy_net_price, ""), "0"), ",", ".") AS DECIMAL(15, 4)) * 1.11), 0) as total_val,
-                        COALESCE(SUM(CAST(REPLACE(COALESCE(NULLIF(b.stock, ""), "0"), ",", ".") AS DECIMAL(15, 2))), 0) as total_qty,
+                    ->selectRaw("
+                        COALESCE(SUM(CAST(REPLACE(COALESCE(NULLIF(b.stock, ''), '0'), ',', '.') AS DECIMAL(15, 2)) * CAST(REPLACE(COALESCE(NULLIF(m.raw_price, ''), '0'), ',', '.') AS DECIMAL(15, 4)) * 1.11), 0) as total_val,
+                        COALESCE(SUM(CAST(REPLACE(COALESCE(NULLIF(b.stock, ''), '0'), ',', '.') AS DECIMAL(15, 2))), 0) as total_qty,
                         COUNT(DISTINCT b.medicine_id) as total_items
-                    ')
+                    ")
                     ->first();
 
                 $storageVal = (float) ($storageRow->total_val ?? 0);
@@ -3838,7 +3840,7 @@ class FinanceController extends Controller
     protected function getStats($hutang = null, $cash = null, $piutang = null)
     {
         $targetPharmacyIds = $this->getTargetPharmacyIds();
-        $cacheKey = 'finance_stats_summary_branch_v2_' . getActivePharmacyId() . '_' . implode('_', $targetPharmacyIds);
+        $cacheKey = 'finance_stats_summary_branch_v3_' . getActivePharmacyId() . '_' . implode('_', $targetPharmacyIds);
 
         $isPrecomputedHutangStats = is_array($hutang) && array_key_exists('totalHutangCount', $hutang);
         $isPrecomputedPiutangStats = is_array($piutang) && array_key_exists('totalPiutangCount', $piutang);
@@ -4036,12 +4038,13 @@ class FinanceController extends Controller
             $branchSuffix = $activeId . '_' . implode('_', $targetPharmacyIds);
             Cache::forget('finance_stats_summary_branch_' . $branchSuffix);
             Cache::forget('finance_stats_summary_branch_v2_' . $branchSuffix);
-            Cache::forget('finance_stats_summary_branch_v2_' . $activeId . '_' . implode('_', $targetPharmacyIds));
+            Cache::forget('finance_stats_summary_branch_v3_' . $branchSuffix);
             $branches = [0, 1, 2, 3, 4, 5, 6, 9];
             foreach ($branches as $b) {
                 Cache::forget('finance_stats_summary_' . $b);
                 Cache::forget('finance_stock_valuation_' . $b);
                 Cache::forget('finance_stock_valuation_v2_' . $b);
+                Cache::forget('finance_stock_valuation_v3_' . $b);
             }
             $currentYear = (int) now()->year;
             $pharmKey = implode('_', $targetPharmacyIds);
