@@ -163,7 +163,7 @@ class NeracaReportService
             'selisih' => round($labaTanpaStokAkhir - $labaTanpaStokAwal, 2),
         ];
 
-        // 6. Persediaan: Nilai total stok (Stok * raw_price), Selisih = AKHIR - AWAL
+        // 6. Persediaan: Nilai total stok aktif (Stok * raw_price * 1.11, kecualikan konsinyasi), Selisih = AKHIR - AWAL
         $persediaanAwal = $this->inventoryValuationAtDate($pharmacyIds, $dayBeforeStart);
         $persediaanAkhir = $this->inventoryValuationAtDate($pharmacyIds, $periodEnd);
         $persediaanSelisih = round($persediaanAkhir - $persediaanAwal, 2);
@@ -511,81 +511,229 @@ class NeracaReportService
     }
 
     /**
-     * Calculate automatic inventory valuation for the target pharmacy as of a date.
+     * Hitung nilai total persediaan (obat aktif status = 1, tidak termasuk konsinyasi) per tanggal tertentu.
+     * Formula: Stok * raw_price (historis per cutoff) * 1.11, identik dengan kartu Nilai Stok pada tanggal hari ini.
      */
-    private function inventoryValuationAtDate(array $pharmacyIds, string $asOfDate): float
+    public function inventoryValuationAtDate(array $pharmacyIds, string $asOfDate): float
     {
         $targetPharmacyId = (int) ($pharmacyIds[0] ?? 1);
         $warehouseId = function_exists('getWarehousePharmacyId') ? getWarehousePharmacyId() : 9;
         $canSeeWarehouse = function_exists('canAccessWarehouseStock') ? canAccessWarehouseStock($targetPharmacyId) : in_array($targetPharmacyId, [1, 9, 6], true);
         $counterPharmacyId = (function_exists('isWarehousePharmacy') && isWarehousePharmacy($targetPharmacyId)) ? 1 : $targetPharmacyId;
 
-        // Current counter stock valuation (exclude consignment)
+        // 1. Snapshot qty etalase saat ini per medicine_id (obat aktif, qty > 0, kecualikan konsinyasi)
         $counterQuery = DB::table('medicine_transfer_items as mti')
             ->join('batches as b', 'b.id', '=', 'mti.batches_id')
             ->join('medicines as m', 'm.id', '=', 'b.medicine_id')
+            ->where('m.status', 1)
             ->where('b.pharmacy_id', $counterPharmacyId)
             ->where('mti.status', 1)
+            ->where('mti.qty', '>', 0)
             ->where(function ($q) {
                 $q->whereNull('mti.source_type')->orWhere('mti.source_type', '!=', 'retur_gudang');
             });
         ConsignmentService::excludeConsignmentFromTransferItemsQuery($counterQuery, 'mti', 'b');
-        $counterValuation = (float) $counterQuery
-            ->selectRaw('SUM(mti.qty * COALESCE(NULLIF(m.raw_price, 0), 0)) as total_val')
-            ->value('total_val');
+        $counterQtyRows = $counterQuery
+            ->groupBy('b.medicine_id')
+            ->selectRaw('b.medicine_id, COALESCE(SUM(mti.qty), 0) as qty_sum')
+            ->pluck('qty_sum', 'b.medicine_id')
+            ->all();
 
-        // Storage / warehouse valuation if applicable (exclude consignment)
-        $storageValuation = 0.0;
+        $currentQtyByMed = [];
+        foreach ($counterQtyRows as $medId => $qtySum) {
+            $mId = (int) $medId;
+            if ($mId > 0) {
+                $currentQtyByMed[$mId] = ($currentQtyByMed[$mId] ?? 0.0) + (float) $qtySum;
+            }
+        }
+
+        // 2. Snapshot qty gudang saat ini per medicine_id (khusus PMI, obat aktif, stok > 0, kecualikan konsinyasi)
         if ($canSeeWarehouse) {
             $storageQuery = DB::table('batches as b')
                 ->join('medicines as m', 'm.id', '=', 'b.medicine_id')
+                ->where('m.status', 1)
                 ->where('b.pharmacy_id', $warehouseId)
-                ->where('b.stock', '>', 0);
+                ->whereRaw("CAST(REPLACE(COALESCE(NULLIF(b.stock, ''), '0'), ',', '.') AS DECIMAL(15, 2)) > 0");
             ConsignmentService::excludeConsignmentFromBatchesQuery($storageQuery, 'b');
-            $storageValuation = (float) $storageQuery
-                ->selectRaw('SUM(b.stock * COALESCE(NULLIF(m.raw_price, 0), 0)) as total_val')
-                ->value('total_val');
+            $storageQtyRows = $storageQuery
+                ->groupBy('b.medicine_id')
+                ->selectRaw("b.medicine_id, COALESCE(SUM(CAST(REPLACE(COALESCE(NULLIF(b.stock, ''), '0'), ',', '.') AS DECIMAL(15, 2))), 0) as qty_sum")
+                ->pluck('qty_sum', 'b.medicine_id')
+                ->all();
+
+            foreach ($storageQtyRows as $medId => $qtySum) {
+                $mId = (int) $medId;
+                if ($mId > 0) {
+                    $currentQtyByMed[$mId] = ($currentQtyByMed[$mId] ?? 0.0) + (float) $qtySum;
+                }
+            }
         }
 
-        $currentTotalValuation = round($counterValuation + $storageValuation, 2);
-
-        // Jika tanggal cutoff adalah hari ini (atau di masa depan), gunakan langsung snapshot stok aktual
         $todayOperationalDate = FinanceShift::operationalDate(now());
         if ($asOfDate >= $todayOperationalDate) {
-            return max(0.0, $currentTotalValuation);
+            if (empty($currentQtyByMed)) {
+                return 0.0;
+            }
+
+            $medPrices = DB::table('medicines')
+                ->where('status', 1)
+                ->whereIn('id', array_keys($currentQtyByMed))
+                ->pluck('raw_price', 'id')
+                ->all();
+
+            $totalVal = 0.0;
+            foreach ($currentQtyByMed as $mId => $qty) {
+                $hna = $this->parseDecimalPrice($medPrices[$mId] ?? 0);
+                if ($qty > 0 && $hna > 0) {
+                    $totalVal += ($qty * $hna * 1.11);
+                }
+            }
+
+            return round(max(0.0, $totalVal), 2);
         }
 
-        // Reconcile backwards from today to $asOfDate using items_log movements (exclude consignment)
+        // 3. Cutoff historis: tarik mundur pergerakan items_log per medicine_id (kecualikan SO-SALDO-AWAL & konsinyasi)
         $trackedPharmacies = $canSeeWarehouse ? array_unique([$counterPharmacyId, $warehouseId]) : [$counterPharmacyId];
         $cutoff = Carbon::parse($asOfDate)->endOfDay()->toDateTimeString();
 
+        $consFilter = ConsignmentService::getConsignmentStockFilter();
+        $consBatchSet = array_flip($consFilter['consignment_batch_ids']);
+        $nonConsBatchSet = array_flip($consFilter['non_consignment_batch_ids']);
+        $consMedSet = array_flip($consFilter['consignment_medicine_ids']);
+
         $deltaQuery = DB::table('items_log as il')
-            ->join('batches as b', 'b.id', '=', 'il.batches_id')
+            ->leftJoin('batches as b', 'b.id', '=', 'il.batches_id')
             ->join('medicines as m', 'm.id', '=', 'il.medicine_id')
-            ->whereIn('b.pharmacy_id', $trackedPharmacies)
-            ->where('il.date', '>', $cutoff);
-        ConsignmentService::excludeConsignmentFromBatchesQuery($deltaQuery, 'b');
+            ->leftJoin('users as u', 'u.id', '=', 'il.user_id')
+            ->where('m.status', 1)
+            ->where('il.date', '>', $cutoff)
+            ->where(function ($q) {
+                $q->whereNull('il.type')->orWhere('il.type', '!=', 'SO-SALDO-AWAL');
+            })
+            ->where(function ($q) use ($trackedPharmacies) {
+                $q->whereIn('b.pharmacy_id', $trackedPharmacies)
+                    ->orWhere(function ($noBatch) use ($trackedPharmacies) {
+                        $noBatch->whereNull('il.batches_id')
+                            ->whereIn('u.pharmacy_id', $trackedPharmacies);
+                    });
+            })
+            ->select([
+                'il.medicine_id',
+                'il.batches_id',
+                'il.status',
+                'il.qty',
+                'il.qty_before',
+                'il.qty_after',
+                'il.total',
+            ]);
 
-        $deltaSinceCutoff = (float) $deltaQuery
-            ->selectRaw('SUM(
-                CASE 
-                    WHEN il.status IN (1, 4, 9) THEN -ABS(il.qty) * COALESCE(NULLIF(m.raw_price, 0), 0)
-                    WHEN il.status IN (2, 3) THEN ABS(il.qty) * COALESCE(NULLIF(m.raw_price, 0), 0)
-                    WHEN il.status = 5 THEN 
-                        CASE 
-                            WHEN il.total IS NOT NULL AND TRIM(il.total) REGEXP "^[+-]?[0-9]+([.][0-9]+)?$" 
-                            THEN CAST(il.total AS DECIMAL(15,2)) * COALESCE(NULLIF(m.raw_price, 0), 0)
-                            ELSE (CAST(il.qty_after AS DECIMAL(15,2)) - CAST(il.qty_before AS DECIMAL(15,2))) * COALESCE(NULLIF(m.raw_price, 0), 0)
-                        END
-                    WHEN il.status IN (6, 7) THEN 
-                        (CAST(il.qty_after AS DECIMAL(15,2)) - CAST(il.qty_before AS DECIMAL(15,2))) * COALESCE(NULLIF(m.raw_price, 0), 0)
-                    WHEN il.status = 8 THEN il.qty * COALESCE(NULLIF(m.raw_price, 0), 0)
-                    ELSE 0
-                END
-            ) as delta_val')
-            ->value('delta_val');
+        $deltaQtyByMed = [];
+        foreach ($deltaQuery->cursor() as $log) {
+            $mId = (int) ($log->medicine_id ?? 0);
+            if ($mId <= 0) {
+                continue;
+            }
 
-        return round(max(0.0, $currentTotalValuation - $deltaSinceCutoff), 2);
+            $bId = (int) ($log->batches_id ?? 0);
+            if ($bId > 0 && isset($consBatchSet[$bId])) {
+                continue;
+            }
+            if (isset($consMedSet[$mId]) && !($bId > 0 && isset($nonConsBatchSet[$bId]))) {
+                continue;
+            }
+
+            $deltaQtyByMed[$mId] = ($deltaQtyByMed[$mId] ?? 0.0) + $this->computeStockLogDelta($log);
+        }
+
+        $allMedIds = array_values(array_unique(array_merge(array_keys($currentQtyByMed), array_keys($deltaQtyByMed))));
+        if (empty($allMedIds)) {
+            return 0.0;
+        }
+
+        $qtyAtCutoffByMed = [];
+        foreach ($allMedIds as $mId) {
+            $qtyAtCutoff = ($currentQtyByMed[$mId] ?? 0.0) - ($deltaQtyByMed[$mId] ?? 0.0);
+            if ($qtyAtCutoff > 0) {
+                $qtyAtCutoffByMed[$mId] = $qtyAtCutoff;
+            }
+        }
+
+        if (empty($qtyAtCutoffByMed)) {
+            return 0.0;
+        }
+
+        $cutoffMedIds = array_keys($qtyAtCutoffByMed);
+        $currentHnaByMed = DB::table('medicines')
+            ->where('status', 1)
+            ->whereIn('id', $cutoffMedIds)
+            ->pluck('raw_price', 'id')
+            ->all();
+
+        $historicalHnaByMed = [];
+        if (Schema::hasTable('medicine_price_history')) {
+            foreach (array_chunk($cutoffMedIds, 1000) as $medChunk) {
+                $priceChanges = DB::table('medicine_price_history')
+                    ->whereIn('medicine_id', $medChunk)
+                    ->where('created_at', '>', $cutoff)
+                    ->orderBy('created_at', 'asc')
+                    ->orderBy('id', 'asc')
+                    ->get(['medicine_id', 'old_price']);
+
+                foreach ($priceChanges as $change) {
+                    $mId = (int) $change->medicine_id;
+                    if (!array_key_exists($mId, $historicalHnaByMed)
+                        && $change->old_price !== null
+                        && trim((string) $change->old_price) !== '') {
+                        $historicalHnaByMed[$mId] = $this->parseDecimalPrice($change->old_price);
+                    }
+                }
+            }
+        }
+
+        $totalVal = 0.0;
+        foreach ($qtyAtCutoffByMed as $mId => $qty) {
+            $hna = array_key_exists($mId, $historicalHnaByMed)
+                ? $historicalHnaByMed[$mId]
+                : $this->parseDecimalPrice($currentHnaByMed[$mId] ?? 0);
+            if ($hna > 0) {
+                $totalVal += ($qty * $hna * 1.11);
+            }
+        }
+
+        return round(max(0.0, $totalVal), 2);
+    }
+
+    private function parseDecimalPrice(mixed $value): float
+    {
+        if ($value === null || $value === '') {
+            return 0.0;
+        }
+        $normalized = str_replace(',', '.', trim((string) $value));
+        return is_numeric($normalized) ? max(0.0, (float) $normalized) : 0.0;
+    }
+
+    private function computeStockLogDelta(object $log): float
+    {
+        $status = (int) ($log->status ?? 0);
+        $qty = (float) ($log->qty ?? 0);
+
+        if ($status === 1 || $status === 4 || $status === 9) {
+            return -abs($qty);
+        }
+        if ($status === 2 || $status === 3) {
+            return abs($qty);
+        }
+        if ($status === 8) {
+            return $qty;
+        }
+        if ($status === 5) {
+            $rawTotal = trim((string) ($log->total ?? ''));
+            if ($rawTotal !== '' && $rawTotal !== '-' && is_numeric($rawTotal)) {
+                return (float) $rawTotal;
+            }
+        }
+
+        return (float) ($log->qty_after ?? 0) - (float) ($log->qty_before ?? 0);
     }
 }
 
