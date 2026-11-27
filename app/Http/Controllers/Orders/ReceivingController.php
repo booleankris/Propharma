@@ -2313,7 +2313,7 @@ class ReceivingController extends Controller
         try {
             DB::beginTransaction();
 
-            $item = ReceivingItems::findOrFail($id);
+            $item = ReceivingItems::with('order_items')->findOrFail($id);
 
             if (!is_null($item->batches_id)) {
                 DB::rollBack();
@@ -2323,13 +2323,25 @@ class ReceivingController extends Controller
                 ], 422);
             }
 
+            $orderId = $item->order_items?->order_id;
+            $detailId = $item->receiving_details_id;
+
             $item->delete();
 
+            if ($detailId && !ReceivingItems::where('receiving_details_id', $detailId)->exists()) {
+                ReceivingDetails::whereKey($detailId)->delete();
+            }
+
             DB::commit();
+
+            $summary = $orderId
+                ? self::summarizeReceivingDetailsByPrintRule($this->getOrderInputtedReceivingDetails((int) $orderId))
+                : ['price_item' => 0, 'price_ppn' => 0, 'price_total' => 0];
 
             return response()->json([
                 'success' => true,
                 'message' => 'Item berhasil dihapus',
+                'summary' => $summary,
             ]);
         } catch (\Throwable $e) {
             DB::rollBack();
@@ -3350,6 +3362,9 @@ class ReceivingController extends Controller
             $transaction = Receiving::with('receiving_details')
                 ->where('status', '!=', 3)
                 ->where('pharmacy_id', $orderPharmacyId)
+                ->whereDoesntHave('receiving_details.receiving_items.order_items', function ($q) use ($id) {
+                    $q->where('order_id', '!=', $id);
+                })
                 ->find($getOrder->receiving_id);
         }
 
@@ -3374,15 +3389,7 @@ class ReceivingController extends Controller
             ->unique('code')
             ->values();
 
-        $allFakturs = \App\Models\ReceivingDetails::whereHas('receiving_items.order_items', function ($q) use ($id) {
-            $q->where('order_id', $id);
-        })
-            ->when($transaction, function ($q) use ($transaction) {
-                $q->orWhere('receiving_id', $transaction->id);
-            })
-            ->get()
-            ->unique('id')
-            ->values();
+        $allFakturs = $this->getOrderInputtedReceivingDetails((int) $id);
 
         $pId = $orderPharmacyId ?? getPurchasingPharmacyId();
         foreach ($allFakturs as $faktur) {
@@ -3420,14 +3427,7 @@ class ReceivingController extends Controller
         $order_id = $getOrder->id;
         $order_code = $getOrder->code;
 
-        $receivingDetails = ReceivingDetails::with(['receiving_items.order_items.medicines', 'creditor'])
-            ->where(function ($q) use ($id, $transaction) {
-                $q->where('receiving_id', $transaction->id)
-                    ->orWhereHas('receiving_items.order_items', function ($oq) use ($id) {
-                        $oq->where('order_id', $id);
-                    });
-            })
-            ->get();
+        $receivingDetails = $allFakturs;
 
         $summary = self::summarizeReceivingDetailsByPrintRule($receivingDetails);
         $d_price = $summary['price_item'];
@@ -3500,11 +3500,8 @@ class ReceivingController extends Controller
             }
             $details = ReceivingDetails::where('invoice_number', $request->invoice_number)
                 ->where('creditor_code', $request->creditor_code)
-                ->where(function ($q) use ($request, $sourceOrder) {
-                    $q->where('receiving_id', $request->receiving_id)
-                        ->orWhereHas('receiving_items.order_items', function ($oq) use ($sourceOrder) {
-                            $oq->where('order_id', $sourceOrder->id);
-                        });
+                ->whereHas('receiving_items.order_items', function ($oq) use ($sourceOrder) {
+                    $oq->where('order_id', $sourceOrder->id);
                 })
                 ->first();
 
@@ -3602,9 +3599,7 @@ class ReceivingController extends Controller
 
             DB::commit();
 
-            $receivingDetails = ReceivingDetails::with(['receiving_items.order_items', 'creditor'])
-                ->where('receiving_id', $receiving->id)
-                ->get();
+            $receivingDetails = $this->getOrderInputtedReceivingDetails((int) $sourceOrder->id);
 
             $summary = self::summarizeReceivingDetailsByPrintRule($receivingDetails);
 
@@ -4214,6 +4209,36 @@ class ReceivingController extends Controller
             'ppn' => $detailPpn,
             'grand_total' => $detailGrandTotal,
         ];
+    }
+
+    /**
+     * Ambil daftar faktur (ReceivingDetails) beserta item yang benar-benar sudah di-input
+     * khusus untuk pesanan (BPBA) tertentu saja.
+     */
+    private function getOrderInputtedReceivingDetails(int $orderId)
+    {
+        return ReceivingDetails::whereHas('receiving_items', function ($q) use ($orderId) {
+            $q->whereHas('order_items', function ($sub) use ($orderId) {
+                $sub->where('order_id', $orderId);
+            })->where(function ($q2) {
+                $q2->whereNotNull('batches_id')->orWhere('qty_received', '>', 0);
+            });
+        })
+            ->with([
+                'receiving_items' => function ($q) use ($orderId) {
+                    $q->whereHas('order_items', function ($sub) use ($orderId) {
+                        $sub->where('order_id', $orderId);
+                    })->where(function ($q2) {
+                        $q2->whereNotNull('batches_id')->orWhere('qty_received', '>', 0);
+                    })->with('order_items.medicines');
+                },
+                'creditor',
+            ])
+            ->orderBy('id', 'asc')
+            ->get()
+            ->filter(fn($d) => $d->receiving_items->isNotEmpty())
+            ->unique('id')
+            ->values();
     }
 
     /**

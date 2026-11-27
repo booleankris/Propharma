@@ -1595,6 +1595,11 @@
                         message: res.data.message ?? 'Item berhasil dihapus',
                         position: 'topRight'
                     });
+                    if (res.data.summary) {
+                        $('#d_price').val(formatRupiah(res.data.summary.price_item));
+                        $('#d_ppn').val(formatRupiah(res.data.summary.price_ppn));
+                        $('#d_total').val(formatRupiah(res.data.summary.price_total));
+                    }
                     orderItemsTable.ajax.reload(null, false);
                     selectedRowData = null;
                     selectedRowIndex = null;
