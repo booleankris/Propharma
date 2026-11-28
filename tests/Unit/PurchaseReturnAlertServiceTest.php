@@ -280,4 +280,125 @@ class PurchaseReturnAlertServiceTest extends TestCase
         $returnedBatchIdsP2 = collect($resPharmacy2['data']->items())->pluck('batch_id')->all();
         $this->assertSame([$batchOtherPharmacySameName->id], $returnedBatchIdsP2);
     }
+
+    public function test_hides_opname_batch_when_effective_stock_becomes_zero_after_cross_batch_return_and_reduces_partial_stock(): void
+    {
+        $creditor = Creditor::create(['code' => 'PBF-APL', 'name' => 'ANUGERAH PHARMINDO LESTARI']);
+        $factoryId = \DB::table('factories')->insertGetId([
+            'name' => 'ASTRAZENECA',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        ReturnPolicy::create([
+            'creditor_code' => 'PBF-APL',
+            'factory_id' => $factoryId,
+            'factory_name' => 'ASTRAZENECA',
+            'is_returnable' => true,
+            'months_before_ed' => 3,
+            'months_after_ed' => 0,
+        ]);
+
+        $medZeroed = Medicines::create([
+            'code' => 'MED-XIG',
+            'name' => 'XIGDUO XR TAB 5MG/1000MG @28',
+            'unit' => 'TAB',
+            'packaging' => 'BOX',
+            'content' => 28,
+            'factory_id' => $factoryId,
+            'creditors_id' => $creditor->id,
+            'stock' => 0,
+            'raw_price' => 23905,
+        ]);
+
+        $medPartial = Medicines::create([
+            'code' => 'MED-PAR',
+            'name' => 'OBAT PARTIAL',
+            'unit' => 'TAB',
+            'packaging' => 'BOX',
+            'content' => 10,
+            'factory_id' => $factoryId,
+            'creditors_id' => $creditor->id,
+            'stock' => 60,
+            'raw_price' => 10000,
+        ]);
+
+        $expDate = Carbon::now()->startOfMonth()->addMonths(1)->toDateString();
+
+        // Batch OPN- masih menyimpan 112 TAB (4 BOX), tetapi retur sudah memotong batch pabrik WT0077 menjadi -112 TAB
+        Batches::create([
+            'medicine_id' => $medZeroed->id,
+            'pharmacy_id' => 9,
+            'name' => 'OPN-20261201',
+            'expired_date' => $expDate,
+            'stock' => 112,
+        ]);
+        $negReturnBatch = Batches::create([
+            'medicine_id' => $medZeroed->id,
+            'pharmacy_id' => 9,
+            'name' => 'WT0077',
+            'expired_date' => $expDate,
+            'stock' => -112,
+        ]);
+
+        $prZeroed = PurchaseReturn::create([
+            'return_no' => 'RET-XIG-01',
+            'creditor_code' => 'PBF-APL',
+            'pharmacy_id' => 9,
+            'status' => 'sudah_diambil',
+        ]);
+        PurchaseReturnItem::create([
+            'purchase_return_id' => $prZeroed->id,
+            'medicine_id' => $medZeroed->id,
+            'batch_id' => $negReturnBatch->id,
+            'medicine_name' => $medZeroed->name,
+            'unit' => 'BOX',
+            'retur_type' => 'packaging',
+            'stock_unit_factor' => 28,
+            'batch_number' => 'WT0077',
+            'qty' => 4,
+            'status' => 'sudah_diambil',
+            'stock_deducted' => true,
+        ]);
+
+        // Obat kedua: OPN memiliki 100 TAB, tetapi sudah ada pengajuan non-deducted 4 BOX (40 TAB) -> sisa 60 TAB (6 BOX)
+        $opnPartial = Batches::create([
+            'medicine_id' => $medPartial->id,
+            'pharmacy_id' => 9,
+            'name' => 'OPN-20261202',
+            'expired_date' => $expDate,
+            'stock' => 100,
+        ]);
+        $prPartial = PurchaseReturn::create([
+            'return_no' => 'RET-PAR-01',
+            'creditor_code' => 'PBF-APL',
+            'pharmacy_id' => 9,
+            'status' => 'diajukan',
+        ]);
+        PurchaseReturnItem::create([
+            'purchase_return_id' => $prPartial->id,
+            'medicine_id' => $medPartial->id,
+            'batch_id' => null,
+            'medicine_name' => $medPartial->name,
+            'unit' => 'BOX',
+            'retur_type' => 'packaging',
+            'stock_unit_factor' => 10,
+            'batch_number' => 'BATCH-LAIN',
+            'qty' => 4,
+            'status' => 'diajukan',
+            'stock_deducted' => false,
+        ]);
+
+        $service = new PurchaseReturnAlertService();
+        $res = $service->getApproachingReturns(9, [], 25);
+        $items = collect($res['data']->items());
+
+        // XIGDUO tidak boleh muncul lagi karena sisa stok efektif = 0
+        $this->assertCount(1, $items);
+        $this->assertSame($opnPartial->id, $items->first()['batch_id']);
+        $this->assertEquals(60.0, (float) $items->first()['stock']);
+        $this->assertEquals(6.0, (float) $items->first()['stock_pack']);
+        $this->assertSame(1, $res['stats']['total_count']);
+        $this->assertEquals(60.0, (float) $res['stats']['total_stock_at_risk']);
+    }
 }

@@ -117,15 +117,96 @@ class PurchaseReturnAlertService
         // 2. Pre-load Master Ketentuan Retur
         $policies = ReturnPolicy::all();
 
-        // 3. Pre-load obat/batch yang sedang dalam proses pengajuan retur aktif
-        $activeReturnItems = PurchaseReturnItem::whereIn('status', ['diajukan', 'dikonfirmasi'])
-            ->get(['medicine_id', 'batch_number', 'status', 'qty']);
+        // 3. Pre-load obat/batch yang sudah pernah diajukan returnya (kecuali dibatalkan)
+        $submittedReturnItems = PurchaseReturnItem::query()
+            ->join('purchase_returns', 'purchase_return_items.purchase_return_id', '=', 'purchase_returns.id')
+            ->when($pharmacyId, fn ($q) => $q->where('purchase_returns.pharmacy_id', $pharmacyId))
+            ->where(function ($q) {
+                $q->whereNull('purchase_return_items.status')
+                    ->orWhere('purchase_return_items.status', '!=', 'dibatalkan');
+            })
+            ->where(function ($q) {
+                $q->whereNull('purchase_returns.status')
+                    ->orWhere('purchase_returns.status', '!=', 'dibatalkan');
+            })
+            ->get([
+                'purchase_return_items.batch_id',
+                'purchase_return_items.medicine_id',
+                'purchase_return_items.batch_number',
+                'purchase_return_items.qty',
+                'purchase_return_items.stock_unit_factor',
+                'purchase_return_items.stock_deducted',
+                'purchase_returns.pharmacy_id',
+            ]);
 
-        $activeReturnKeys = [];
-        foreach ($activeReturnItems as $ari) {
-            $key = ($ari->medicine_id ?: '') . '_' . strtoupper(trim($ari->batch_number ?: ''));
-            $activeReturnKeys[$key] = $ari->status;
+        $positiveBatchIds = [];
+        $positiveMedBatchKeys = [];
+        foreach ($batches as $posBatch) {
+            $positiveBatchIds[(int) $posBatch->id] = true;
+            $posNorm = strtoupper(trim((string) ($posBatch->name ?? '')));
+            if (!empty($posBatch->medicine_id) && $posNorm !== '' && $posNorm !== '-') {
+                $posPharm = (int) ($posBatch->pharmacy_id ?? 0);
+                $positiveMedBatchKeys["{$posPharm}_{$posBatch->medicine_id}_{$posNorm}"] = true;
+            }
         }
+
+        $submittedBatchIds = [];
+        $submittedMedBatchKeys = [];
+        $unmatchedDeficitByKey = [];
+        foreach ($submittedReturnItems as $sri) {
+            $matchedPositive = false;
+            if (!empty($sri->batch_id)) {
+                $submittedBatchIds[(int) $sri->batch_id] = true;
+                if (isset($positiveBatchIds[(int) $sri->batch_id])) {
+                    $matchedPositive = true;
+                }
+            }
+            $normBatch = strtoupper(trim((string) ($sri->batch_number ?? '')));
+            $pKey = (int) ($sri->pharmacy_id ?? 0);
+            if (!empty($sri->medicine_id) && $normBatch !== '' && $normBatch !== '-') {
+                $submittedMedBatchKeys["{$pKey}_{$sri->medicine_id}_{$normBatch}"] = true;
+                if (isset($positiveMedBatchKeys["{$pKey}_{$sri->medicine_id}_{$normBatch}"])) {
+                    $matchedPositive = true;
+                }
+            }
+
+            // Retur non-deducted pada batch berbeda/manual (mis. nomor batch pabrik sedangkan stok berada di batch OPN)
+            if (!$matchedPositive && empty($sri->stock_deducted) && !empty($sri->medicine_id)) {
+                $factor = max(1, (int) ($sri->stock_unit_factor ?? 1));
+                $qtyUnits = (float) ($sri->qty ?? 0) * $factor;
+                if ($qtyUnits > 0) {
+                    $defKey = "{$pKey}_{$sri->medicine_id}";
+                    $unmatchedDeficitByKey[$defKey] = ($unmatchedDeficitByKey[$defKey] ?? 0.0) + $qtyUnits;
+                }
+            }
+        }
+
+        // 3b. Hitung defisit batch stok negatif (mis. retur memotong batch pabrik WT0077 menjadi minus sementara stok fisik tercatat di batch OPN)
+        $medIdsInPositive = $batches->pluck('medicine_id')->filter()->unique()->values();
+        if ($medIdsInPositive->isNotEmpty()) {
+            $negativeQuery = Batches::where('stock', '<', 0)
+                ->whereIn('medicine_id', $medIdsInPositive);
+            if ($pharmacyId) {
+                $negativeQuery->where('pharmacy_id', $pharmacyId);
+            }
+            foreach ($negativeQuery->get(['pharmacy_id', 'medicine_id', 'stock']) as $negBatch) {
+                $negStock = (float) str_replace(',', '.', (string) ($negBatch->stock ?? 0));
+                if ($negStock < 0) {
+                    $defKey = (int) ($negBatch->pharmacy_id ?? 0) . '_' . (int) $negBatch->medicine_id;
+                    $unmatchedDeficitByKey[$defKey] = ($unmatchedDeficitByKey[$defKey] ?? 0.0) + abs($negStock);
+                }
+            }
+        }
+
+        // Prioritaskan batch OPN- dan ED terdekat saat menyerap defisit lintas batch
+        $batches = $batches->sort(function ($a, $b) {
+            $aOpn = str_starts_with(strtoupper(trim((string) ($a->name ?? ''))), 'OPN-') ? 0 : 1;
+            $bOpn = str_starts_with(strtoupper(trim((string) ($b->name ?? ''))), 'OPN-') ? 0 : 1;
+            if ($aOpn !== $bOpn) return $aOpn <=> $bOpn;
+            $cmpDate = strcmp((string) $a->expired_date, (string) $b->expired_date);
+            if ($cmpDate !== 0) return $cmpDate;
+            return ((int) $a->id) <=> ((int) $b->id);
+        })->values();
 
         // 4. Proses pencocokan ketentuan retur
         $items = collect();
@@ -133,6 +214,18 @@ class PurchaseReturnAlertService
         foreach ($batches as $b) {
             $med = $b->medicines;
             if (!$med) continue;
+
+            // Hanya tampilkan obat/batch yang belum pernah diajukan returnya
+            $batchPharmacyId = (int) ($b->pharmacy_id ?? 0);
+            $normBatchName = strtoupper(trim((string) ($b->name ?? '')));
+            $isAlreadyReturned = isset($submittedBatchIds[(int) $b->id])
+                || ($normBatchName !== '' && $normBatchName !== '-' && (
+                    isset($submittedMedBatchKeys["{$batchPharmacyId}_{$med->id}_{$normBatchName}"])
+                    || isset($submittedMedBatchKeys["0_{$med->id}_{$normBatchName}"])
+                ));
+            if ($isAlreadyReturned) {
+                continue;
+            }
 
             $ri = $b->receivingItems->first();
             $rd = $ri ? $ri->receiving_details : null;
@@ -198,9 +291,18 @@ class PurchaseReturnAlertService
             // Batas akhir pengajuan retur
             $deadlineDate = $ed->copy()->subMonths($monthsBefore)->endOfMonth();
 
-            // Cek apakah sudah pernah diajukan
-            $batchKey = ($med->id ?: '') . '_' . strtoupper(trim($b->name ?: ''));
-            $activeReturnStatus = $activeReturnKeys[$batchKey] ?? null;
+            $stock = (float) $b->stock; // Always stored in basic unit (e.g. TAB / BTL)
+            foreach (["{$batchPharmacyId}_{$med->id}", "0_{$med->id}"] as $defKey) {
+                $availableDeficit = $unmatchedDeficitByKey[$defKey] ?? 0.0;
+                if ($availableDeficit > 0 && $stock > 0) {
+                    $consumed = min($stock, $availableDeficit);
+                    $stock = round($stock - $consumed, 4);
+                    $unmatchedDeficitByKey[$defKey] = round($availableDeficit - $consumed, 4);
+                }
+            }
+            if ($stock <= 0.0001) {
+                continue;
+            }
 
             $stockUnit = $med->unit ?: 'PCS';
             $content = (int) ($med->content ?: 1);
@@ -218,7 +320,6 @@ class PurchaseReturnAlertService
                 $factor = $isPack ? $content : 1;
             }
 
-            $stock = (float) $b->stock; // Always stored in basic unit (e.g. TAB / BTL)
             $rawPrice = (float) ($ri?->raw_price ?: $med->raw_price ?: 0);
 
             if ($isPack && $factor > 1) {
@@ -278,7 +379,7 @@ class PurchaseReturnAlertService
                 'price_per_unit' => $pricePerUnit,
                 'pack_price' => $packPrice,
                 'estimated_value' => $estimatedValue,
-                'active_return_status' => $activeReturnStatus,
+                'active_return_status' => null,
             ]);
         }
 
