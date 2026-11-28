@@ -2629,34 +2629,41 @@ export default function Piutang({
                                 </div>
                             )}
 
-                            <div className="grid grid-cols-2 gap-4">
-                                <div>
-                                    <label className="block text-slate-700 font-semibold mb-1">
-                                        Tanggal Tagihan / Cut-off <span className="text-red-500">*</span>
-                                    </label>
-                                    <input
-                                        type="date"
-                                        value={openingForm.invoice_date}
-                                        onChange={(e) => {
-                                            const val = e.target.value;
-                                            setOpeningForm({ ...openingForm, invoice_date: val });
-                                            if (val) fetchOpeningPreview(val);
-                                        }}
-                                        required
-                                        className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none"
-                                    />
+                            <div>
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div>
+                                        <label className="block text-slate-700 font-semibold mb-1">
+                                            Tanggal Tagihan / Cut-off <span className="text-red-500">*</span>
+                                        </label>
+                                        <input
+                                            type="date"
+                                            value={openingForm.invoice_date}
+                                            onChange={(e) => {
+                                                const val = e.target.value;
+                                                setOpeningForm({ ...openingForm, invoice_date: val });
+                                                if (val) fetchOpeningPreview(val);
+                                            }}
+                                            required
+                                            className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-slate-700 font-semibold mb-1">
+                                            Tanggal Jatuh Tempo
+                                        </label>
+                                        <input
+                                            type="date"
+                                            value={openingForm.due_date}
+                                            onChange={(e) => setOpeningForm({ ...openingForm, due_date: e.target.value })}
+                                            className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                                        />
+                                    </div>
                                 </div>
-                                <div>
-                                    <label className="block text-slate-700 font-semibold mb-1">
-                                        Tanggal Jatuh Tempo
-                                    </label>
-                                    <input
-                                        type="date"
-                                        value={openingForm.due_date}
-                                        onChange={(e) => setOpeningForm({ ...openingForm, due_date: e.target.value })}
-                                        className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none"
-                                    />
-                                </div>
+                                {openingForm.invoice_date && openingForm.invoice_date > getDefaultCutoffDate() && (
+                                    <div className="mt-2 p-2.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 text-[11px] leading-relaxed">
+                                        <strong>Catatan Tanggal Bulan Berjalan:</strong> Untuk piutang bawaan periode sebelumnya, disarankan memakai tanggal akhir bulan lalu (<strong>{getDefaultCutoffDate()}</strong>). Meski memakai tanggal bulan ini, sistem otomatis menjaga angka <strong>Laba</strong> &amp; <strong>Cashflow Piutang</strong> agar tetap terpisah.
+                                    </div>
+                                )}
                             </div>
 
                             <div>

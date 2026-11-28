@@ -10,6 +10,13 @@ use Illuminate\Support\Facades\DB;
 
 class ConsignmentService
 {
+    private static ?array $stockFilterCache = null;
+
+    public static function clearStockFilterCache(): void
+    {
+        self::$stockFilterCache = null;
+    }
+
     /**
      * Allocate a cumulative sold quantity to receipt lines in FIFO order.
      */
@@ -311,9 +318,8 @@ class ConsignmentService
      */
     public static function getConsignmentStockFilter(): array
     {
-        static $cached = null;
-        if ($cached !== null) {
-            return $cached;
+        if (!app()->runningUnitTests() && self::$stockFilterCache !== null) {
+            return self::$stockFilterCache;
         }
 
         $rows = DB::table('receiving_items as ri')
@@ -393,7 +399,7 @@ class ConsignmentService
             $frontier = array_values(array_unique($next));
         }
 
-        return $cached = [
+        return self::$stockFilterCache = [
             'consignment_batch_ids' => array_keys($consignmentBatchMap),
             'non_consignment_batch_ids' => array_keys($nonConsignmentBatchMap),
             'consignment_medicine_ids' => array_keys($consignmentMedMap),

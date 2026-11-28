@@ -110,7 +110,7 @@ export default function RekapCashflow({ recap = {}, monthLabel = '' }) {
         </div>
         <footer className="flex items-start gap-2 border-t border-slate-200 bg-slate-50 px-4 py-3 text-[11px] leading-relaxed text-slate-600">
             <CircleHelp className="mt-0.5 h-4 w-4 shrink-0 text-blue-600" />
-            <span>Penjualan kredit ditampilkan sebagai informasi piutang dan tidak dijumlahkan sebagai arus kas; penerimaan piutang baru dihitung saat uang diterima. Saldo awal/akhir kas dan bank mengikuti saldo rekening cabang. Piutang Usaha, penerimaan/pembayaran Cash Bond, dan Penyesuaian belum memiliki sumber pencatatan terpisah sehingga sementara ditampilkan nol.</span>
+            <span>Penjualan kredit ditampilkan sebagai informasi piutang dan tidak dijumlahkan sebagai arus kas; penerimaan piutang baru dihitung saat uang diterima. Saldo awal/akhir kas dan bank mengikuti saldo rekening cabang, sedangkan baris Penyesuaian menampilkan selisih bersih Opname Kas &amp; Bank (PENYESUAIAN SALDO) periode berjalan. Piutang Usaha dan Cash Bond sementara ditampilkan nol.</span>
         </footer>
     </section>;
 }

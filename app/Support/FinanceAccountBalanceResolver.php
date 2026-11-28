@@ -52,7 +52,7 @@ class FinanceAccountBalanceResolver
             } elseif (in_array($payment->payment_type, self::OUTFLOW_TYPES, true)) {
                 $balance -= (float) $payment->amount;
             } elseif ($payment->payment_type === 'PENYESUAIAN SALDO') {
-                if ($payment->reference_number === 'OPNAME-OUT') {
+                if (self::isOpnameOut($payment->reference_number)) {
                     $balance -= (float) $payment->amount;
                 } else {
                     $balance += (float) $payment->amount;
@@ -96,7 +96,7 @@ class FinanceAccountBalanceResolver
             } elseif (in_array($payment->payment_type, self::OUTFLOW_TYPES, true)) {
                 $balance -= (float) $payment->amount;
             } elseif ($payment->payment_type === 'PENYESUAIAN SALDO') {
-                if ($payment->reference_number === 'OPNAME-OUT') {
+                if (self::isOpnameOut($payment->reference_number)) {
                     $balance -= (float) $payment->amount;
                 } else {
                     $balance += (float) $payment->amount;
@@ -187,7 +187,7 @@ class FinanceAccountBalanceResolver
             } elseif (in_array($payment->payment_type, self::OUTFLOW_TYPES, true)) {
                 $delta -= (float) $payment->amount;
             } elseif ($payment->payment_type === 'PENYESUAIAN SALDO') {
-                if ($payment->reference_number === 'OPNAME-OUT') {
+                if (self::isOpnameOut($payment->reference_number)) {
                     $delta -= (float) $payment->amount;
                 } else {
                     $delta += (float) $payment->amount;
@@ -202,6 +202,37 @@ class FinanceAccountBalanceResolver
             ->sum('amount');
 
         return round($delta, 2);
+    }
+
+    public static function isOpnameOut(?string $referenceNumber): bool
+    {
+        return str_starts_with(strtoupper(trim((string) $referenceNumber)), 'OPNAME-OUT');
+    }
+
+    /**
+     * Hitung penyesuaian saldo bersih (OPNAME-IN - OPNAME-OUT) dari PENYESUAIAN SALDO
+     * pada daftar akun Kas & Bank dalam rentang [fromDate, toDate] (inklusif).
+     */
+    public static function netOpnameAdjustmentBetween(array $accountIds, string $fromDate, string $toDate): float
+    {
+        $ids = array_values(array_unique(array_filter(array_map('intval', $accountIds))));
+        if (empty($ids) || $fromDate > $toDate || !Schema::hasTable('finance_payments')) {
+            return 0.0;
+        }
+
+        $payments = FinancePayment::whereIn('account_id', $ids)
+            ->where('payment_type', 'PENYESUAIAN SALDO')
+            ->whereDate('payment_date', '>=', $fromDate)
+            ->whereDate('payment_date', '<=', $toDate)
+            ->get(['amount', 'reference_number']);
+
+        $net = 0.0;
+        foreach ($payments as $payment) {
+            $amt = (float) $payment->amount;
+            $net += self::isOpnameOut($payment->reference_number) ? -$amt : $amt;
+        }
+
+        return round($net, 2);
     }
 
     /**

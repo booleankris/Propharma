@@ -23,6 +23,8 @@ export default function Neraca({ data = {}, monthLabel = '' }) {
     const harta = data.harta || {};
     const kewajiban = data.kewajiban || {};
     const saldo = data.saldo || {};
+    const nonOp = data.penyesuaian_non_operasional || {};
+    const hasNonOp = Boolean(nonOp.has_adjustments);
 
     const startDate = data.startDate || '';
     const endDate = data.endDate || '';
@@ -112,7 +114,9 @@ export default function Neraca({ data = {}, monthLabel = '' }) {
                                 <td className="border border-yellow-400 px-4 py-3 tracking-wide">
                                     <div>{labaTanpaStok.label || 'LABA TANPA STOK'}</div>
                                     <div className="mt-0.5 text-[10px] font-semibold normal-case text-slate-700/80">
-                                        (Kas + Bank + Piutang) − Hutang Dagang
+                                        {hasNonOp
+                                            ? '(Kas + Bank + Piutang) − Hutang Dagang (Laba operasional di luar Opname & Cut-off periode)'
+                                            : '(Kas + Bank + Piutang) − Hutang Dagang'}
                                     </div>
                                 </td>
                                 <td className="border border-yellow-400 px-4 py-3 text-right tabular-nums">
@@ -155,7 +159,9 @@ export default function Neraca({ data = {}, monthLabel = '' }) {
                                 <td className="border border-yellow-400 px-4 py-3 tracking-wide">
                                     <div>{labaDenganStok.label || 'LABA DENGAN STOK'}</div>
                                     <div className="mt-0.5 text-[10px] font-semibold normal-case text-slate-700/80">
-                                        Laba Tanpa Stok + Persediaan
+                                        {hasNonOp
+                                            ? 'Laba Tanpa Stok (Operasional) + Selisih Persediaan'
+                                            : 'Laba Tanpa Stok + Persediaan'}
                                     </div>
                                 </td>
                                 <td className="border border-yellow-400 px-4 py-3 text-right tabular-nums">
@@ -240,6 +246,63 @@ export default function Neraca({ data = {}, monthLabel = '' }) {
                     </table>
                 </div>
             </section>
+
+            {hasNonOp && (
+                <section className="rounded-2xl border border-amber-200 bg-amber-50/70 px-5 py-4 text-xs text-slate-800 shadow-sm">
+                    <div className="font-bold uppercase tracking-wide text-amber-900">
+                        Penyesuaian Non-Operasional Periode (Dikecualikan dari Laba)
+                    </div>
+                    <p className="mt-1 text-[11px] text-amber-900/80">
+                        Saldo AWAL &amp; AKHIR tetap menampilkan posisi riil Kas/Bank, Piutang, dan Hutang, sedangkan selisih akibat Opname Kas/Bank maupun input Tagihan Saldo Awal / Pelunasan Pra-Cut-off pada periode ini dikeluarkan agar angka <strong>Laba</strong> tetap murni operasional:
+                    </p>
+                    <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+                        {Math.abs(Number(nonOp.opname_kas_bank || 0)) >= 0.005 && (
+                            <div className="rounded-xl border border-amber-200/80 bg-white px-3 py-2">
+                                <div className="text-[11px] text-slate-500">Opname Kas &amp; Bank</div>
+                                <div className="mt-0.5 font-bold tabular-nums text-slate-900">
+                                    {formatNeracaNumber(nonOp.opname_kas_bank, true)}
+                                </div>
+                            </div>
+                        )}
+                        {Math.abs(Number(nonOp.opening_hutang || 0)) >= 0.005 && (
+                            <div className="rounded-xl border border-amber-200/80 bg-white px-3 py-2">
+                                <div className="text-[11px] text-slate-500">Dampak Saldo Awal Hutang</div>
+                                <div className="mt-0.5 font-bold tabular-nums text-slate-900">
+                                    {formatNeracaNumber(nonOp.opening_hutang, true)}
+                                </div>
+                            </div>
+                        )}
+                        {Math.abs(Number(nonOp.opening_piutang || 0)) >= 0.005 && (
+                            <div className="rounded-xl border border-amber-200/80 bg-white px-3 py-2">
+                                <div className="text-[11px] text-slate-500">Dampak Saldo Awal Piutang</div>
+                                <div className="mt-0.5 font-bold tabular-nums text-slate-900">
+                                    {formatNeracaNumber(nonOp.opening_piutang, true)}
+                                </div>
+                            </div>
+                        )}
+                        {Math.abs(Number(nonOp.cutoff_settlement || 0)) >= 0.005 && (
+                            <div className="rounded-xl border border-amber-200/80 bg-white px-3 py-2">
+                                <div className="text-[11px] text-slate-500">Pelunasan Pra-Cut-off Non-Kas</div>
+                                <div className="mt-0.5 font-bold tabular-nums text-slate-900">
+                                    {formatNeracaNumber(nonOp.cutoff_settlement, true)}
+                                </div>
+                            </div>
+                        )}
+                        <div className="rounded-xl border border-amber-300 bg-amber-100/70 px-3 py-2">
+                            <div className="text-[11px] font-semibold text-amber-900">Total Penyesuaian Non-Op</div>
+                            <div className="mt-0.5 font-extrabold tabular-nums text-amber-950">
+                                {formatNeracaNumber(nonOp.total, true)}
+                            </div>
+                        </div>
+                        <div className="rounded-xl border border-slate-200 bg-white px-3 py-2">
+                            <div className="text-[11px] text-slate-500">Selisih Posisi Bersih (AKHIR − AWAL)</div>
+                            <div className="mt-0.5 font-bold tabular-nums text-slate-900">
+                                {formatNeracaNumber(labaTanpaStok.raw_selisih ?? (Number(labaTanpaStok.akhir || 0) - Number(labaTanpaStok.awal || 0)), true)}
+                            </div>
+                        </div>
+                    </div>
+                </section>
+            )}
         </div>
     );
 }

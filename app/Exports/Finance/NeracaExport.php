@@ -159,6 +159,49 @@ class NeracaExport implements FromArray, WithStyles, WithColumnWidths, WithTitle
             $saldo['selisih'] ?? 0,
         ];
 
+        $nonOp = $this->data['penyesuaian_non_operasional'] ?? [];
+        if (!empty($nonOp['has_adjustments'])) {
+            $currentRow++;
+            $rows[] = ['', '', '', '', ''];
+
+            $currentRow++;
+            $this->boldRows[] = $currentRow;
+            $rows[] = [
+                '',
+                'REKONSILIASI PENYESUAIAN NON-OPERASIONAL (DIKECUALIKAN DARI LABA)',
+                '',
+                '',
+                (float) ($nonOp['total'] ?? 0),
+            ];
+
+            if (abs((float) ($nonOp['opname_kas_bank'] ?? 0)) >= 0.005) {
+                $currentRow++;
+                $rows[] = ['', '• Opname Kas & Bank (PENYESUAIAN SALDO)', '', '', (float) $nonOp['opname_kas_bank']];
+            }
+            if (abs((float) ($nonOp['opening_hutang'] ?? 0)) >= 0.005) {
+                $currentRow++;
+                $rows[] = ['', '• Dampak Saldo Awal Hutang dalam Periode', '', '', (float) $nonOp['opening_hutang']];
+            }
+            if (abs((float) ($nonOp['opening_piutang'] ?? 0)) >= 0.005) {
+                $currentRow++;
+                $rows[] = ['', '• Dampak Saldo Awal Piutang dalam Periode', '', '', (float) $nonOp['opening_piutang']];
+            }
+            if (abs((float) ($nonOp['cutoff_settlement'] ?? 0)) >= 0.005) {
+                $currentRow++;
+                $rows[] = ['', '• Pelunasan Pra-Cut-off Non-Kas dalam Periode', '', '', (float) $nonOp['cutoff_settlement']];
+            }
+
+            $currentRow++;
+            $this->boldRows[] = $currentRow;
+            $rows[] = [
+                '',
+                'SELISIH POSISI BERSIH TANPA STOK (AKHIR - AWAL)',
+                '',
+                '',
+                (float) ($lts['raw_selisih'] ?? (($lts['akhir'] ?? 0) - ($lts['awal'] ?? 0))),
+            ];
+        }
+
         $this->lastRow = $currentRow;
 
         return $rows;

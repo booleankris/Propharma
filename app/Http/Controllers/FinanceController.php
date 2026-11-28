@@ -2683,7 +2683,11 @@ class FinanceController extends Controller
             'periodReceivablePayments' => $periodReceivablePayments,
             'periodOtherIncome' => $periodOtherIncome,
             'periodCashbondReceipts' => 0,
-            'periodAdjustments' => 0,
+            'periodAdjustments' => FinanceAccountBalanceResolver::netOpnameAdjustmentBetween(
+                $accounts->pluck('id')->all(),
+                $startDate,
+                $periodEnd
+            ),
             'periodSupplierCashPayments' => $periodSupplierPaymentsByType['cash'],
             'periodSupplierBankPayments' => $periodSupplierPaymentsByType['bank'],
             'periodCreditSupplierPayments' => $periodCreditSupplierPayments,

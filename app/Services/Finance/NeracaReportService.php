@@ -153,14 +153,28 @@ class NeracaReportService
             + $piutangAkhir
             + $piutangUsahaRow['akhir'];
 
-        // 5b. Laba Tanpa Stok = (Jumlah Poin 1 s/d 8) - Poin 9 (Hutang Dagang), Selisih = AKHIR - AWAL
+        // 5b. Laba Tanpa Stok = (Jumlah Poin 1 s/d 8) - Poin 9 (Hutang Dagang)
+        // Penyesuaian non-operasional (Opname KasBank, Tagihan Saldo Awal dalam periode, Pelunasan Cutoff non-kas)
+        // dikeluarkan dari Selisih Laba agar Laba mencerminkan kinerja operasional murni, sementara AWAL & AKHIR tetap riil.
+        $nonOperational = $this->computeNonOperationalAdjustments(
+            $pharmacyIds,
+            $accountIds,
+            $startDate,
+            $periodEnd,
+            $dayBeforeStart
+        );
+        $nonOpTotal = (float) ($nonOperational['total'] ?? 0.0);
+
         $labaTanpaStokAwal = round($totalAsetLancarAwal - $hutangAwal, 2);
         $labaTanpaStokAkhir = round($totalAsetLancarAkhir - $hutangAkhir, 2);
+        $labaTanpaStokRawSelisih = round($labaTanpaStokAkhir - $labaTanpaStokAwal, 2);
+        $labaTanpaStokSelisih = round($labaTanpaStokRawSelisih - $nonOpTotal, 2);
         $labaTanpaStok = [
             'label' => 'LABA TANPA STOK',
             'awal' => $labaTanpaStokAwal,
             'akhir' => $labaTanpaStokAkhir,
-            'selisih' => round($labaTanpaStokAkhir - $labaTanpaStokAwal, 2),
+            'selisih' => $labaTanpaStokSelisih,
+            'raw_selisih' => $labaTanpaStokRawSelisih,
         ];
 
         // 6. Persediaan: Nilai total stok aktif (Stok * raw_price * 1.11, kecualikan konsinyasi), Selisih = AKHIR - AWAL
@@ -174,24 +188,27 @@ class NeracaReportService
             'selisih' => $persediaanSelisih,
         ];
 
-        // 7. Laba Dengan Stok: Laba Tanpa Stok + Persediaan, Selisih = AKHIR - AWAL
+        // 7. Laba Dengan Stok: Laba Tanpa Stok + Persediaan (Operasional)
         $labaDenganStokAwal = round($labaTanpaStokAwal + $persediaanAwal, 2);
         $labaDenganStokAkhir = round($labaTanpaStokAkhir + $persediaanAkhir, 2);
+        $labaDenganStokRawSelisih = round($labaDenganStokAkhir - $labaDenganStokAwal, 2);
+        $labaDenganStokSelisih = round($labaTanpaStokSelisih + $persediaanSelisih, 2);
         $labaDenganStok = [
             'label' => 'LABA DENGAN STOK',
             'awal' => $labaDenganStokAwal,
             'akhir' => $labaDenganStokAkhir,
-            'selisih' => round($labaDenganStokAkhir - $labaDenganStokAwal, 2),
+            'selisih' => $labaDenganStokSelisih,
+            'raw_selisih' => $labaDenganStokRawSelisih,
         ];
 
         // 8. Harta (Wealth / Total Aktiva): Kas + Bank + Piutang + Persediaan
-        $hartaAwal = $totalAsetLancarAwal + $persediaanAwal;
-        $hartaAkhir = $totalAsetLancarAkhir + $persediaanAkhir;
+        $hartaAwal = round($totalAsetLancarAwal + $persediaanAwal, 2);
+        $hartaAkhir = round($totalAsetLancarAkhir + $persediaanAkhir, 2);
         $harta = [
             'label' => 'HARTA',
             'awal' => $hartaAwal,
             'akhir' => $hartaAkhir,
-            'selisih' => $hartaAkhir - $hartaAwal,
+            'selisih' => round($hartaAkhir - $hartaAwal, 2),
         ];
 
         // 9. Kewajiban (Total Pasiva / Liabilitas): Hutang Dagang
@@ -199,17 +216,17 @@ class NeracaReportService
             'label' => 'KEWAJIBAN',
             'awal' => $hutangAwal,
             'akhir' => $hutangAkhir,
-            'selisih' => $hutangAkhir - $hutangAwal,
+            'selisih' => round($hutangAkhir - $hutangAwal, 2),
         ];
 
-        // 10. Saldo (Ekuitas): Harta - Kewajiban (= Laba Dengan Stok)
-        $saldoAwal = $hartaAwal - $hutangAwal;
-        $saldoAkhir = $hartaAkhir - $hutangAkhir;
+        // 10. Saldo (Ekuitas): Harta - Kewajiban (tetap posisi riil)
+        $saldoAwal = round($hartaAwal - $hutangAwal, 2);
+        $saldoAkhir = round($hartaAkhir - $hutangAkhir, 2);
         $saldo = [
             'label' => 'SALDO',
             'awal' => $saldoAwal,
             'akhir' => $saldoAkhir,
-            'selisih' => $saldoAkhir - $saldoAwal,
+            'selisih' => round($saldoAkhir - $saldoAwal, 2),
         ];
 
         // Build items list with numbers 1..9
@@ -241,6 +258,7 @@ class NeracaReportService
             'harta' => $harta,
             'kewajiban' => $kewajiban,
             'saldo' => $saldo,
+            'penyesuaian_non_operasional' => $nonOperational,
         ];
     }
 
@@ -400,93 +418,15 @@ class NeracaReportService
             ->get();
 
         // Ambil retur pembelian yang berstatus "sudah_potong" hingga tanggal cutoff (konsisten & bebas duplikat seperti PayablesReceivablesService)
-        $returnsByDetailId = [];
-        if (Schema::hasTable('purchase_returns') && Schema::hasTable('purchase_return_items') && $details->isNotEmpty()) {
-            $detailIds = [];
-            $invoiceNumberToDetailIds = [];
-            $uniqueInvoices = [];
-
-            foreach ($details as $detail) {
-                $dId = (int) $detail->id;
-                $detailIds[] = $dId;
-                $invRaw = trim((string) ($detail->invoice_number ?? ''));
-                if ($invRaw !== '') {
-                    $uniqueInvoices[$invRaw] = true;
-                    $invoiceNumberToDetailIds[strtoupper($invRaw)][] = $dId;
-                }
-            }
-            $uniqueInvoiceList = array_keys($uniqueInvoices);
-
-            $seenReturnIdsByDetail = [];
-            $processReturnRows = function ($retRows) use (&$seenReturnIdsByDetail, &$returnsByDetailId, $invoiceNumberToDetailIds) {
-                foreach ($retRows as $r) {
-                    $matchedIds = [];
-                    if (!empty($r->pr_receiving_id)) {
-                        $matchedIds[] = (int) $r->pr_receiving_id;
-                    }
-                    $invNorm = strtoupper(trim((string) ($r->pr_invoice_number ?? '')));
-                    if ($invNorm !== '' && isset($invoiceNumberToDetailIds[$invNorm])) {
-                        foreach ($invoiceNumberToDetailIds[$invNorm] as $mId) {
-                            $matchedIds[] = $mId;
-                        }
-                    }
-
-                    $amt = (float) ($r->subtotal ?? 0);
-                    foreach (array_unique($matchedIds) as $dId) {
-                        if (isset($seenReturnIdsByDetail[$dId][$r->id])) {
-                            continue;
-                        }
-                        $seenReturnIdsByDetail[$dId][$r->id] = true;
-                        $returnsByDetailId[$dId] = ($returnsByDetailId[$dId] ?? 0.0) + $amt;
-                    }
-                }
-            };
-
-            foreach (array_chunk($detailIds, 400) as $chunkIds) {
-                $retByReceiving = DB::table('purchase_return_items as pri')
-                    ->join('purchase_returns as pr', 'pr.id', '=', 'pri.purchase_return_id')
-                    ->whereIn('pr.receiving_id', $chunkIds)
-                    ->where('pr.status', '!=', 'dibatalkan')
-                    ->where('pri.status', 'sudah_potong')
-                    ->whereRaw('COALESCE(pri.deduction_date, pri.status_date, DATE(pr.created_at)) <= ?', [$asOfDate])
-                    ->select(['pri.id', 'pri.subtotal', 'pr.receiving_id as pr_receiving_id', 'pr.invoice_number as pr_invoice_number'])
-                    ->get();
-                $processReturnRows($retByReceiving);
-            }
-
-            foreach (array_chunk($uniqueInvoiceList, 400) as $chunkInvoices) {
-                $retByInvoice = DB::table('purchase_return_items as pri')
-                    ->join('purchase_returns as pr', 'pr.id', '=', 'pri.purchase_return_id')
-                    ->whereIn('pr.invoice_number', $chunkInvoices)
-                    ->where('pr.status', '!=', 'dibatalkan')
-                    ->where('pri.status', 'sudah_potong')
-                    ->whereRaw('COALESCE(pri.deduction_date, pri.status_date, DATE(pr.created_at)) <= ?', [$asOfDate])
-                    ->select(['pri.id', 'pri.subtotal', 'pr.receiving_id as pr_receiving_id', 'pr.invoice_number as pr_invoice_number'])
-                    ->get();
-                $processReturnRows($retByInvoice);
-            }
-        }
+        $returnsByDetailId = $this->collectPurchaseReturnTotals($details, $asOfDate);
 
         $balance = 0.0;
         foreach ($details as $detail) {
-            $ppnType = strtoupper(trim((string) ($detail->invoice_ppn ?? $detail->creditor?->ppn_type ?? 'TANPA')));
-            $invoiceTotal = ReceivingInvoiceTotals::calculate($detail->receiving_items, $ppnType)['total'];
-
-            $returFromPr = (float) ($returnsByDetailId[$detail->id] ?? 0.0);
-
-            // Pembayaran kas/bank & pembayaran retur
-            $paidCashBank = (float) $detail->payments->where('payment_type', '!=', 'RETUR')->sum('amount');
-            $paidRetur = (float) $detail->payments->where('payment_type', 'RETUR')->sum('amount');
-            $totalReturDeduction = round(max($paidRetur, $returFromPr), 2);
-            $netTotal = round(max(0, $invoiceTotal - $totalReturDeduction), 2);
-            $paidApplied = round(min($netTotal, $paidCashBank), 2);
-
-            // Sisa hutang faktur = (nilai faktur - potongan retur) - pembayaran kas/bank
-            $sisa = round(max(0, $netTotal - $paidApplied), 2);
-            if ($sisa < 0.005) {
-                $sisa = 0.0;
-            }
-            $balance += $sisa;
+            $balance += $this->computePayableDetailRemaining(
+                $detail,
+                (float) ($returnsByDetailId[$detail->id] ?? 0.0),
+                $detail->payments
+            );
         }
 
         if (Schema::hasTable('finance_opening_invoices')) {
@@ -734,6 +674,382 @@ class NeracaReportService
         }
 
         return (float) ($log->qty_after ?? 0) - (float) ($log->qty_before ?? 0);
+    }
+
+    /**
+     * Hitung seluruh dampak ekuitas non-operasional di dalam [startDate, periodEnd]
+     * agar Selisih Laba di Neraca tidak terdistorsi oleh Opname KasBank, Tagihan Saldo Awal,
+     * maupun Pelunasan Pra-Cut-off non-kas yang dicatat pada periode berjalan.
+     */
+    private function computeNonOperationalAdjustments(
+        array $pharmacyIds,
+        array $accountIds,
+        string $startDate,
+        string $periodEnd,
+        string $dayBeforeStart
+    ): array {
+        $payablePharmacyIds = $pharmacyIds;
+        if (in_array(1, $payablePharmacyIds, true) && !in_array(9, $payablePharmacyIds, true)) {
+            $payablePharmacyIds[] = 9;
+        }
+
+        // 1. Opname Kas & Bank (PENYESUAIAN SALDO: OPNAME-IN - OPNAME-OUT)
+        $opnameKasBank = FinanceAccountBalanceResolver::netOpnameAdjustmentBetween($accountIds, $startDate, $periodEnd);
+
+        // 2. Tagihan Saldo Awal (finance_opening_invoices) HUTANG & PIUTANG
+        $openingHutangEffect = 0.0;
+        $openingPiutangEffect = 0.0;
+        $hasOpeningInvoiceCol = Schema::hasTable('finance_payments') && Schema::hasColumn('finance_payments', 'opening_invoice_id');
+
+        if (Schema::hasTable('finance_opening_invoices') && $startDate <= $periodEnd) {
+            $query = FinanceOpeningInvoice::query()
+                ->whereDate('invoice_date', '<=', $periodEnd)
+                ->where(function ($q) use ($payablePharmacyIds, $pharmacyIds) {
+                    $q->where(function ($hq) use ($payablePharmacyIds) {
+                        $hq->where('type', 'HUTANG')->whereIn('pharmacy_id', $payablePharmacyIds);
+                    })->orWhere(function ($pq) use ($pharmacyIds) {
+                        $pq->where('type', 'PIUTANG')->whereIn('pharmacy_id', $pharmacyIds);
+                    });
+                });
+
+            if ($hasOpeningInvoiceCol) {
+                $query->with(['payments' => fn ($q) => $q
+                    ->whereDate('payment_date', '<=', $periodEnd)
+                    ->select(['id', 'opening_invoice_id', 'account_id', 'payment_type', 'payment_date', 'amount'])]);
+            }
+
+            foreach ($query->get(['id', 'type', 'pharmacy_id', 'invoice_date', 'amount']) as $oi) {
+                $invoiceDate = $oi->invoice_date?->format('Y-m-d');
+                $amt = (float) $oi->amount;
+                $paidBeforeStart = 0.0;
+                $paidAsOfEnd = 0.0;
+                $cashOutflowInPeriod = 0.0;
+                $cashInflowInPeriod = 0.0;
+
+                if ($hasOpeningInvoiceCol) {
+                    foreach ($oi->payments as $p) {
+                        $pDate = $p->payment_date?->format('Y-m-d');
+                        if (!$pDate || $pDate > $periodEnd) {
+                            continue;
+                        }
+                        $pAmt = (float) $p->amount;
+                        if ($pDate <= $dayBeforeStart) {
+                            $paidBeforeStart += $pAmt;
+                        }
+                        $paidAsOfEnd += $pAmt;
+
+                        if ($pDate >= $startDate && $pDate <= $periodEnd && in_array((int) ($p->account_id ?? 0), $accountIds, true)) {
+                            if (in_array($p->payment_type, FinanceAccountBalanceResolver::OUTFLOW_TYPES, true)) {
+                                $cashOutflowInPeriod += $pAmt;
+                            } elseif (in_array($p->payment_type, FinanceAccountBalanceResolver::INFLOW_TYPES, true)) {
+                                $cashInflowInPeriod += $pAmt;
+                            }
+                        }
+                    }
+                }
+
+                $beforeBal = ($invoiceDate && $invoiceDate <= $dayBeforeStart)
+                    ? ($amt < 0 ? $amt : max(0.0, $amt - $paidBeforeStart))
+                    : 0.0;
+                $afterBal = $amt < 0 ? $amt : max(0.0, $amt - $paidAsOfEnd);
+
+                if (strtoupper((string) $oi->type) === 'HUTANG') {
+                    // Kenaikan hutang non-operasional mengurangi Posisi Bersih; pembayaran kas regulernya diperiode saling menghapus
+                    $openingHutangEffect += (-($afterBal - $beforeBal) - $cashOutflowInPeriod);
+                } elseif (strtoupper((string) $oi->type) === 'PIUTANG') {
+                    $openingPiutangEffect += (($afterBal - $beforeBal) + $cashInflowInPeriod);
+                }
+            }
+        }
+
+        // 3. Pelunasan Pra-Cut-off non-kas (KREDIT CUTOFF / PIUTANG CUTOFF) pada faktur reguler dalam periode
+        $cutoffSettlementEffect = $this->computeRegularCutoffSettlementEffect(
+            $pharmacyIds,
+            $payablePharmacyIds,
+            $startDate,
+            $periodEnd
+        );
+
+        $opnameKasBank = round($opnameKasBank, 2);
+        $openingHutangEffect = round($openingHutangEffect, 2);
+        $openingPiutangEffect = round($openingPiutangEffect, 2);
+        $cutoffSettlementEffect = round($cutoffSettlementEffect, 2);
+        $total = round($opnameKasBank + $openingHutangEffect + $openingPiutangEffect + $cutoffSettlementEffect, 2);
+
+        $hasAdjustments = abs($total) >= 0.005
+            || abs($opnameKasBank) >= 0.005
+            || abs($openingHutangEffect) >= 0.005
+            || abs($openingPiutangEffect) >= 0.005
+            || abs($cutoffSettlementEffect) >= 0.005;
+
+        return [
+            'opname_kas_bank' => $opnameKasBank,
+            'opening_hutang' => $openingHutangEffect,
+            'opening_piutang' => $openingPiutangEffect,
+            'cutoff_settlement' => $cutoffSettlementEffect,
+            'total' => $total,
+            'has_adjustments' => $hasAdjustments,
+        ];
+    }
+
+    private function computeRegularCutoffSettlementEffect(
+        array $pharmacyIds,
+        array $payablePharmacyIds,
+        string $startDate,
+        string $periodEnd
+    ): float {
+        if ($startDate > $periodEnd || !Schema::hasTable('finance_payments')) {
+            return 0.0;
+        }
+
+        $hasOpeningCol = Schema::hasColumn('finance_payments', 'opening_invoice_id');
+        $cutoffQuery = FinancePayment::query()
+            ->whereIn('payment_type', ['KREDIT CUTOFF', 'PIUTANG CUTOFF'])
+            ->whereDate('payment_date', '>=', $startDate)
+            ->whereDate('payment_date', '<=', $periodEnd);
+        if ($hasOpeningCol) {
+            $cutoffQuery->whereNull('opening_invoice_id');
+        }
+        $cutoffRows = $cutoffQuery->get(['payment_type', 'receiving_detail_id', 'medicine_transaction_id']);
+        if ($cutoffRows->isEmpty()) {
+            return 0.0;
+        }
+
+        $effect = 0.0;
+
+        // 3a. KREDIT CUTOFF pada receiving_details
+        $detailIds = $cutoffRows
+            ->where('payment_type', 'KREDIT CUTOFF')
+            ->pluck('receiving_detail_id')
+            ->filter()
+            ->map(fn ($v) => (int) $v)
+            ->unique()
+            ->values()
+            ->all();
+
+        if (!empty($detailIds) && Schema::hasTable('receiving_details')) {
+            $isSqlite = DB::connection()->getDriverName() === 'sqlite';
+            $receivingDateExpr = $isSqlite
+                ? "COALESCE(CASE WHEN date LIKE '__/__/____' THEN substr(date, 7, 4) || '-' || substr(date, 4, 2) || '-' || substr(date, 1, 2) WHEN date LIKE '____-__-__' THEN substr(date, 1, 10) ELSE NULL END, DATE(created_at))"
+                : "COALESCE(STR_TO_DATE(NULLIF(date, ''), '%d/%m/%Y'), STR_TO_DATE(NULLIF(date, ''), '%Y-%m-%d'), DATE(created_at))";
+            $hasOrderItemsJoin = Schema::hasTable('order_items') && Schema::hasColumn('receiving_items', 'order_items_id');
+
+            $details = ReceivingDetails::query()
+                ->whereIn('id', $detailIds)
+                ->with([
+                    'receiving:id,pharmacy_id,status,date,created_at',
+                    'creditor:code,ppn_type',
+                    'receiving_items' => function ($query) use ($hasOrderItemsJoin) {
+                        $query->whereNotNull('batches_id')
+                            ->select(['id', 'receiving_details_id', 'order_items_id', 'total', 'raw_price', 'qty_received', 'qty', 'discount', 'extra_discount']);
+                        if ($hasOrderItemsJoin) {
+                            $query->with('order_items:id,price');
+                        }
+                    },
+                    'payments' => fn ($query) => $query->whereDate('payment_date', '<=', $periodEnd),
+                ])
+                ->whereRaw('UPPER(TRIM(COALESCE(invoice_payment, ""))) = ?', ['KREDIT'])
+                ->postedToStock()
+                ->whereHas('receiving', function ($query) use ($payablePharmacyIds, $periodEnd, $receivingDateExpr) {
+                    $query->whereIn('pharmacy_id', $payablePharmacyIds)
+                        ->whereRaw("{$receivingDateExpr} <= ?", [$periodEnd]);
+                })
+                ->get();
+
+            if ($details->isNotEmpty()) {
+                $returnsByDetailId = $this->collectPurchaseReturnTotals($details, $periodEnd);
+                foreach ($details as $detail) {
+                    $retAmt = (float) ($returnsByDetailId[$detail->id] ?? 0.0);
+                    $withCutoff = $this->computePayableDetailRemaining($detail, $retAmt, $detail->payments);
+                    $paymentsWithoutPeriodCutoff = $detail->payments->reject(function ($p) use ($startDate, $periodEnd) {
+                        $pDate = $p->payment_date?->format('Y-m-d');
+                        return $p->payment_type === 'KREDIT CUTOFF'
+                            && $pDate
+                            && $pDate >= $startDate
+                            && $pDate <= $periodEnd;
+                    });
+                    $withoutCutoff = $this->computePayableDetailRemaining($detail, $retAmt, $paymentsWithoutPeriodCutoff);
+                    $effect += ($withoutCutoff - $withCutoff);
+                }
+            }
+        }
+
+        // 3b. PIUTANG CUTOFF pada medicine_transactions
+        $txIds = $cutoffRows
+            ->where('payment_type', 'PIUTANG CUTOFF')
+            ->pluck('medicine_transaction_id')
+            ->filter()
+            ->map(fn ($v) => (int) $v)
+            ->unique()
+            ->values()
+            ->all();
+
+        if (!empty($txIds) && Schema::hasTable('medicine_transactions')) {
+            $endExclusive = FinanceShift::endExclusive($periodEnd);
+            $txQuery = MedicineTransactions::query()
+                ->whereIn('id', $txIds)
+                ->whereIn('transaction_type', ['KREDIT', 'RESEP KREDIT'])
+                ->whereIn('pharmacy_id', $pharmacyIds)
+                ->where(function ($period) use ($endExclusive) {
+                    $period->where('created_at', '<', $endExclusive)
+                        ->orWhere(function ($legacy) use ($endExclusive) {
+                            $legacy->whereNull('created_at')->where('updated_at', '<', $endExclusive);
+                        });
+                });
+            LiphTransactionScope::applySalesStatus($txQuery);
+            $txHeaders = $txQuery->select(['id', 'subtotal', 'paid'])->toBase()->get();
+
+            if ($txHeaders->isNotEmpty()) {
+                $validTxIds = $txHeaders->pluck('id')->map(fn ($v) => (int) $v)->all();
+                $cartRows = DB::table('medicine_cart')
+                    ->whereIn('transaction_id', $validTxIds)
+                    ->select(['transaction_id', 'quantity', 'item_price', 'total_price', 'final_price'])
+                    ->get();
+                $cartSubtotal = [];
+                foreach ($cartRows as $c) {
+                    $final = (float) ($c->final_price ?: ($c->total_price ?: ((float) ($c->quantity ?? 0) * (float) ($c->item_price ?? 0))));
+                    $cartSubtotal[(int) $c->transaction_id] = ($cartSubtotal[(int) $c->transaction_id] ?? 0.0) + $final;
+                }
+                $returByTx = DB::table('retur')
+                    ->whereIn('transaction_id', $validTxIds)
+                    ->where(fn ($q) => $q->whereNull('created_at')->orWhere('created_at', '<', $endExclusive))
+                    ->groupBy('transaction_id')
+                    ->select('transaction_id', DB::raw('SUM(total_retur) as sum_retur'))
+                    ->pluck('sum_retur', 'transaction_id')
+                    ->all();
+                $allPaymentsByTx = DB::table('finance_payments')
+                    ->whereIn('medicine_transaction_id', $validTxIds)
+                    ->get(['medicine_transaction_id', 'payment_type', 'payment_date', 'amount'])
+                    ->groupBy('medicine_transaction_id');
+
+                foreach ($txHeaders as $tx) {
+                    $txId = (int) $tx->id;
+                    $rawSub = (float) ($tx->subtotal ?? 0);
+                    $total = round($rawSub > 0 ? $rawSub : (float) ($cartSubtotal[$txId] ?? 0.0), 2);
+                    $netTotal = round(max(0, $total - round((float) ($returByTx[$txId] ?? 0), 2)), 2);
+
+                    $txPays = $allPaymentsByTx->get($txId, collect());
+                    $financeAll = (float) $txPays->sum('amount');
+                    $financeAsOf = (float) $txPays->filter(fn ($p) => $p->payment_date && substr((string) $p->payment_date, 0, 10) <= $periodEnd)->sum('amount');
+                    $periodCutoffAmt = (float) $txPays->filter(function ($p) use ($startDate, $periodEnd) {
+                        $d = substr((string) ($p->payment_date ?? ''), 0, 10);
+                        return $p->payment_type === 'PIUTANG CUTOFF' && $d !== '' && $d >= $startDate && $d <= $periodEnd;
+                    })->sum('amount');
+
+                    $legacyPaid = (float) ($tx->paid ?? 0);
+                    $paidWith = ($financeAsOf + 0.005 >= $financeAll)
+                        ? max($financeAll, $legacyPaid)
+                        : $financeAsOf + max(0, $legacyPaid - $financeAll);
+                    $paidWith = round(min($netTotal, $paidWith), 2);
+                    $sisaWith = round(max(0, $netTotal - $paidWith), 2);
+
+                    $financeWithout = max(0.0, $financeAsOf - $periodCutoffAmt);
+                    $financeAllWithout = max(0.0, $financeAll - $periodCutoffAmt);
+                    $paidWithout = ($financeWithout + 0.005 >= $financeAllWithout)
+                        ? max($financeAllWithout, $legacyPaid)
+                        : $financeWithout + max(0, $legacyPaid - $financeAllWithout);
+                    $paidWithout = round(min($netTotal, $paidWithout), 2);
+                    $sisaWithout = round(max(0, $netTotal - $paidWithout), 2);
+
+                    // PIUTANG CUTOFF menurunkan piutang akhir tanpa kas masuk (efek ekuitas negatif)
+                    $effect -= ($sisaWithout - $sisaWith);
+                }
+            }
+        }
+
+        return round($effect, 2);
+    }
+
+    private function collectPurchaseReturnTotals(iterable $details, string $asOfDate): array
+    {
+        $returnsByDetailId = [];
+        if (!Schema::hasTable('purchase_returns') || !Schema::hasTable('purchase_return_items')) {
+            return $returnsByDetailId;
+        }
+
+        $detailIds = [];
+        $invoiceNumberToDetailIds = [];
+        $uniqueInvoices = [];
+
+        foreach ($details as $detail) {
+            $dId = (int) $detail->id;
+            $detailIds[] = $dId;
+            $invRaw = trim((string) ($detail->invoice_number ?? ''));
+            if ($invRaw !== '') {
+                $uniqueInvoices[$invRaw] = true;
+                $invoiceNumberToDetailIds[strtoupper($invRaw)][] = $dId;
+            }
+        }
+        $uniqueInvoiceList = array_keys($uniqueInvoices);
+        if (empty($detailIds)) {
+            return $returnsByDetailId;
+        }
+
+        $seenReturnIdsByDetail = [];
+        $processReturnRows = function ($retRows) use (&$seenReturnIdsByDetail, &$returnsByDetailId, $invoiceNumberToDetailIds) {
+            foreach ($retRows as $r) {
+                $matchedIds = [];
+                if (!empty($r->pr_receiving_id)) {
+                    $matchedIds[] = (int) $r->pr_receiving_id;
+                }
+                $invNorm = strtoupper(trim((string) ($r->pr_invoice_number ?? '')));
+                if ($invNorm !== '' && isset($invoiceNumberToDetailIds[$invNorm])) {
+                    foreach ($invoiceNumberToDetailIds[$invNorm] as $mId) {
+                        $matchedIds[] = $mId;
+                    }
+                }
+
+                $amt = (float) ($r->subtotal ?? 0);
+                foreach (array_unique($matchedIds) as $dId) {
+                    if (isset($seenReturnIdsByDetail[$dId][$r->id])) {
+                        continue;
+                    }
+                    $seenReturnIdsByDetail[$dId][$r->id] = true;
+                    $returnsByDetailId[$dId] = ($returnsByDetailId[$dId] ?? 0.0) + $amt;
+                }
+            }
+        };
+
+        foreach (array_chunk($detailIds, 400) as $chunkIds) {
+            $retByReceiving = DB::table('purchase_return_items as pri')
+                ->join('purchase_returns as pr', 'pr.id', '=', 'pri.purchase_return_id')
+                ->whereIn('pr.receiving_id', $chunkIds)
+                ->where('pr.status', '!=', 'dibatalkan')
+                ->where('pri.status', 'sudah_potong')
+                ->whereRaw('COALESCE(pri.deduction_date, pri.status_date, DATE(pr.created_at)) <= ?', [$asOfDate])
+                ->select(['pri.id', 'pri.subtotal', 'pr.receiving_id as pr_receiving_id', 'pr.invoice_number as pr_invoice_number'])
+                ->get();
+            $processReturnRows($retByReceiving);
+        }
+
+        foreach (array_chunk($uniqueInvoiceList, 400) as $chunkInvoices) {
+            $retByInvoice = DB::table('purchase_return_items as pri')
+                ->join('purchase_returns as pr', 'pr.id', '=', 'pri.purchase_return_id')
+                ->whereIn('pr.invoice_number', $chunkInvoices)
+                ->where('pr.status', '!=', 'dibatalkan')
+                ->where('pri.status', 'sudah_potong')
+                ->whereRaw('COALESCE(pri.deduction_date, pri.status_date, DATE(pr.created_at)) <= ?', [$asOfDate])
+                ->select(['pri.id', 'pri.subtotal', 'pr.receiving_id as pr_receiving_id', 'pr.invoice_number as pr_invoice_number'])
+                ->get();
+            $processReturnRows($retByInvoice);
+        }
+
+        return $returnsByDetailId;
+    }
+
+    private function computePayableDetailRemaining(ReceivingDetails $detail, float $returFromPr, $payments): float
+    {
+        $ppnType = strtoupper(trim((string) ($detail->invoice_ppn ?? $detail->creditor?->ppn_type ?? 'TANPA')));
+        $invoiceTotal = ReceivingInvoiceTotals::calculate($detail->receiving_items, $ppnType)['total'];
+
+        $paidCashBank = (float) $payments->where('payment_type', '!=', 'RETUR')->sum('amount');
+        $paidRetur = (float) $payments->where('payment_type', 'RETUR')->sum('amount');
+        $totalReturDeduction = round(max($paidRetur, $returFromPr), 2);
+        $netTotal = round(max(0, $invoiceTotal - $totalReturDeduction), 2);
+        $paidApplied = round(min($netTotal, $paidCashBank), 2);
+
+        $sisa = round(max(0, $netTotal - $paidApplied), 2);
+        return $sisa < 0.005 ? 0.0 : $sisa;
     }
 }
 

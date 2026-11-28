@@ -62,30 +62,7 @@ class CashflowTradeReportService
             $rows['entities'][$key]['total'] += $amount;
         }
 
-        if (Schema::hasTable('finance_opening_invoices')) {
-            $openingInPeriod = FinanceOpeningInvoice::query()
-                ->with('debtor:id,name')
-                ->where('type', 'PIUTANG')
-                ->whereIn('pharmacy_id', $pharmacyIds)
-                ->whereBetween('invoice_date', [$startDate, $endDate])
-                ->get();
-
-            foreach ($openingInPeriod as $oi) {
-                $date = $oi->invoice_date?->toDateString();
-                if (!$date || !isset($rows['dates'][$date])) continue;
-                $debtorId = (int) ($oi->debtor_id ?? 0);
-                $key = 'debtor:' . $debtorId;
-                if (!isset($rows['entities'][$key])) {
-                    $name = $oi->debtor?->name ?: 'Debitur tidak tercatat';
-                    $rows['entities'][$key] = $this->blankEntity($key, $name, array_keys($rows['dates']));
-                }
-                $amount = (float) $oi->amount;
-                $rows['entities'][$key]['amounts'][$date] += $amount;
-                $rows['entities'][$key]['total'] += $amount;
-            }
-        }
-
-        $opening = $this->receivableBalancesBefore($pharmacyIds, $startDate);
+        $opening = $this->receivableBalancesBefore($pharmacyIds, $startDate, $endDate);
         $payments = $this->receivablePaymentsInPeriod($pharmacyIds, $startDate, $endDate);
         $this->attachBalanceColumns($rows, $opening, $payments);
 
@@ -101,10 +78,14 @@ class CashflowTradeReportService
         $rows = $this->blankRows(Creditor::query()->orderBy('name')->get(['code', 'name']), $startDate, $endDate, 'creditor:');
         $start = FinanceShift::start($startDate);
         $until = FinanceShift::endExclusive($endDate);
+        $isSqlite = DB::connection()->getDriverName() === 'sqlite';
+        $receivingDateExpr = $isSqlite
+            ? "COALESCE(CASE WHEN date LIKE '__/__/____' THEN substr(date, 7, 4) || '-' || substr(date, 4, 2) || '-' || substr(date, 1, 2) WHEN date LIKE '____-__-__' THEN substr(date, 1, 10) ELSE NULL END, DATE(created_at))"
+            : "COALESCE(STR_TO_DATE(NULLIF(date, ''), '%d/%m/%Y'), STR_TO_DATE(NULLIF(date, ''), '%Y-%m-%d'), DATE(created_at))";
 
         $items = ReceivingItems::query()
             ->with(['receiving_details.creditor', 'receiving_details.receiving'])
-            ->where(function ($dateQ) use ($start, $until, $startDate, $endDate) {
+            ->where(function ($dateQ) use ($start, $until, $startDate, $endDate, $receivingDateExpr) {
                 $dateQ->whereBetween('receiving_items.created_at', [$start, $until])
                     ->orWhere(function ($fallback) use ($start, $until) {
                         $fallback->whereNull('receiving_items.created_at')
@@ -113,8 +94,8 @@ class CashflowTradeReportService
                     ->orWhereHas('receiving_details', function ($dq) use ($start, $until) {
                         $dq->whereBetween('receiving_details.created_at', [$start, $until]);
                     })
-                    ->orWhereHas('receiving_details.receiving', function ($rq) use ($startDate, $endDate) {
-                        $rq->whereRaw("COALESCE(STR_TO_DATE(NULLIF(date, ''), '%d/%m/%Y'), STR_TO_DATE(NULLIF(date, ''), '%Y-%m-%d'), DATE(created_at)) BETWEEN ? AND ?", [$startDate, $endDate]);
+                    ->orWhereHas('receiving_details.receiving', function ($rq) use ($startDate, $endDate, $receivingDateExpr) {
+                        $rq->whereRaw("{$receivingDateExpr} BETWEEN ? AND ?", [$startDate, $endDate]);
                     });
             })
             ->whereHas('receiving_details', fn($query) => $query->whereRaw('UPPER(TRIM(COALESCE(invoice_payment, ""))) = ?', ['KREDIT']))
@@ -164,30 +145,7 @@ class CashflowTradeReportService
             $rows['entities'][$key]['total'] += $amount;
         }
 
-        if (Schema::hasTable('finance_opening_invoices')) {
-            $openingInPeriod = FinanceOpeningInvoice::query()
-                ->with('creditor:code,name')
-                ->where('type', 'HUTANG')
-                ->whereIn('pharmacy_id', $pharmacyIds)
-                ->whereBetween('invoice_date', [$startDate, $endDate])
-                ->get();
-
-            foreach ($openingInPeriod as $oi) {
-                $date = $oi->invoice_date?->toDateString();
-                if (!$date || !isset($rows['dates'][$date])) continue;
-                $code = (string) ($oi->creditor_code ?? '');
-                $key = 'creditor:' . ($code !== '' ? $code : 'unknown');
-                if (!isset($rows['entities'][$key])) {
-                    $name = $oi->creditor?->name ?: ($code !== '' ? "Supplier {$code}" : 'Supplier tidak tercatat');
-                    $rows['entities'][$key] = $this->blankEntity($key, $name, array_keys($rows['dates']));
-                }
-                $amount = (float) $oi->amount;
-                $rows['entities'][$key]['amounts'][$date] += $amount;
-                $rows['entities'][$key]['total'] += $amount;
-            }
-        }
-
-        $opening = $this->payableBalancesBefore($pharmacyIds, $startDate);
+        $opening = $this->payableBalancesBefore($pharmacyIds, $startDate, $endDate);
         $payments = $this->payablePaymentsInPeriod($pharmacyIds, $startDate, $endDate);
         $this->attachBalanceColumns($rows, $opening, $payments);
 
@@ -197,7 +155,7 @@ class CashflowTradeReportService
     /**
      * Saldo piutang per debitur sebelum awal periode operasional.
      */
-    private function receivableBalancesBefore(array $pharmacyIds, string $startDate): array
+    private function receivableBalancesBefore(array $pharmacyIds, string $startDate, ?string $endDate = null): array
     {
         $cutoff = FinanceShift::start($startDate);
         $paymentCutoff = Carbon::parse($startDate)->subDay()->toDateString();
@@ -238,11 +196,12 @@ class CashflowTradeReportService
         }
 
         if (Schema::hasTable('finance_opening_invoices')) {
+            $cutoffDate = $endDate ?: $startDate;
             $openingReceivables = FinanceOpeningInvoice::query()
                 ->withSum(['payments as paid_before' => fn($q) => $q->whereDate('payment_date', '<=', $paymentCutoff)], 'amount')
                 ->where('type', 'PIUTANG')
                 ->whereIn('pharmacy_id', $pharmacyIds)
-                ->whereDate('invoice_date', '<', $startDate)
+                ->whereDate('invoice_date', '<=', $cutoffDate)
                 ->get(['id', 'debtor_id', 'amount']);
 
             foreach ($openingReceivables as $oi) {
@@ -285,9 +244,9 @@ class CashflowTradeReportService
     }
 
     /**
-     * Saldo hutang per supplier sebelum awal periode operasional.
+     * Saldo hutang per supplier sebelum awal periode operasional (termasuk tagihan saldo awal pra-sistem).
      */
-    private function payableBalancesBefore(array $pharmacyIds, string $startDate): array
+    private function payableBalancesBefore(array $pharmacyIds, string $startDate, ?string $endDate = null): array
     {
         if (in_array(1, $pharmacyIds, true) && !in_array(9, $pharmacyIds, true)) {
             $pharmacyIds[] = 9;
@@ -322,6 +281,11 @@ class CashflowTradeReportService
             }
         }
 
+        $isSqlite = DB::connection()->getDriverName() === 'sqlite';
+        $receivingDateExpr = $isSqlite
+            ? "COALESCE(CASE WHEN date LIKE '__/__/____' THEN substr(date, 7, 4) || '-' || substr(date, 4, 2) || '-' || substr(date, 1, 2) WHEN date LIKE '____-__-__' THEN substr(date, 1, 10) ELSE NULL END, DATE(created_at))"
+            : "COALESCE(STR_TO_DATE(NULLIF(date, ''), '%d/%m/%Y'), STR_TO_DATE(NULLIF(date, ''), '%Y-%m-%d'), DATE(created_at))";
+
         $details = ReceivingDetails::query()
             ->with([
                 'creditor:code,name',
@@ -335,10 +299,10 @@ class CashflowTradeReportService
             ->whereRaw('UPPER(TRIM(COALESCE(invoice_payment, ""))) = ?', ['KREDIT'])
             ->postedToStock()
             ->whereHas('receiving', fn($query) => $query->whereIn('pharmacy_id', $pharmacyIds))
-            ->where(function ($dateQuery) use ($cutoff, $startDate) {
+            ->where(function ($dateQuery) use ($cutoff, $startDate, $receivingDateExpr) {
                 $dateQuery->where('receiving_details.created_at', '<', $cutoff)
-                    ->orWhereHas('receiving', function ($rq) use ($startDate) {
-                        $rq->whereRaw("COALESCE(STR_TO_DATE(NULLIF(date, ''), '%d/%m/%Y'), STR_TO_DATE(NULLIF(date, ''), '%Y-%m-%d'), DATE(created_at)) < ?", [$startDate]);
+                    ->orWhereHas('receiving', function ($rq) use ($startDate, $receivingDateExpr) {
+                        $rq->whereRaw("{$receivingDateExpr} < ?", [$startDate]);
                     });
             })
             ->get();
@@ -365,11 +329,12 @@ class CashflowTradeReportService
         }
 
         if (Schema::hasTable('finance_opening_invoices')) {
+            $cutoffDate = $endDate ?: $startDate;
             $openingPayables = FinanceOpeningInvoice::query()
                 ->withSum(['payments as paid_before' => fn($q) => $q->whereDate('payment_date', '<=', $paymentCutoff)], 'amount')
                 ->where('type', 'HUTANG')
                 ->whereIn('pharmacy_id', $pharmacyIds)
-                ->whereDate('invoice_date', '<', $startDate)
+                ->whereDate('invoice_date', '<=', $cutoffDate)
                 ->get(['id', 'creditor_code', 'amount']);
 
             foreach ($openingPayables as $oi) {
