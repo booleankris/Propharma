@@ -267,7 +267,7 @@ class ReconcileNeracaNovember extends Command
             ->whereDate('fp.payment_date', '<=', $end)
             ->whereRaw('COALESCE(mt.discount, 0) > 0')
             ->orderBy('fp.id')
-            ->get([
+            ->select([
                 'fp.id as fp_id',
                 'fp.account_id',
                 'fp.payment_date',
@@ -277,6 +277,8 @@ class ReconcileNeracaNovember extends Command
                 'mt.subtotal',
                 'mt.discount',
             ])
+            ->selectRaw("(SELECT COUNT(*) FROM finance_payments fp2 WHERE fp2.medicine_transaction_id = mt.id AND fp2.payment_type IN ('PENJUALAN TUNAI', 'PENJUALAN NON TUNAI')) as sales_fp_count")
+            ->get()
             ->map(function ($row) {
                 $expectedNet = round(max(0.0, (float) $row->subtotal - (float) ($row->discount ?? 0)), 2);
                 $recorded = round((float) $row->amount, 2);
@@ -285,7 +287,12 @@ class ReconcileNeracaNovember extends Command
                 $row->excess = round($recorded - $expectedNet, 2);
                 return $row;
             })
-            ->filter(fn ($row) => abs($row->excess) > 0.01)
+            // Hanya pola bug lama yang persis: 1 mutasi penjualan per transaksi, tercatat = subtotal kotor,
+            // dan lebih besar dari subtotal - diskon. Transaksi dengan talangan ongkir / split payment
+            // (lebih dari 1 mutasi PENJUALAN) tidak pernah disentuh.
+            ->filter(fn ($row) => (int) $row->sales_fp_count === 1
+                && abs($row->recorded - round((float) $row->subtotal, 2)) <= 0.01
+                && $row->excess > 0.01)
             ->values();
     }
 

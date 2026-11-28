@@ -514,6 +514,60 @@ class ReconcileNeracaNovemberCommandTest extends TestCase
         $this->assertEqualsWithDelta(-149000.0, $afterSecond['laba_tanpa_stok']['selisih'], 0.01);
     }
 
+    public function test_discount_fix_never_touches_correct_or_shipping_fee_payments(): void
+    {
+        FinancePayment::create([
+            'pharmacy_id' => 2,
+            'account_id' => $this->kas->id,
+            'payment_type' => 'SALDO AWAL',
+            'payment_date' => '2026-11-01',
+            'amount' => 1000000,
+        ]);
+
+        // Sale with discount recorded correctly (net 51.000) + separate talangan ongkir 10.000
+        $saleTrx = new MedicineTransactions([
+            'pharmacy_id' => 2,
+            'transaction_code' => '26112099902',
+            'transaction_type' => 'PENJUALAN',
+            'payment_method' => 'CASH',
+            'subtotal' => 52000,
+            'discount' => 1000,
+            'paid' => 61000,
+            'status' => 1,
+        ]);
+        $saleTrx->created_at = '2026-11-12 10:00:00';
+        $saleTrx->save();
+
+        $mainFp = FinancePayment::create([
+            'pharmacy_id' => 2,
+            'medicine_transaction_id' => $saleTrx->id,
+            'account_id' => $this->kas->id,
+            'payment_type' => 'PENJUALAN TUNAI',
+            'payment_date' => '2026-11-12',
+            'amount' => 51000,
+        ]);
+        $ongkirFp = FinancePayment::create([
+            'pharmacy_id' => 2,
+            'medicine_transaction_id' => $saleTrx->id,
+            'account_id' => $this->kas->id,
+            'payment_type' => 'PENJUALAN TUNAI',
+            'payment_date' => '2026-11-12',
+            'amount' => 10000,
+            'notes' => 'Penerimaan talangan ongkir (Tunai)',
+        ]);
+
+        $code = Artisan::call('finance:reconcile-neraca', [
+            '--pharmacy_id' => 2,
+            '--sync-retur' => 0,
+            '--void-august-trial' => 0,
+            '--apply' => true,
+        ]);
+
+        $this->assertSame(0, $code);
+        $this->assertEqualsWithDelta(51000.0, (float) FinancePayment::find($mainFp->id)->amount, 0.01);
+        $this->assertEqualsWithDelta(10000.0, (float) FinancePayment::find($ongkirFp->id)->amount, 0.01);
+    }
+
     public function test_reconcile_aborts_safely_when_target_account_has_no_post_event_opname(): void
     {
         FinancePayment::create([
