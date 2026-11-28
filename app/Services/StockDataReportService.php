@@ -36,23 +36,25 @@ class StockDataReportService
         $transferSourcePharmacyIds = $canSeeWarehouse ? [$warehouseId, $pmiPharmacyId] : [$pharmacyId];
         $hasDateFilter = ($startDate !== null || $endDate !== null);
 
-        // 1. Storage Stock (Gudang PMI)
+        // 1. Storage Stock (Gudang PMI) — hanya stok positif (> 0), abaikan batch minus
         $storageStockMap = [];
         if ($canSeeWarehouse) {
             $storageStockMap = Batches::query()
                 ->when(!$allMedicines, fn($q) => $q->whereIn('medicine_id', $medicineIds))
                 ->where('pharmacy_id', $warehouseId)
-                ->selectRaw('medicine_id, SUM(stock) as total')
+                ->whereRaw("CAST(REPLACE(COALESCE(NULLIF(stock, ''), '0'), ',', '.') AS DECIMAL(15, 2)) > 0")
+                ->selectRaw("medicine_id, COALESCE(SUM(CAST(REPLACE(COALESCE(NULLIF(stock, ''), '0'), ',', '.') AS DECIMAL(15, 2))), 0) as total")
                 ->groupBy('medicine_id')
                 ->pluck('total', 'medicine_id')
                 ->all();
         }
 
-        // 2. Counter Stock (Pelayanan PMI / Etalase Cabang)
+        // 2. Counter Stock (Pelayanan PMI / Etalase Cabang) — hanya qty positif (> 0), abaikan baris minus
         $counterStockMap = MedicineTransferItems::join('batches', 'batches.id', '=', 'medicine_transfer_items.batches_id')
             ->when(!$allMedicines, fn($q) => $q->whereIn('batches.medicine_id', $medicineIds))
             ->where('batches.pharmacy_id', $counterPharmacyId)
             ->where('medicine_transfer_items.status', 1)
+            ->where('medicine_transfer_items.qty', '>', 0)
             ->where(function ($q) {
                 $q->whereNull('medicine_transfer_items.source_type')
                   ->orWhere('medicine_transfer_items.source_type', '!=', 'retur_gudang');

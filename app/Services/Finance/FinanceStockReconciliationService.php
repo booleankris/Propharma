@@ -175,7 +175,7 @@ class FinanceStockReconciliationService
             $metrics = $metricsMap[$mId] ?? [];
 
             $hnaExact = round($this->parsePositiveDecimal($m->raw_price), 4);
-            $hnaExcelFloat = (float) ($m->raw_price ?? 0);
+            $hnaExcelFloat = (float) str_replace(',', '.', trim((string) ($m->raw_price ?? '0')));
             $hnaVat = $hnaExact * 1.11;
 
             $excelQtyTotal = (int) ($metrics['qty_now'] ?? 0);
@@ -271,7 +271,13 @@ class FinanceStockReconciliationService
                 'negative_qty' => round($negQtyTotal, 2),
                 'is_mismatch' => $isMismatch,
                 'status_label' => $isMismatch ? 'ADA SELISIH' : 'COCOK',
-                'reason' => $isMismatch ? implode('; ', $reasons) : ($consPosQty > 0.0001 ? 'Konsinyasi cocok (sama-sama ter-exclude)' : 'Sesuai'),
+                'reason' => $isMismatch
+                    ? implode('; ', $reasons)
+                    : ($consPosQty > 0.0001
+                        ? 'Konsinyasi cocok (sama-sama ter-exclude)'
+                        : ($negQtyTotal < -0.0001
+                            ? 'Cocok (batch/etalase minus ' . $this->formatQtyLabel($negQtyTotal) . ' sama-sama diabaikan)'
+                            : 'Sesuai')),
                 '_abs_diff' => abs($diffValExact),
                 '_fin_val' => abs($finValExact),
             ];

@@ -186,12 +186,14 @@ class FinanceStockReconciliationServiceTest extends TestCase
         $bMatchEtl = DB::table('batches')->insertGetId(['medicine_id' => $mMatch, 'pharmacy_id' => 1, 'name' => 'B1', 'stock' => '5']);
         DB::table('medicine_transfer_items')->insert(['batches_id' => $bMatchEtl, 'qty' => 5, 'status' => 1]);
 
-        // 2. Obat Batch Minus: Gudang OPN +20 dan batch retur -20 -> Excel net 0, Finance +20 * 1110 = 22,200
+        // 2. Obat Batch Minus: Gudang OPN +20 dan batch retur -20 -> baik Excel Data Stok maupun Finance abaikan -20 (sama-sama 20)
         $mNeg = DB::table('medicines')->insertGetId([
             'code' => '002', 'name' => 'OBAT BATCH MINUS', 'raw_price' => '1000', 'status' => 1,
         ]);
         DB::table('batches')->insert(['medicine_id' => $mNeg, 'pharmacy_id' => 9, 'name' => 'OPN-1', 'stock' => '20']);
         DB::table('batches')->insert(['medicine_id' => $mNeg, 'pharmacy_id' => 9, 'name' => 'WT-NEG', 'stock' => '-20']);
+        $bNegEtl = DB::table('batches')->insertGetId(['medicine_id' => $mNeg, 'pharmacy_id' => 1, 'name' => 'E-NEG', 'stock' => '-5']);
+        DB::table('medicine_transfer_items')->insert(['batches_id' => $bNegEtl, 'qty' => -5, 'status' => 1]);
 
         // 3. Obat Faktur Terakhir KREDIT tetapi punya sisa batch Konsinyasi lama:
         //    Batch KREDIT (+10), Batch KONSINYASI (+6) -> Excel label 'Kredit' total 16, Finance hanya hitung 10!
@@ -264,16 +266,26 @@ class FinanceStockReconciliationServiceTest extends TestCase
 
         $report = app(FinanceStockReconciliationService::class)->buildReport(1);
         $this->assertSame($financeValuation['total'], $report['summary']['finance_total_value']);
-        $this->assertSame(3, $report['summary']['mismatch_count']);
+        $this->assertSame(2, $report['summary']['mismatch_count']);
 
         $byCode = collect($report['rows'])->keyBy('code');
         $this->assertSame('COCOK', $byCode['001']['status_label']);
-        $this->assertSame('ADA SELISIH', $byCode['002']['status_label']);
-        $this->assertStringContainsString('Batch/etalase minus (-20)', $byCode['002']['reason']);
+        $this->assertSame(20, $byCode['002']['excel_qty']);
+        $this->assertSame(-25.0, $byCode['002']['negative_qty']);
+        $this->assertSame('COCOK', $byCode['002']['status_label']);
+        $this->assertStringContainsString('batch/etalase minus -25 sama-sama diabaikan', $byCode['002']['reason']);
         $this->assertSame('ADA SELISIH', $byCode['003']['status_label']);
         $this->assertStringContainsString('batch Konsinyasi (6)', $byCode['003']['reason']);
         $this->assertSame('ADA SELISIH', $byCode['004']['status_label']);
         $this->assertStringContainsString('batch Non-Konsinyasi (4)', $byCode['004']['reason']);
+
+        // Pastikan Sheet 1 Data Stok Export untuk OBAT BATCH MINUS (002) menampilkan stok 20 (mengabaikan -20 gudang & -5 etalase)
+        $sheet1Rows = collect($sheets[0]->array())->slice(5)->values();
+        $row002 = $sheet1Rows->firstWhere(1, '002');
+        $this->assertNotNull($row002);
+        $this->assertSame(20, $row002[13]); // STOK GUDANG
+        $this->assertSame(0, $row002[14]);  // STOK PELAYANAN
+        $this->assertSame(20, $row002[15]); // TOTAL STOK
 
         // Ensure Sheet 2 array() produces summary + 4 rows + total without errors
         $sheet2Array = $sheets[1]->array();

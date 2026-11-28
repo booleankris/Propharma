@@ -297,7 +297,7 @@ class StockDataSheetExport extends DefaultValueBinder implements FromArray, With
 
             $factoryName = $m->factory_name ?: '-';
             $contentVal = (float) ($m->content ?: 1);
-            $rawPriceVal = (float) ($m->raw_price ?? 0);
+            $rawPriceVal = (float) str_replace(',', '.', trim((string) ($m->raw_price ?? '0')));
 
             if ($canSeeWarehouse) {
                 $rows[] = [
