@@ -17,6 +17,7 @@ use App\Models\ReceivingItems;
 use App\Models\ReceivingDetails;
 use App\Models\Retur;
 use App\Models\User;
+use App\Support\FinanceShift;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
@@ -695,7 +696,7 @@ class ReturController extends Controller
                     'medicine_transaction_id' => $transaction->id,
                     'account_id' => $refundAccount->id,
                     'payment_type' => 'RETUR PENJUALAN',
-                    'payment_date' => Carbon::now()->toDateString(),
+                    'payment_date' => FinanceShift::operationalDate(Carbon::now()) ?? Carbon::now()->toDateString(),
                     'amount' => $refundAmount,
                     'reference_number' => $returCode,
                     'notes' => 'Pengembalian dana retur penjualan (' . $viaLabel . '): ' . $medName . ' (' . $patientName . ' - Struk: ' . $origCode . ')',

@@ -11,6 +11,7 @@ use App\Models\MedicineTransactions;
 use App\Models\Pharmacies;
 use App\Models\Retur;
 use App\Models\User;
+use App\Support\FinanceShift;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use DataTables;
@@ -663,7 +664,8 @@ class SalesDataController extends Controller
                             'medicine_transaction_id' => $transaction->id,
                             'account_id' => $newTargetAccount->id,
                             'payment_type' => $newPaymentType,
-                            'payment_date' => Carbon::parse($transaction->created_at ?? $transaction->updated_at)->toDateString(),
+                            'payment_date' => FinanceShift::operationalDate(Carbon::parse($transaction->created_at ?? $transaction->updated_at))
+                                ?? Carbon::parse($transaction->created_at ?? $transaction->updated_at)->toDateString(),
                             'amount' => $amount,
                             'reference_number' => $transaction->transaction_code,
                             'notes' => $newNotes,

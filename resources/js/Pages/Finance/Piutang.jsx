@@ -12,7 +12,7 @@ import {
     ShoppingCart, Search, Check, X, Calendar, AlertCircle, ChevronLeft, ChevronRight, User,
     ArrowLeft, Printer, MoreVertical, ChevronDown, History, Landmark, Maximize2, CreditCard,
     Download, ArrowUp, ArrowDown, Clock, AlertTriangle, FileText, CheckCircle2, FileSpreadsheet, Upload,
-    RotateCcw, Loader2, Plus, Trash2
+    RotateCcw, Loader2, Plus, Trash2, Pencil
 } from 'lucide-react';
 
 export default function Piutang({
@@ -216,6 +216,68 @@ export default function Piutang({
         const initial = detailCacheRef.current[item.id] || item;
         setDetailViewPiutang(initial);
         loadPiutangDetail(item.id);
+    };
+
+    // State Modal Revisi Akun Kas & Bank Pelunasan
+    const [isReviseAccountModalOpen, setIsReviseAccountModalOpen] = useState(false);
+    const [isSubmittingReviseAccount, setIsSubmittingReviseAccount] = useState(false);
+    const [reviseAccountForm, setReviseAccountForm] = useState({
+        payment_id: '',
+        parent_id: '',
+        account_id: '',
+        old_account_name: '',
+        tanggal: '',
+        nominal: 0,
+        reference_number: '',
+        revision_reason: '',
+    });
+
+    const openReviseAccountModal = (pay, parentItem) => {
+        if (!pay?.id || !pay?.akunId) return;
+        setReviseAccountForm({
+            payment_id: pay.id,
+            parent_id: parentItem?.id || '',
+            account_id: String(pay.akunId),
+            old_account_name: `${pay.akunNama} (${pay.akunKode})`,
+            tanggal: pay.tanggal || '-',
+            nominal: Number(pay.nominal || 0),
+            reference_number: pay.noReferensi && pay.noReferensi !== '-' ? pay.noReferensi : '',
+            revision_reason: '',
+        });
+        setIsReviseAccountModalOpen(true);
+    };
+
+    const handleReviseAccountSubmit = (e) => {
+        e.preventDefault();
+        if (!reviseAccountForm.account_id) {
+            alert('Pilih akun Kas & Bank terlebih dahulu.');
+            return;
+        }
+        setIsSubmittingReviseAccount(true);
+        router.put(`/finance/payments/${reviseAccountForm.payment_id}/account`, {
+            account_id: reviseAccountForm.account_id,
+            reference_number: reviseAccountForm.reference_number,
+            revision_reason: reviseAccountForm.revision_reason,
+        }, {
+            preserveScroll: true,
+            onSuccess: () => {
+                setIsReviseAccountModalOpen(false);
+                setIsSubmittingReviseAccount(false);
+                const targetParentId = reviseAccountForm.parent_id;
+                if (targetParentId) {
+                    delete detailCacheRef.current[targetParentId];
+                    if (drawerPiutang?.id === targetParentId || detailViewPiutang?.id === targetParentId) {
+                        loadPiutangDetail(targetParentId);
+                    }
+                } else {
+                    detailCacheRef.current = {};
+                }
+            },
+            onError: (errs) => {
+                setIsSubmittingReviseAccount(false);
+                alert(Object.values(errs).flat()[0] || 'Gagal merevisi akun Kas & Bank.');
+            },
+        });
     };
 
     const openPiutangDetailById = (txId, fallbackRet = null) => {
@@ -1070,6 +1132,7 @@ export default function Piutang({
                                             <th className="py-2.5 px-3 font-medium">Dicatat Oleh</th>
                                             <th className="py-2.5 px-3 font-medium">Waktu Audit</th>
                                             <th className="py-2.5 px-3 font-medium">Catatan</th>
+                                            <th className="py-2.5 px-3 font-medium text-right">Aksi</th>
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-slate-100 text-slate-700">
@@ -1089,7 +1152,21 @@ export default function Piutang({
                                                 </td>
                                                 <td className="py-3 px-3 font-medium text-slate-800">{pay.diprosesOleh}</td>
                                                 <td className="py-3 px-3 text-slate-500 text-[11px]">{pay.waktuAudit}</td>
-                                                <td className="py-3 px-3 text-slate-500 text-[11px]">{pay.catatan}</td>
+                                                <td className="py-3 px-3 text-slate-500 text-[11px] whitespace-pre-line">{pay.catatan}</td>
+                                                <td className="py-3 px-3 text-right">
+                                                    {pay.akunId && pay.tipe === 'PIUTANG' ? (
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => openReviseAccountModal(pay, detailViewPiutang)}
+                                                            className="inline-flex items-center gap-1 px-2.5 py-1 text-[11px] font-semibold text-amber-700 bg-amber-50 hover:bg-amber-100 border border-amber-200 rounded-lg transition cursor-pointer"
+                                                        >
+                                                            <Pencil className="w-3 h-3" />
+                                                            <span>Ubah Akun</span>
+                                                        </button>
+                                                    ) : (
+                                                        <span className="text-[11px] text-slate-300">-</span>
+                                                    )}
+                                                </td>
                                             </tr>
                                         ))}
                                     </tbody>
@@ -2415,14 +2492,29 @@ export default function Piutang({
                             ) : (
                                 <div className="space-y-2">
                                     {item.payments.map((p) => (
-                                        <div key={p.id} className="p-3 bg-slate-50 border border-slate-100 rounded-xl space-y-1">
-                                            <div className="flex justify-between items-center">
+                                        <div key={p.id} className="p-3 bg-slate-50 border border-slate-100 rounded-xl space-y-1.5">
+                                            <div className="flex justify-between items-center gap-2">
                                                 <span className="font-bold text-slate-900">{formatRupiah(p.nominal)}</span>
-                                                <span className="text-[11px] text-slate-400">{p.tanggal}</span>
+                                                <div className="flex items-center gap-2">
+                                                    <span className="text-[11px] text-slate-400">{p.tanggal}</span>
+                                                    {p.akunId && p.tipe === 'PIUTANG' && (
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => openReviseAccountModal(p, item)}
+                                                            className="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-semibold text-amber-700 bg-amber-50 hover:bg-amber-100 border border-amber-200 rounded-md transition cursor-pointer"
+                                                        >
+                                                            <Pencil className="w-2.5 h-2.5" />
+                                                            <span>Ubah Akun</span>
+                                                        </button>
+                                                    )}
+                                                </div>
                                             </div>
                                             <div className="text-[11px] text-slate-500">
                                                 Masuk ke: <strong>{p.akunNama}</strong> ({p.akunKode}) • Ref: {p.noReferensi}
                                             </div>
+                                            {p.catatan && p.catatan !== '-' && (
+                                                <div className="text-[10px] text-slate-400 whitespace-pre-line">{p.catatan}</div>
+                                            )}
                                         </div>
                                     ))}
                                 </div>
@@ -2640,6 +2732,103 @@ export default function Piutang({
                         <button type="button" onClick={() => setImportSuccessMessage('')} className="mt-6 w-full rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-emerald-700">
                             Selesai
                         </button>
+                    </div>
+                </div>
+            )}
+            {/* Modal Revisi Akun Kas & Bank Pelunasan Piutang */}
+            {isReviseAccountModalOpen && (
+                <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-900/50 backdrop-blur-xs p-4">
+                    <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-md w-full overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+                        <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                                <Landmark className="w-5 h-5 text-amber-600" />
+                                <h3 className="font-bold text-slate-900 text-sm">Revisi Akun Kas & Bank</h3>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={() => setIsReviseAccountModalOpen(false)}
+                                className="text-slate-400 hover:text-slate-600 p-1 rounded-lg cursor-pointer"
+                            >
+                                <X className="w-4 h-4" />
+                            </button>
+                        </div>
+
+                        <form onSubmit={handleReviseAccountSubmit} className="p-6 space-y-4 text-xs">
+                            <div className="p-3 rounded-xl bg-slate-50 border border-slate-200/80 space-y-1">
+                                <div className="flex justify-between">
+                                    <span className="text-slate-500">Tanggal Terima:</span>
+                                    <span className="font-semibold text-slate-800">{reviseAccountForm.tanggal}</span>
+                                </div>
+                                <div className="flex justify-between">
+                                    <span className="text-slate-500">Nominal Diterima:</span>
+                                    <span className="font-bold text-emerald-600">{formatRupiah(reviseAccountForm.nominal)}</span>
+                                </div>
+                                <div className="flex justify-between">
+                                    <span className="text-slate-500">Akun Sebelumnya:</span>
+                                    <span className="font-semibold text-slate-800">{reviseAccountForm.old_account_name}</span>
+                                </div>
+                            </div>
+
+                            <div className="p-2.5 rounded-xl bg-amber-50/70 border border-amber-100 text-[11px] text-amber-800">
+                                Revisi memindahkan mutasi penerimaan saldo ke akun yang benar tanpa mengubah nominal, tanggal terima, status piutang, atau Saldo Awal.
+                            </div>
+
+                            <div>
+                                <label className="block font-semibold text-slate-700 mb-1.5">Akun Kas & Bank Baru *</label>
+                                <select
+                                    value={reviseAccountForm.account_id}
+                                    onChange={(e) => setReviseAccountForm({ ...reviseAccountForm, account_id: e.target.value })}
+                                    className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 outline-none bg-white"
+                                    required
+                                >
+                                    <option value="">-- Pilih Akun Kas & Bank --</option>
+                                    {kasBankAccounts.map((acc) => (
+                                        <option key={acc.id} value={acc.id}>
+                                            {acc.name} ({acc.code}) — Saldo: {formatRupiah(acc.balance)}
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
+
+                            <div>
+                                <label className="block font-semibold text-slate-700 mb-1.5">No. Referensi / Bukti Transfer</label>
+                                <input
+                                    type="text"
+                                    value={reviseAccountForm.reference_number}
+                                    onChange={(e) => setReviseAccountForm({ ...reviseAccountForm, reference_number: e.target.value })}
+                                    placeholder="Opsional, misal TRF-12345"
+                                    className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 outline-none"
+                                />
+                            </div>
+
+                            <div>
+                                <label className="block font-semibold text-slate-700 mb-1.5">Alasan Revisi</label>
+                                <input
+                                    type="text"
+                                    value={reviseAccountForm.revision_reason}
+                                    onChange={(e) => setReviseAccountForm({ ...reviseAccountForm, revision_reason: e.target.value })}
+                                    placeholder="Opsional, misal Salah pilih rekening bank saat input"
+                                    className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 outline-none"
+                                />
+                            </div>
+
+                            <div className="pt-2 flex justify-end gap-2">
+                                <button
+                                    type="button"
+                                    onClick={() => setIsReviseAccountModalOpen(false)}
+                                    className="px-4 py-2 border border-slate-200 rounded-xl text-slate-600 hover:bg-slate-50 font-medium transition cursor-pointer"
+                                >
+                                    Batal
+                                </button>
+                                <button
+                                    type="submit"
+                                    disabled={isSubmittingReviseAccount}
+                                    className="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-xl font-semibold transition disabled:opacity-50 cursor-pointer"
+                                >
+                                    {isSubmittingReviseAccount ? 'Menyimpan...' : 'Simpan Revisi Akun'}
+                                </button>
+                            </div>
+                        </form>
                     </div>
                 </div>
             )}

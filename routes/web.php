@@ -672,6 +672,7 @@ Route::middleware(['auth', 'role:General Manager|Kasir|Gudang PMI|HO|administrat
         Route::delete('/accounts/{id}', [\App\Http\Controllers\FinanceController::class, 'destroyAccount'])->name('accounts.destroy');
         Route::post('/cash-payment', [\App\Http\Controllers\FinanceController::class, 'assignCashAccount'])->name('cash.assign');
         Route::post('/bulk-cash-payment', [\App\Http\Controllers\FinanceController::class, 'assignBulkCashAccount'])->name('cash.bulkAssign');
+        Route::put('/payments/{id}/account', [\App\Http\Controllers\FinanceController::class, 'updatePaymentAccount'])->name('payments.updateAccount');
         Route::post('/piutang-payments', [\App\Http\Controllers\FinanceController::class, 'storePiutangPayment'])->name('piutang.store');
         Route::get('/saldo-awal/estimate', [\App\Http\Controllers\FinanceController::class, 'estimateSaldoAwal'])->name('saldoAwal.estimate');
         Route::get('/opening-balance-preview', [\App\Http\Controllers\FinanceController::class, 'previewOpeningBalance'])->name('opening.preview');

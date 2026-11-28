@@ -27,6 +27,7 @@ use App\Models\MedicineTransfers;
 use App\Models\MedicineTransferItems;
 use App\Services\MedicineTransactionCodeGenerator;
 use App\Services\StockLedgerService;
+use App\Support\FinanceShift;
 use App\Models\User;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
@@ -1408,7 +1409,10 @@ class SalesController extends Controller
             // created_at is intentionally not mass assignable on the model.
             // Set it explicitly at checkout so reports that fall back to the
             // transaction timestamp use the sale time, not when the cart began.
-            $transaction->forceFill(['created_at' => Carbon::now()]);
+            $checkoutAt = Carbon::now();
+            $operationalPaymentDate = FinanceShift::operationalDate($checkoutAt) ?? $checkoutAt->toDateString();
+
+            $transaction->forceFill(['created_at' => $checkoutAt]);
             $transaction->update([
                 'status' => 1,
                 'paid' => $validated['paid'],
@@ -1434,7 +1438,7 @@ class SalesController extends Controller
                 2
             );
 
-            // Penjualan tunai masuk otomatis ke akun Kas Apotek cabang transaksi.
+            // Penjualan tunai masuk otomatis ke akun Kas Apotek cabang transaksi (tanggal operasional 07:30 LIPH).
             if ($paymentMethod === 'CASH' && !$isCreditTransaction && $netTransactionAmount > 0) {
                 $cashAccount = FinanceAccount::resolveBranchCashAccount($txPharmacyId, true);
 
@@ -1444,7 +1448,7 @@ class SalesController extends Controller
                         'medicine_transaction_id' => $transaction->id,
                         'account_id' => $cashAccount->id,
                         'payment_type' => 'PENJUALAN TUNAI',
-                        'payment_date' => Carbon::now()->toDateString(),
+                        'payment_date' => $operationalPaymentDate,
                         'amount' => $netTransactionAmount,
                         'reference_number' => $transaction->transaction_code,
                         'notes' => 'Penerimaan penjualan tunai kasir',
@@ -1463,7 +1467,7 @@ class SalesController extends Controller
                     'medicine_transaction_id' => $transaction->id,
                     'account_id' => $bankAccount->id,
                     'payment_type' => 'PENJUALAN NON TUNAI',
-                    'payment_date' => Carbon::now()->toDateString(),
+                    'payment_date' => $operationalPaymentDate,
                     'amount' => $netTransactionAmount,
                     'reference_number' => $transaction->transaction_code,
                     'notes' => "Penerimaan penjualan {$paymentMethod} melalui {$bankShort}",
@@ -1489,7 +1493,7 @@ class SalesController extends Controller
                             'medicine_transaction_id' => $transaction->id,
                             'account_id' => $shippingCashAccount->id,
                             'payment_type' => 'PENJUALAN TUNAI',
-                            'payment_date' => Carbon::now()->toDateString(),
+                            'payment_date' => $operationalPaymentDate,
                             'amount' => $doctorShippingFee,
                             'reference_number' => $transaction->transaction_code,
                             'notes' => 'Penerimaan talangan ongkir (Tunai)',
@@ -1507,7 +1511,7 @@ class SalesController extends Controller
                             'medicine_transaction_id' => $transaction->id,
                             'account_id' => $shippingBankAccount->id,
                             'payment_type' => 'PENJUALAN NON TUNAI',
-                            'payment_date' => Carbon::now()->toDateString(),
+                            'payment_date' => $operationalPaymentDate,
                             'amount' => $doctorShippingFee,
                             'reference_number' => $transaction->transaction_code,
                             'notes' => "Penerimaan talangan ongkir ({$doctorShippingPaymentMethod} melalui {$shipBankShort})",
@@ -1527,7 +1531,7 @@ class SalesController extends Controller
                         'medicine_transaction_id' => $transaction->id,
                         'account_id' => $shippingDrawerAccount->id,
                         'payment_type' => 'ONGKIR',
-                        'payment_date' => Carbon::now()->toDateString(),
+                        'payment_date' => $operationalPaymentDate,
                         'amount' => $doctorShippingFee,
                         'reference_number' => $transaction->transaction_code,
                         'notes' => "Pengeluaran talangan ongkir dari Kas Apotek ({$drawerShipLabel})",

@@ -160,10 +160,11 @@ export default function Cash({ pembelianCash = [], creditors = [], kasBankAccoun
     // Buka Modal Tetapkan Akun Satuan
     const openCashModal = (item) => {
         const defaultAccount = item.akunPembayaran?.id || kasBankAccounts[0]?.id || '';
+        const preservedDate = item.akunPembayaran?.rawTanggal || item.raw_tanggal || new Date().toISOString().split('T')[0];
         setCashForm({
             receiving_detail_id: item.id,
             account_id: defaultAccount,
-            payment_date: new Date().toISOString().split('T')[0],
+            payment_date: preservedDate,
             reference_number: item.akunPembayaran?.noReferensi || '',
             notes: `Pembelian tunai faktur ${item.nomor} kepada ${item.vendor}`,
         });

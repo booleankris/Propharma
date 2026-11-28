@@ -285,6 +285,102 @@ class OngkirTalanganKasBankTest extends TestCase
         $this->assertSame('OUT', $first['direction']);
     }
 
+    public function test_checkout_and_backfill_use_liph_0730_operational_date_cutoff(): void
+    {
+        \Carbon\Carbon::setTestNow(\Carbon\Carbon::parse('2026-11-01 02:15:00'));
+
+        try {
+            $txCheckout = MedicineTransactions::create([
+                'pharmacy_id' => 1,
+                'user_id' => $this->user->id,
+                'transaction_type' => 'JASA',
+                'status' => 0,
+            ]);
+
+            TransactionService::create([
+                'medicine_transaction_id' => $txCheckout->id,
+                'service_name' => 'Jasa Racik',
+                'price' => 40000,
+            ]);
+
+            DB::table('medicine_transaction_sequences')->insertOrIgnore([
+                'sequence_key' => '2611501',
+                'last_number' => 10,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+
+            $this->postJson('/transaction/checkout', [
+                'transaction_id' => $txCheckout->id,
+                'paid' => 40000,
+                'discounsubtotalvalue' => 0,
+                'totaltransaction' => 40000,
+                'changes' => 0,
+                'paymentType' => 'CASH',
+                'has_doctor_shipping_fee' => true,
+                'doctor_shipping_fee' => 12000,
+                'doctor_shipping_payment_method' => 'QRIS',
+                'doctor_shipping_bank_name' => 'BCA',
+            ])->assertOk()->assertJson(['success' => true]);
+
+            $payments = FinancePayment::where('medicine_transaction_id', $txCheckout->id)->get();
+            $this->assertCount(3, $payments);
+            foreach ($payments as $p) {
+                // Jam 02:15 pada 1 Nov masuk hari operasional LIPH 31 Okt
+                $this->assertSame('2026-10-31', $p->payment_date->format('Y-m-d'));
+            }
+        } finally {
+            \Carbon\Carbon::setTestNow();
+        }
+
+        // Transaksi tgl 2 Nov jam 06:00 (milik operasional 1 Nov) & tgl 1 Nov jam 05:00 (milik 31 Okt)
+        $octShiftTx = new MedicineTransactions([
+            'pharmacy_id' => 1,
+            'user_id' => $this->user->id,
+            'transaction_type' => 'HV/OTC',
+            'transaction_code' => 'TRX-SHIFT-OCT',
+            'status' => 1,
+            'subtotal' => 50000,
+            'discount' => 0,
+            'payment_method' => 'CASH',
+            'has_doctor_shipping_fee' => true,
+            'doctor_shipping_fee' => 10000,
+            'doctor_shipping_payment_method' => 'QRIS',
+            'doctor_shipping_bank_name' => 'BCA',
+        ]);
+        $octShiftTx->forceFill(['created_at' => '2026-11-01 05:00:00', 'updated_at' => '2026-11-01 05:00:00'])->save();
+
+        $novShiftTx = new MedicineTransactions([
+            'pharmacy_id' => 1,
+            'user_id' => $this->user->id,
+            'transaction_type' => 'HV/OTC',
+            'transaction_code' => 'TRX-SHIFT-NOV',
+            'status' => 1,
+            'subtotal' => 60000,
+            'discount' => 0,
+            'payment_method' => 'CASH',
+            'has_doctor_shipping_fee' => true,
+            'doctor_shipping_fee' => 15000,
+            'doctor_shipping_payment_method' => 'QRIS',
+            'doctor_shipping_bank_name' => 'BCA',
+        ]);
+        $novShiftTx->forceFill(['created_at' => '2026-11-02 06:00:00', 'updated_at' => '2026-11-02 06:00:00'])->save();
+
+        $this->post('/finance/kas-bank/backfill-ongkir', [
+            'from_date' => '2026-11-01',
+            'to_date' => '2026-11-27',
+        ])->assertRedirect();
+
+        $this->assertNull(
+            FinancePayment::where('medicine_transaction_id', $octShiftTx->id)->where('payment_type', 'ONGKIR')->first(),
+            'Transaksi 1 Nov 05:00 tidak boleh ikut backfill periode mulai 1 Nov 07:30'
+        );
+
+        $novBackfill = FinancePayment::where('medicine_transaction_id', $novShiftTx->id)->where('payment_type', 'ONGKIR')->first();
+        $this->assertNotNull($novBackfill);
+        $this->assertSame('2026-11-01', $novBackfill->payment_date->format('Y-m-d'));
+    }
+
     private function createSchema(): void
     {
         Schema::create('pharmacies', function (Blueprint $table) {

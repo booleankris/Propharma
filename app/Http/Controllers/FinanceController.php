@@ -1328,16 +1328,16 @@ class FinanceController extends Controller
                 ->where('account_id', $lockedAccount->id)
                 ->first();
 
-            MedicineTransactions::query()
+            $tunaiQuery = MedicineTransactions::query()
                 ->where('pharmacy_id', $pharmacyId)
                 ->where('status', 1)
                 ->where('payment_method', 'CASH')
                 ->whereNotIn('transaction_type', ['KREDIT'])
                 ->whereRaw("UPPER(COALESCE(transaction_type, '')) NOT LIKE 'RETUR%'")
-                ->whereBetween(DB::raw('DATE(created_at)'), [$validated['from_date'], $validated['to_date']])
                 ->whereDoesntHave('payments', fn($query) => $query->where('payment_type', 'PENJUALAN TUNAI'))
-                ->orderBy('id')
-                ->chunkById(500, function ($transactions) use ($lockedAccount, $pharmacyId, $opening, &$createdCount, &$createdTotal, &$createdGrossTotal) {
+                ->orderBy('id');
+            $this->applyOperationalSaleDateRange($tunaiQuery, $validated['from_date'], $validated['to_date']);
+            $tunaiQuery->chunkById(500, function ($transactions) use ($lockedAccount, $pharmacyId, $opening, &$createdCount, &$createdTotal, &$createdGrossTotal) {
                     foreach ($transactions as $transaction) {
                         $amount = round(max(0, (float) $transaction->subtotal - (float) ($transaction->discount ?? 0)), 2);
                         if ($amount <= 0)
@@ -1350,7 +1350,7 @@ class FinanceController extends Controller
                         if ($alreadyRecorded)
                             continue;
 
-                        $paymentDate = $transaction->created_at?->toDateString() ?? now()->toDateString();
+                        $paymentDate = $this->resolveTransactionOperationalPaymentDate($transaction);
                         FinancePayment::create([
                             'pharmacy_id' => $pharmacyId,
                             'medicine_transaction_id' => $transaction->id,
@@ -1441,12 +1441,11 @@ class FinanceController extends Controller
                 return [$drawerAccounts[$branchId], $openingDates[$branchId] ?? ['date' => null, 'inclusive' => true]];
             };
 
-            MedicineTransactions::query()
+            $nonCashQuery = MedicineTransactions::query()
                 ->where('pharmacy_id', $pharmacyId)
                 ->where('status', 1)
                 ->whereRaw("UPPER(COALESCE(transaction_type, '')) NOT IN ('KREDIT', 'RESEP KREDIT')")
                 ->whereRaw("UPPER(COALESCE(transaction_type, '')) NOT LIKE 'RETUR%'")
-                ->whereBetween(DB::raw('DATE(created_at)'), [$validated['from_date'], $validated['to_date']])
                 ->where(function ($q) {
                     $q
                         ->whereRaw('UPPER(TRIM(COALESCE(payment_method, ""))) IN (?, ?, ?, ?)', ['QRIS', 'DEBIT', 'TRANSFER', 'EDC'])
@@ -1457,11 +1456,12 @@ class FinanceController extends Controller
                                 ->whereRaw('UPPER(TRIM(COALESCE(doctor_shipping_payment_method, ""))) IN (?, ?, ?, ?)', ['QRIS', 'DEBIT', 'TRANSFER', 'EDC']);
                         });
                 })
-                ->orderBy('id')
-                ->chunkById(500, function ($transactions) use ($pharmacyId, $resolveDrawerAndAnchor, &$createdCount, &$skippedCount, &$createdGrossTotal, &$balanceDeltas, &$touchedAccountIds) {
+                ->orderBy('id');
+            $this->applyOperationalSaleDateRange($nonCashQuery, $validated['from_date'], $validated['to_date']);
+            $nonCashQuery->chunkById(500, function ($transactions) use ($pharmacyId, $resolveDrawerAndAnchor, &$createdCount, &$skippedCount, &$createdGrossTotal, &$balanceDeltas, &$touchedAccountIds) {
                     foreach ($transactions as $transaction) {
                         $txPharmacyId = (int) ($transaction->pharmacy_id ?: $pharmacyId);
-                        $paymentDate = $transaction->created_at?->toDateString() ?? now()->toDateString();
+                        $paymentDate = $this->resolveTransactionOperationalPaymentDate($transaction);
                         $methodUpper = strtoupper(trim((string) ($transaction->payment_method ?? '')));
 
                         // 1. Penjualan utama non-tunai
@@ -1631,17 +1631,17 @@ class FinanceController extends Controller
             $anchorDate = $opening?->payment_date?->format('Y-m-d') ?? $opname?->adjustment_date?->format('Y-m-d');
             $anchorInclusive = (bool) $opening;
 
-            MedicineTransactions::query()
+            $ongkirQuery = MedicineTransactions::query()
                 ->where('pharmacy_id', $pharmacyId)
                 ->where('status', 1)
                 ->whereRaw("UPPER(COALESCE(transaction_type, '')) NOT IN ('KREDIT', 'RESEP KREDIT')")
                 ->whereRaw("UPPER(COALESCE(transaction_type, '')) NOT LIKE 'RETUR%'")
                 ->where('has_doctor_shipping_fee', 1)
                 ->where('doctor_shipping_fee', '>', 0)
-                ->whereBetween(DB::raw('DATE(created_at)'), [$validated['from_date'], $validated['to_date']])
                 ->whereDoesntHave('payments', fn($query) => $query->where('payment_type', 'ONGKIR'))
-                ->orderBy('id')
-                ->chunkById(500, function ($transactions) use ($drawerAccount, $anchorDate, $anchorInclusive, &$createdCount, &$createdGrossTotal, &$balanceDeduction) {
+                ->orderBy('id');
+            $this->applyOperationalSaleDateRange($ongkirQuery, $validated['from_date'], $validated['to_date']);
+            $ongkirQuery->chunkById(500, function ($transactions) use ($drawerAccount, $anchorDate, $anchorInclusive, &$createdCount, &$createdGrossTotal, &$balanceDeduction) {
                     foreach ($transactions as $transaction) {
                         $result = $this->recordShippingDrawerOutflowForTransaction(
                             $transaction,
@@ -1701,7 +1701,7 @@ class FinanceController extends Controller
         }
 
         $txPharmacyId = (int) ($transaction->pharmacy_id ?: ($drawerAccount->pharmacy_id ?: getActivePharmacyId()));
-        $paymentDate = $transaction->created_at?->toDateString() ?? now()->toDateString();
+        $paymentDate = $this->resolveTransactionOperationalPaymentDate($transaction);
         $shipMethod = strtoupper(trim((string) ($transaction->doctor_shipping_payment_method ?? '')));
         $shipBankName = trim((string) ($transaction->doctor_shipping_bank_name ?: ($transaction->transfer_bank_name ?? '')));
         $shipBankShort = $shipBankName !== '' ? FinanceAccount::extractShortBankName($shipBankName) : '';
@@ -1738,6 +1738,36 @@ class FinanceController extends Controller
             'affects_balance' => $affectsBalance,
             'amount' => $shipFee,
         ];
+    }
+
+    /**
+     * Filter rentang hari operasional LIPH (07:30 s/d 07:29:59 hari berikutnya).
+     */
+    protected function applyOperationalSaleDateRange($query, string $fromDate, string $toDate)
+    {
+        $startAt = FinanceShift::start($fromDate);
+        $untilAt = FinanceShift::endExclusive($toDate);
+
+        return $query->where(function ($period) use ($startAt, $untilAt) {
+            $period->where(function ($main) use ($startAt, $untilAt) {
+                $main->where('created_at', '>=', $startAt)->where('created_at', '<', $untilAt);
+            })->orWhere(function ($legacy) use ($startAt, $untilAt) {
+                $legacy->whereNull('created_at')
+                    ->where('updated_at', '>=', $startAt)
+                    ->where('updated_at', '<', $untilAt);
+            });
+        });
+    }
+
+    /**
+     * Hitung payment_date mengikuti tanggal operasional LIPH (07:30).
+     */
+    protected function resolveTransactionOperationalPaymentDate($transaction): string
+    {
+        $txAt = $transaction->created_at ?? $transaction->updated_at;
+        $carbonAt = $txAt ? \Carbon\Carbon::parse($txAt) : now();
+
+        return FinanceShift::operationalDate($carbonAt) ?? $carbonAt->toDateString();
     }
 
     public function storePendapatanLainLain(Request $request)
@@ -1899,6 +1929,51 @@ class FinanceController extends Controller
     private function calculateBalanceFromOpening(int $accountId, FinancePayment $opening, string $asOfDate): float
     {
         return FinanceAccountBalanceResolver::calculateFromOpening($accountId, $opening, $asOfDate);
+    }
+
+    /**
+     * Sinkronkan saldo akun kas/bank yang terdampak revisi mutasi pembayaran tanpa merusak SALDO AWAL / Opname.
+     *
+     * @param  array<int, float>  $fallbackDeltasByAccountId
+     */
+    private function syncAccountsAfterPaymentMutation(array $fallbackDeltasByAccountId, ?string $asOfDate = null): void
+    {
+        if (empty($fallbackDeltasByAccountId)) {
+            return;
+        }
+
+        $targetDate = $asOfDate ?: now()->toDateString();
+        ksort($fallbackDeltasByAccountId);
+
+        foreach ($fallbackDeltasByAccountId as $accountId => $fallbackDelta) {
+            $lockedAccount = FinanceAccount::lockForUpdate()->find((int) $accountId);
+            if (!$lockedAccount) {
+                continue;
+            }
+
+            $opening = FinancePayment::where('payment_type', 'SALDO AWAL')
+                ->where('account_id', $lockedAccount->id)
+                ->first();
+
+            if ($opening) {
+                $lockedAccount->update([
+                    'balance' => $this->calculateBalanceFromOpening($lockedAccount->id, $opening, $targetDate),
+                ]);
+                continue;
+            }
+
+            $latestOpname = FinanceAccountBalanceResolver::latestOpnameOnOrBefore($lockedAccount->id, $targetDate);
+            if ($latestOpname) {
+                $lockedAccount->update([
+                    'balance' => FinanceAccountBalanceResolver::calculateFromOpnameAnchor($lockedAccount->id, $latestOpname, $targetDate),
+                ]);
+                continue;
+            }
+
+            $lockedAccount->update([
+                'balance' => round((float) $lockedAccount->balance + (float) $fallbackDelta, 2),
+            ]);
+        }
     }
 
     /**
@@ -2824,6 +2899,7 @@ class FinanceController extends Controller
                         'noRekening' => $latestPayment->account->account_number,
                         'noReferensi' => $latestPayment->reference_number,
                         'tanggal' => \Carbon\Carbon::parse($latestPayment->payment_date)->format('d/m/Y'),
+                        'rawTanggal' => $latestPayment->payment_date ? \Carbon\Carbon::parse($latestPayment->payment_date)->format('Y-m-d') : null,
                         'diprosesOleh' => $latestPayment->creator->name ?? 'Staf',
                     ];
                 }
@@ -4612,27 +4688,39 @@ class FinanceController extends Controller
             $totalInvoice = ReceivingInvoiceTotals::calculate($detail->receiving_items, $ppnType)['total'];
 
             // Cek apakah sudah pernah ada payment record untuk detail ini
-            $existingPayment = FinancePayment::where('receiving_detail_id', $detail->id)->first();
+            $existingPayment = FinancePayment::lockForUpdate()->where('receiving_detail_id', $detail->id)->first();
+            $fallbackDeltas = [];
 
             if ($existingPayment) {
-                // Balikkan saldo akun lama dan kurangi saldo akun baru jika berbeda
-                if ($existingPayment->account_id != $account->id) {
-                    $oldAccount = FinanceAccount::find($existingPayment->account_id);
-                    if ($oldAccount) {
-                        $oldAccount->increment('balance', $existingPayment->amount);
-                    }
-                    $account->decrement('balance', $totalInvoice);
-                }
+                $oldAccountId = $existingPayment->account_id ? (int) $existingPayment->account_id : null;
+                $oldAmount = (float) $existingPayment->amount;
+
+                $lockIds = array_values(array_unique(array_filter([$oldAccountId, (int) $account->id])));
+                sort($lockIds);
+                FinanceAccount::whereIn('id', $lockIds)->orderBy('id')->lockForUpdate()->get();
+
+                $preservedDate = !empty($validated['payment_date'])
+                    ? $validated['payment_date']
+                    : ($existingPayment->payment_date?->format('Y-m-d') ?? now()->toDateString());
+
                 $existingPayment->update([
                     'pharmacy_id' => $detail->receiving?->pharmacy_id,
                     'account_id' => $account->id,
-                    'payment_date' => $validated['payment_date'] ?? now()->toDateString(),
+                    'payment_date' => $preservedDate,
                     'amount' => $totalInvoice,
                     'reference_number' => $validated['reference_number'] ?? $existingPayment->reference_number,
                     'notes' => $validated['notes'] ?? $existingPayment->notes,
                     'created_by' => Auth::id(),
                 ]);
+
+                if ($oldAccountId && $oldAccountId !== (int) $account->id) {
+                    $fallbackDeltas[$oldAccountId] = $oldAmount;
+                    $fallbackDeltas[$account->id] = -$totalInvoice;
+                } else {
+                    $fallbackDeltas[$account->id] = $oldAmount - $totalInvoice;
+                }
             } else {
+                FinanceAccount::whereKey($account->id)->lockForUpdate()->first();
                 FinancePayment::create([
                     'pharmacy_id' => $detail->receiving?->pharmacy_id,
                     'receiving_id' => $detail->receiving_id,
@@ -4645,8 +4733,10 @@ class FinanceController extends Controller
                     'notes' => $validated['notes'] ?? 'Pembelian Cash via ' . $account->name,
                     'created_by' => Auth::id(),
                 ]);
-                $account->decrement('balance', $totalInvoice);
+                $fallbackDeltas[$account->id] = -$totalInvoice;
             }
+
+            $this->syncAccountsAfterPaymentMutation($fallbackDeltas);
 
             // Pastikan status receiving adalah 3 (Lunas)
             if ($detail->receiving) {
@@ -4656,6 +4746,100 @@ class FinanceController extends Controller
 
         $this->clearStatsCache();
         return back()->with('success', 'Akun pembayaran pembelian cash berhasil disimpan.');
+    }
+
+    /**
+     * Revisi akun Kas & Bank pada transaksi pembayaran Hutang Dagang (KREDIT) atau Pelunasan Piutang (PIUTANG).
+     * Mengubah akun sumber/tujuan tanpa mengubah nominal, tanggal, atau merusak SALDO AWAL / Opname.
+     */
+    public function updatePaymentAccount(Request $request, $id)
+    {
+        $payment = FinancePayment::findOrFail($id);
+
+        if (!in_array($payment->payment_type, ['KREDIT', 'PIUTANG'], true)) {
+            return back()->withErrors([
+                'payment_id' => 'Hanya pembayaran Hutang Dagang (KREDIT) dan Pelunasan Piutang (PIUTANG) non-cut-off yang dapat direvisi akunnya.',
+            ]);
+        }
+
+        $validated = $request->validate([
+            'account_id' => 'required|exists:finance_accounts,id',
+            'reference_number' => 'nullable|string|max:100',
+            'revision_reason' => 'nullable|string|max:250',
+        ]);
+
+        $newAccount = $this->branchKasBankAccountsQuery()->findOrFail($validated['account_id']);
+        if ($newAccount->category !== 'Kas & Bank') {
+            return back()->withErrors(['account_id' => 'Akun Kas & Bank tujuan tidak valid.']);
+        }
+
+        if ($payment->pharmacy_id && (int) $payment->pharmacy_id !== (int) $newAccount->pharmacy_id) {
+            return back()->withErrors(['account_id' => 'Pembayaran ini bukan milik cabang aktif.']);
+        }
+
+        $oldAccountId = $payment->account_id ? (int) $payment->account_id : null;
+        $oldAccount = $oldAccountId ? FinanceAccount::find($oldAccountId) : null;
+        if ($oldAccount && $oldAccount->pharmacy_id && (int) $oldAccount->pharmacy_id !== (int) $newAccount->pharmacy_id) {
+            return back()->withErrors(['account_id' => 'Akun asal dan akun tujuan harus berada di cabang yang sama.']);
+        }
+
+        DB::transaction(function () use ($payment, $validated, $newAccount, $oldAccountId) {
+            $freshPayment = FinancePayment::lockForUpdate()->findOrFail($payment->id);
+            $currentOldAccountId = $freshPayment->account_id ? (int) $freshPayment->account_id : $oldAccountId;
+
+            $lockIds = array_values(array_unique(array_filter([$currentOldAccountId, (int) $newAccount->id])));
+            sort($lockIds);
+            $lockedAccounts = FinanceAccount::whereIn('id', $lockIds)
+                ->orderBy('id')
+                ->lockForUpdate()
+                ->get()
+                ->keyBy('id');
+
+            $oldAcc = $currentOldAccountId ? ($lockedAccounts[$currentOldAccountId] ?? null) : null;
+            $actorName = Auth::user()?->name ?? 'Staf';
+            $reason = trim((string) ($validated['revision_reason'] ?? ''));
+
+            $updatedNotes = trim((string) ($freshPayment->notes ?? ''));
+            if ($currentOldAccountId !== (int) $newAccount->id) {
+                $oldName = $oldAcc?->name ?? ('Akun #' . $currentOldAccountId);
+                $auditTag = "[Revisi Akun: {$oldName} -> {$newAccount->name} oleh {$actorName} " . now()->format('d/m/Y H:i')
+                    . ($reason !== '' ? " | Alasan: {$reason}" : '') . ']';
+                $updatedNotes = $updatedNotes !== '' ? ($updatedNotes . "\n" . $auditTag) : $auditTag;
+            } elseif ($reason !== '') {
+                $auditTag = "[Revisi Catatan oleh {$actorName} " . now()->format('d/m/Y H:i') . ": {$reason}]";
+                $updatedNotes = $updatedNotes !== '' ? ($updatedNotes . "\n" . $auditTag) : $auditTag;
+            }
+
+            $updatePayload = [
+                'account_id' => $newAccount->id,
+                'notes' => $updatedNotes !== '' ? $updatedNotes : null,
+                'created_by' => Auth::id() ?? $freshPayment->created_by,
+            ];
+            if (array_key_exists('reference_number', $validated)) {
+                $ref = trim((string) ($validated['reference_number'] ?? ''));
+                $updatePayload['reference_number'] = $ref !== '' ? $ref : null;
+            }
+
+            $freshPayment->update($updatePayload);
+
+            if ($currentOldAccountId !== (int) $newAccount->id) {
+                $isInflow = $freshPayment->payment_type === 'PIUTANG';
+                $sign = $isInflow ? 1.0 : -1.0;
+                $amount = (float) $freshPayment->amount;
+
+                $fallbackDeltas = [];
+                if ($currentOldAccountId) {
+                    $fallbackDeltas[$currentOldAccountId] = -$sign * $amount;
+                }
+                $fallbackDeltas[$newAccount->id] = $sign * $amount;
+
+                $this->syncAccountsAfterPaymentMutation($fallbackDeltas);
+            }
+
+            $this->clearStatsCache();
+        });
+
+        return back()->with('success', "Akun Kas & Bank berhasil direvisi ke {$newAccount->name}.");
     }
 
     /**
@@ -5040,9 +5224,11 @@ class FinanceController extends Controller
         }
 
         $processedCount = 0;
-        $paymentDate = $validated['payment_date'] ?? now()->toDateString();
+        $explicitPaymentDate = !empty($validated['payment_date']) ? $validated['payment_date'] : null;
 
-        DB::transaction(function () use ($validated, $account, $paymentDate, &$processedCount) {
+        DB::transaction(function () use ($validated, $account, $explicitPaymentDate, &$processedCount) {
+            $fallbackDeltas = [];
+
             foreach ($validated['receiving_detail_ids'] as $detailId) {
                 $detail = ReceivingDetails::with(['receiving_items', 'receiving'])->find($detailId);
                 if (!$detail || $detail->invoice_payment !== 'TUNAI')
@@ -5058,24 +5244,30 @@ class FinanceController extends Controller
                 $ppnType = strtoupper(trim($detail->invoice_ppn ?? $detail->creditor?->ppn_type ?? 'TANPA'));
                 $totalInvoice = ReceivingInvoiceTotals::calculate($detail->receiving_items, $ppnType)['total'];
 
-                $existingPayment = FinancePayment::where('receiving_detail_id', $detail->id)->first();
+                $existingPayment = FinancePayment::lockForUpdate()->where('receiving_detail_id', $detail->id)->first();
                 if ($existingPayment) {
-                    if ($existingPayment->account_id != $account->id) {
-                        $oldAccount = FinanceAccount::find($existingPayment->account_id);
-                        if ($oldAccount) {
-                            $oldAccount->increment('balance', $existingPayment->amount);
-                        }
-                        $account->decrement('balance', $totalInvoice);
-                    }
+                    $oldAccountId = $existingPayment->account_id ? (int) $existingPayment->account_id : null;
+                    $oldAmount = (float) $existingPayment->amount;
+
+                    $resolvedDate = $explicitPaymentDate
+                        ?? ($existingPayment->payment_date?->format('Y-m-d') ?? now()->toDateString());
+
                     $existingPayment->update([
                         'pharmacy_id' => $detail->receiving?->pharmacy_id,
                         'account_id' => $account->id,
-                        'payment_date' => $paymentDate,
+                        'payment_date' => $resolvedDate,
                         'amount' => $totalInvoice,
                         'reference_number' => $validated['reference_number'] ?? $existingPayment->reference_number,
                         'notes' => $validated['notes'] ?? $existingPayment->notes,
                         'created_by' => Auth::id(),
                     ]);
+
+                    if ($oldAccountId && $oldAccountId !== (int) $account->id) {
+                        $fallbackDeltas[$oldAccountId] = ($fallbackDeltas[$oldAccountId] ?? 0.0) + $oldAmount;
+                        $fallbackDeltas[$account->id] = ($fallbackDeltas[$account->id] ?? 0.0) - $totalInvoice;
+                    } else {
+                        $fallbackDeltas[$account->id] = ($fallbackDeltas[$account->id] ?? 0.0) + ($oldAmount - $totalInvoice);
+                    }
                 } else {
                     FinancePayment::create([
                         'pharmacy_id' => $detail->receiving?->pharmacy_id,
@@ -5083,13 +5275,13 @@ class FinanceController extends Controller
                         'receiving_detail_id' => $detail->id,
                         'account_id' => $account->id,
                         'payment_type' => 'CASH',
-                        'payment_date' => $paymentDate,
+                        'payment_date' => $explicitPaymentDate ?? now()->toDateString(),
                         'amount' => $totalInvoice,
                         'reference_number' => $validated['reference_number'] ?? null,
                         'notes' => $validated['notes'] ?? ('Pembelian Cash via ' . $account->name),
                         'created_by' => Auth::id(),
                     ]);
-                    $account->decrement('balance', $totalInvoice);
+                    $fallbackDeltas[$account->id] = ($fallbackDeltas[$account->id] ?? 0.0) - $totalInvoice;
                 }
 
                 if ($detail->receiving) {
@@ -5098,6 +5290,8 @@ class FinanceController extends Controller
 
                 $processedCount++;
             }
+
+            $this->syncAccountsAfterPaymentMutation($fallbackDeltas);
         });
 
         $this->clearStatsCache();
