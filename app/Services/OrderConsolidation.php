@@ -193,10 +193,13 @@ class OrderConsolidation
                 }
                 if ($order->receiving_id) {
                     $receivingId = $order->receiving_id;
+                    $receiving = \App\Models\Receiving::whereKey($receivingId)->lockForUpdate()->first();
+                    if ($receiving && \App\Models\Receiving::hasFinancePaymentsForReceiving((int) $receiving->id, true)) {
+                        $fail('Penerimaan terkait BPBA konsolidasi sudah memiliki catatan pembayaran di Finance dan tidak dapat dibatalkan.');
+                    }
                     $order->update(['receiving_id' => null]);
-                    $receiving = \App\Models\Receiving::find($receivingId);
                     if ($receiving) {
-                        \App\Models\ReceivingDetails::where('receiving_id', $receiving->id)->delete();
+                        \App\Models\ReceivingDetails::where('receiving_id', $receiving->id)->get()->each->delete();
                         $receiving->delete();
                     }
                 }

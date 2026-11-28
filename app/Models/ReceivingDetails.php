@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\Schema;
 
 class ReceivingDetails extends Model
 {
@@ -27,6 +28,35 @@ class ReceivingDetails extends Model
     protected $casts = [
         'is_submitted' => 'boolean',
     ];
+
+    protected static function booted(): void
+    {
+        static::deleting(function (self $detail): void {
+            if (self::hasFinancePaymentsForDetail((int) $detail->id)) {
+                $label = $detail->invoice_number
+                    ? "{$detail->receiving_details_code} ({$detail->invoice_number})"
+                    : ($detail->receiving_details_code ?: ('#' . $detail->id));
+
+                throw new \RuntimeException(
+                    "Nomor Terima / Faktur {$label} tidak dapat dihapus karena sudah memiliki catatan pembayaran di Finance."
+                );
+            }
+        });
+    }
+
+    public static function hasFinancePaymentsForDetail(?int $detailId, bool $lock = false): bool
+    {
+        if (!$detailId || !Schema::hasTable('finance_payments')) {
+            return false;
+        }
+
+        $query = FinancePayment::where('receiving_detail_id', $detailId);
+        if ($lock) {
+            $query->lockForUpdate();
+        }
+
+        return $query->exists();
+    }
     public function receiving()
     {
         return $this->belongsTo(Receiving::class, 'receiving_id');

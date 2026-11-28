@@ -1462,11 +1462,18 @@ class OrdersController extends Controller
                     ->count();
 
                 if ($otherOrdersCount === 0) {
-                    $receivingDetails = ReceivingDetails::where('receiving_id', $order->receiving_id)->get();
+                    $receiving = Receiving::whereKey($order->receiving_id)->lockForUpdate()->first();
+                    if ($receiving && Receiving::hasFinancePaymentsForReceiving((int) $receiving->id, true)) {
+                        DB::rollBack();
+                        return response()->json([
+                            'success' => false,
+                            'message' => 'Pesanan / BPBA tidak dapat dihapus karena penerimaan terkait sudah memiliki catatan pembayaran di Finance.',
+                        ], 422);
+                    }
+                    $receivingDetails = ReceivingDetails::where('receiving_id', $order->receiving_id)->lockForUpdate()->get();
                     foreach ($receivingDetails as $rd) {
                         $rd->delete();
                     }
-                    $receiving = Receiving::find($order->receiving_id);
                     if ($receiving) {
                         $receiving->delete();
                     }

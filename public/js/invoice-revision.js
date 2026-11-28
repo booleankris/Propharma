@@ -648,20 +648,21 @@
             ALL_DETAILS.forEach((d, idx) => {
                 const opt = document.createElement('option');
                 opt.value = d.id;
-                opt.textContent = `${d.code} ${d.invoice ? `(No. Faktur: ${d.invoice})` : ''}`;
+                opt.disabled = Boolean(d.is_paid);
+                opt.textContent = `${d.code} ${d.invoice ? `(No. Faktur: ${d.invoice})` : ''}${d.is_paid ? ' — Terkunci (Sudah Dibayar)' : ''}`;
                 select.appendChild(opt);
             });
 
-            // If a sourceDetailsId is passed, default the target to the other detail (not the source)
+            // If a sourceDetailsId is passed, default the target to the other unpaid detail (not the source)
             if (sourceDetailsId) {
-                const otherDetail = ALL_DETAILS.find(d => d.id !== sourceDetailsId);
+                const otherDetail = ALL_DETAILS.find(d => d.id !== sourceDetailsId && !d.is_paid);
                 if (otherDetail) {
                     select.value = otherDetail.id;
                 }
             } else if (itemId) {
                 const item = ALL_ITEMS.find(i => i.id === itemId);
                 if (item && item.details_id) {
-                    const otherDetail = ALL_DETAILS.find(d => d.id !== item.details_id);
+                    const otherDetail = ALL_DETAILS.find(d => d.id !== item.details_id && !d.is_paid);
                     if (otherDetail) {
                         select.value = otherDetail.id;
                     }
@@ -690,8 +691,8 @@
             const container = document.getElementById('unified_items_list');
             container.innerHTML = '';
 
-            // Items eligible to move: all items NOT in target details
-            const eligibleItems = ALL_ITEMS.filter(i => i.details_id !== targetId);
+            // Items eligible to move: all items NOT in target details and not belonging to a paid faktur
+            const eligibleItems = ALL_ITEMS.filter(i => i.details_id !== targetId && !i.details_is_paid);
 
             if (eligibleItems.length === 0) {
                 container.innerHTML = `

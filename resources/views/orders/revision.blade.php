@@ -111,6 +111,7 @@
                             @forelse ($allReceivingDetails as $rd)
                                 @php
                                     $itemsCount = $rd->receiving_items->count();
+                                    $isPaidLocked = (int) ($rd->payments_count ?? 0) > 0;
                                 @endphp
                                 <!-- Group Header for this Nomor Terima -->
                                 <tr class="bg-blue-50/70 border-t border-b border-blue-100" data-revision-detail-header data-detail-id="{{ $rd->id }}"
@@ -134,53 +135,66 @@
                                             <span class="text-[11px] text-gray-500">
                                                 &bull; {{ $itemsCount }} Item
                                             </span>
+                                            @if ($isPaidLocked)
+                                                <span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold bg-amber-100 text-amber-800 border border-amber-200">
+                                                    Sudah Dibayar di Finance (Terkunci)
+                                                </span>
+                                            @endif
                                         </div>
                                     </td>
                                     <td colspan="3" class="px-4 py-2.5 text-right">
-                                        <div class="inline-flex items-center gap-1.5">
-                                            <!-- Tambah Obat button -->
-                                            <button type="button" data-details-id="{{ $rd->id }}"
-                                                data-details-code="{{ $rd->receiving_details_code }}"
-                                                onclick="openAddModal(this.dataset.detailsId, this.dataset.detailsCode)"
-                                                class="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-semibold rounded-lg shadow-xs transition-all flex items-center gap-1">
-                                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor"
-                                                    viewBox="0 0 24 24">
-                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                                        d="M12 4v16m8-8H4" />
-                                                </svg>
-                                                Tambah Obat
-                                            </button>
-
-                                            <!-- Gabungkan ke... (if multiple receiving details exist) -->
-                                            @if ($allReceivingDetails->count() > 1)
-                                                <button type="button"
-                                                    onclick="openUnifiedMergeModal(null, {{ $rd->id }})"
-                                                    class="px-2.5 py-1 bg-indigo-600 hover:bg-indigo-700 text-white text-[11px] font-semibold rounded-lg shadow-xs transition-all flex items-center gap-1">
+                                        @if ($isPaidLocked)
+                                            <span
+                                                class="inline-flex items-center px-2.5 py-1 rounded-lg bg-amber-50 border border-amber-200 text-amber-800 text-[11px] font-semibold"
+                                                title="Batalkan pembayaran di menu Finance terlebih dahulu untuk merevisi atau menghapus Nomor Terima ini">
+                                                Terkunci (Sudah Dibayar)
+                                            </span>
+                                        @else
+                                            <div class="inline-flex items-center gap-1.5">
+                                                <!-- Tambah Obat button -->
+                                                <button type="button" data-details-id="{{ $rd->id }}"
+                                                    data-details-code="{{ $rd->receiving_details_code }}"
+                                                    onclick="openAddModal(this.dataset.detailsId, this.dataset.detailsCode)"
+                                                    class="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-semibold rounded-lg shadow-xs transition-all flex items-center gap-1">
                                                     <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor"
                                                         viewBox="0 0 24 24">
-                                                        <path stroke-linecap="round" stroke-linejoin="round"
-                                                            stroke-width="2"
-                                                            d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                            d="M12 4v16m8-8H4" />
                                                     </svg>
-                                                    Gabungkan
+                                                    Tambah Obat
                                                 </button>
-                                            @endif
 
-                                            <!-- Hapus Nomor Terima Kosong (if 0 items) -->
-                                            @if ($itemsCount === 0)
-                                                <button type="button"
-                                                    onclick="deleteEmptyDetails({{ $rd->id }}, '{{ $rd->receiving_details_code }}')"
-                                                    class="px-2.5 py-1 bg-red-600 hover:bg-red-700 text-white text-[11px] font-semibold rounded-lg shadow-xs transition-all flex items-center gap-1">
-                                                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor"
-                                                        viewBox="0 0 24 24">
-                                                        <path stroke-linecap="round" stroke-linejoin="round"
-                                                            stroke-width="2"
-                                                            d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                                                    </svg>
-                                                    Hapus NT Kosong
-                                                </button>
-                                            @endif
-                                        </div>
+                                                <!-- Gabungkan ke... (if multiple receiving details exist) -->
+                                                @if ($allReceivingDetails->count() > 1)
+                                                    <button type="button"
+                                                        onclick="openUnifiedMergeModal(null, {{ $rd->id }})"
+                                                        class="px-2.5 py-1 bg-indigo-600 hover:bg-indigo-700 text-white text-[11px] font-semibold rounded-lg shadow-xs transition-all flex items-center gap-1">
+                                                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor"
+                                                            viewBox="0 0 24 24">
+                                                            <path stroke-linecap="round" stroke-linejoin="round"
+                                                                stroke-width="2"
+                                                                d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+                                                        </svg>
+                                                        Gabungkan
+                                                    </button>
+                                                @endif
+
+                                                <!-- Hapus Nomor Terima Kosong (if 0 items) -->
+                                                @if ($itemsCount === 0)
+                                                    <button type="button"
+                                                        onclick="deleteEmptyDetails({{ $rd->id }}, '{{ $rd->receiving_details_code }}')"
+                                                        class="px-2.5 py-1 bg-red-600 hover:bg-red-700 text-white text-[11px] font-semibold rounded-lg shadow-xs transition-all flex items-center gap-1">
+                                                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor"
+                                                            viewBox="0 0 24 24">
+                                                            <path stroke-linecap="round" stroke-linejoin="round"
+                                                                stroke-width="2"
+                                                                d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                                        </svg>
+                                                        Hapus NT Kosong
+                                                    </button>
+                                                @endif
+                                            </div>
+                                        @endif
                                     </td>
                                 </tr>
 
@@ -249,17 +263,25 @@
                                             <td class="px-4 py-3 text-right font-semibold text-gray-900">Rp
                                                 {{ number_format($ri->total, 0, ',', '.') }}</td>
                                             <td class="px-3 py-3 text-center whitespace-nowrap">
-                                                <button onclick="editRow(this)"
-                                                    class="text-blue-600 hover:text-blue-800 font-semibold text-xs">Edit</button>
+                                                @if ($isPaidLocked)
+                                                    <span
+                                                        class="inline-flex items-center px-2 py-0.5 rounded bg-amber-50 border border-amber-200 text-amber-700 font-semibold text-[11px]"
+                                                        title="Batalkan pembayaran di menu Finance terlebih dahulu untuk mengubah atau menghapus item ini">
+                                                        Terkunci
+                                                    </span>
+                                                @else
+                                                    <button onclick="editRow(this)"
+                                                        class="text-blue-600 hover:text-blue-800 font-semibold text-xs">Edit</button>
 
-                                                @if ($allReceivingDetails->count() > 1)
-                                                    <button
-                                                        onclick="openMoveItemModal({{ $ri->id }}, '{{ addslashes($ri->medicine_name) }}', {{ $rd->id }})"
-                                                        class="text-indigo-600 hover:text-indigo-800 font-semibold text-xs ml-2">Pindah</button>
+                                                    @if ($allReceivingDetails->count() > 1)
+                                                        <button
+                                                            onclick="openMoveItemModal({{ $ri->id }}, '{{ addslashes($ri->medicine_name) }}', {{ $rd->id }})"
+                                                            class="text-indigo-600 hover:text-indigo-800 font-semibold text-xs ml-2">Pindah</button>
+                                                    @endif
+
+                                                    <button onclick="deleteRow({{ $ri->id }})"
+                                                        class="text-red-600 hover:text-red-800 font-semibold text-xs ml-2">Hapus</button>
                                                 @endif
-
-                                                <button onclick="deleteRow({{ $ri->id }})"
-                                                    class="text-red-600 hover:text-red-800 font-semibold text-xs ml-2">Hapus</button>
                                             </td>
                                         </tr>
                                     @endforeach
@@ -518,9 +540,11 @@
                         <select id="edit_receiving_details_id"
                             class="w-full rounded-lg border border-gray-300 px-3 py-2 text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none">
                             @foreach ($allReceivingDetails as $rd)
-                                <option value="{{ $rd->id }}">
+                                @php $rdLocked = (int) ($rd->payments_count ?? 0) > 0; @endphp
+                                <option value="{{ $rd->id }}" {{ $rdLocked ? 'disabled' : '' }}>
                                     {{ $rd->receiving_details_code }}
                                     {{ $rd->invoice_number ? "({$rd->invoice_number})" : '' }}
+                                    {{ $rdLocked ? ' — Terkunci (Sudah Dibayar)' : '' }}
                                 </option>
                             @endforeach
                         </select>
@@ -684,11 +708,17 @@
     @php
 
         $detailsData = $allReceivingDetails
-            ->map(fn($d) => ['id' => $d->id, 'code' => $d->receiving_details_code, 'invoice' => $d->invoice_number])
+            ->map(fn($d) => [
+                'id' => $d->id,
+                'code' => $d->receiving_details_code,
+                'invoice' => $d->invoice_number,
+                'is_paid' => (int) ($d->payments_count ?? 0) > 0,
+            ])
             ->values();
 
         $allItemsData = collect();
         foreach ($allReceivingDetails as $rd) {
+            $rdPaid = (int) ($rd->payments_count ?? 0) > 0;
             foreach ($rd->receiving_items as $ri) {
                 $allItemsData->push([
                     'id' => $ri->id,
@@ -696,6 +726,7 @@
                     'order_items_id' => $ri->order_items_id,
                     'details_code' => $rd->receiving_details_code,
                     'details_invoice' => $rd->invoice_number ?? '',
+                    'details_is_paid' => $rdPaid,
                     'medicine_name' => $ri->order_items->medicines->name ?? ($ri->medicines->name ?? '-'),
                     'batch' => $ri->batch ?? '-',
                     'expired_date' => $ri->expired_date ?? '-',

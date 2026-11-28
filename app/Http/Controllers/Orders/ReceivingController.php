@@ -20,6 +20,7 @@ use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use DataTables;
 use Form;
 use App\Exports\Orders\BuyPriceHistoryExport;
@@ -1777,12 +1778,17 @@ class ReceivingController extends Controller
             $order = Order::findOrFail($orderItem->order_id);
 
             $targetDetailId = $request->input('receiving_details_id', $item->receiving_details_id);
-            $targetDetail = ReceivingDetails::whereKey($targetDetailId)->firstOrFail();
+            $targetDetail = ReceivingDetails::whereKey($targetDetailId)->lockForUpdate()->firstOrFail();
             $targetDetailIsForOrder = $this->revisionDetailBelongsToOrder($order, $targetDetail)
                 || (int) $targetDetail->id === (int) $item->receiving_details_id;
             if (!$targetDetailIsForOrder) {
                 DB::rollBack();
                 return response()->json(['success' => false, 'message' => 'Nomor terima tujuan bukan milik faktur ini.'], 422);
+            }
+
+            if ($paidDetail = $this->findFirstPaidDetailLocked([$item->receiving_details_id, $targetDetail->id])) {
+                DB::rollBack();
+                return $this->paidReceivingDetailResponse($paidDetail, 'mengubah atau memindahkan item');
             }
 
             $qty = (float) $request->qty_received;
@@ -2121,7 +2127,7 @@ class ReceivingController extends Controller
 
             if ($oldDetailId && (int) $oldDetailId !== (int) $targetDetail->id
                 && !ReceivingItems::where('receiving_details_id', $oldDetailId)->exists()) {
-                ReceivingDetails::whereKey($oldDetailId)->delete();
+                ReceivingDetails::whereKey($oldDetailId)->first()?->delete();
             }
 
             if ($isCommittedToStock && $targetDetail->receiving_id) {
@@ -2157,6 +2163,11 @@ class ReceivingController extends Controller
             if (!$item->order_items) {
                 DB::rollBack();
                 return response()->json(['success' => false, 'message' => 'Item tidak terhubung ke obat yang valid.'], 422);
+            }
+
+            if ($paidDetail = $this->findFirstPaidDetailLocked([$item->receiving_details_id])) {
+                DB::rollBack();
+                return $this->paidReceivingDetailResponse($paidDetail, 'menghapus item');
             }
 
             $orderItem = OrderItems::whereKey($item->order_items_id)->lockForUpdate()->firstOrFail();
@@ -2314,7 +2325,7 @@ class ReceivingController extends Controller
         try {
             DB::beginTransaction();
 
-            $item = ReceivingItems::with('order_items')->findOrFail($id);
+            $item = ReceivingItems::with('order_items')->whereKey($id)->lockForUpdate()->firstOrFail();
 
             if (!is_null($item->batches_id)) {
                 DB::rollBack();
@@ -2327,10 +2338,15 @@ class ReceivingController extends Controller
             $orderId = $item->order_items?->order_id;
             $detailId = $item->receiving_details_id;
 
+            if ($paidDetail = $this->findFirstPaidDetailLocked([$detailId])) {
+                DB::rollBack();
+                return $this->paidReceivingDetailResponse($paidDetail, 'menghapus draft item');
+            }
+
             $item->delete();
 
             if ($detailId && !ReceivingItems::where('receiving_details_id', $detailId)->exists()) {
-                ReceivingDetails::whereKey($detailId)->delete();
+                ReceivingDetails::whereKey($detailId)->first()?->delete();
             }
 
             DB::commit();
@@ -2393,6 +2409,7 @@ class ReceivingController extends Controller
                 },
                 'creditor'
             ])
+            ->when(Schema::hasTable('finance_payments'), fn ($q) => $q->withCount('payments'))
             ->orderBy('id', 'asc')
             ->get();
 
@@ -2504,6 +2521,11 @@ class ReceivingController extends Controller
             if (!$detailBelongsToOrder) {
                 DB::rollBack();
                 return response()->json(['success' => false, 'message' => 'Nomor terima bukan bagian dari faktur ini.'], 422);
+            }
+
+            if (ReceivingDetails::hasFinancePaymentsForDetail((int) $detail->id, true)) {
+                DB::rollBack();
+                return $this->paidReceivingDetailResponse($detail, 'menambahkan item');
             }
 
             if ($request->filled('order_items_id')) {
@@ -2690,6 +2712,47 @@ class ReceivingController extends Controller
     }
 
     /**
+     * Kunci dan cari Nomor Terima pertama dalam daftar yang sudah memiliki catatan pembayaran di Finance.
+     */
+    private function findFirstPaidDetailLocked(array $detailIds): ?ReceivingDetails
+    {
+        $ids = array_values(array_unique(array_filter(array_map('intval', $detailIds))));
+        if (empty($ids)) {
+            return null;
+        }
+
+        $details = ReceivingDetails::whereIn('id', $ids)
+            ->orderBy('id')
+            ->lockForUpdate()
+            ->get()
+            ->keyBy('id');
+
+        foreach ($ids as $detailId) {
+            $detail = $details->get($detailId);
+            if ($detail && ReceivingDetails::hasFinancePaymentsForDetail($detailId, true)) {
+                return $detail;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Respon seragam (HTTP 422) saat user mencoba memodifikasi atau menghapus faktur yang sudah dibayar.
+     */
+    private function paidReceivingDetailResponse(ReceivingDetails $detail, string $action): \Illuminate\Http\JsonResponse
+    {
+        $label = $detail->invoice_number
+            ? "{$detail->receiving_details_code} (No. Faktur: {$detail->invoice_number})"
+            : ($detail->receiving_details_code ?: ('#' . $detail->id));
+
+        return response()->json([
+            'success' => false,
+            'message' => "Tidak dapat {$action}: Nomor Terima / Faktur {$label} sudah memiliki catatan pembayaran di Finance. Batalkan atau hapus pembayarannya di menu Finance terlebih dahulu.",
+        ], 422);
+    }
+
+    /**
      * Kompensasi unit yang sudah terpakai (terjual / sedang dimutasi) dari penerimaan yang dihapus sebelumnya,
      * serta alihkan referensi batch mutasi dan sisa stok kembalian mutasi ke batch pengganti yang baru.
      */
@@ -2809,6 +2872,13 @@ class ReceivingController extends Controller
                 return response()->json(['success' => false, 'message' => 'Nomor terima sumber/tujuan bukan bagian dari faktur ini.'], 422);
             }
 
+            foreach ([$source, $target] as $checkedDetail) {
+                if (ReceivingDetails::hasFinancePaymentsForDetail((int) $checkedDetail->id, true)) {
+                    DB::rollBack();
+                    return $this->paidReceivingDetailResponse($checkedDetail, 'menggabungkan Nomor Terima');
+                }
+            }
+
             $orderItemIds = $order->order_items->pluck('id');
             if (ReceivingItems::where('receiving_details_id', $source->id)
                 ->whereNotIn('order_items_id', $orderItemIds)->exists()) {
@@ -2886,6 +2956,15 @@ class ReceivingController extends Controller
                 return response()->json(['success' => false, 'message' => 'Sebagian item bukan milik faktur ini; tidak ada item yang dipindahkan.'], 422);
             }
 
+            $involvedDetailIds = $items->pluck('receiving_details_id')
+                ->push($targetDetail->id)
+                ->filter()
+                ->all();
+            if ($paidDetail = $this->findFirstPaidDetailLocked($involvedDetailIds)) {
+                DB::rollBack();
+                return $this->paidReceivingDetailResponse($paidDetail, 'memindahkan item');
+            }
+
             $movedCount = 0;
             $oldDetailIds = [];
 
@@ -2907,7 +2986,7 @@ class ReceivingController extends Controller
             $oldDetailIds = array_unique($oldDetailIds);
             foreach ($oldDetailIds as $oldId) {
                 if ($oldId != $targetDetail->id && ReceivingItems::where('receiving_details_id', $oldId)->count() === 0) {
-                    ReceivingDetails::where('id', $oldId)->delete();
+                    ReceivingDetails::whereKey($oldId)->first()?->delete();
                 }
             }
 
@@ -2941,6 +3020,11 @@ class ReceivingController extends Controller
             if (!$this->revisionDetailBelongsToOrder($order, $detail)) {
                 DB::rollBack();
                 return response()->json(['success' => false, 'message' => 'Nomor terima bukan bagian dari faktur ini.'], 422);
+            }
+
+            if (ReceivingDetails::hasFinancePaymentsForDetail((int) $detail->id, true)) {
+                DB::rollBack();
+                return $this->paidReceivingDetailResponse($detail, 'menghapus Nomor Terima');
             }
             $itemCount = ReceivingItems::where('receiving_details_id', $detail->id)->count();
 
@@ -3511,6 +3595,14 @@ class ReceivingController extends Controller
                     $oq->where('order_id', $sourceOrder->id);
                 })
                 ->first();
+
+            if ($details) {
+                $details = ReceivingDetails::whereKey($details->id)->lockForUpdate()->first();
+                if ($details && ReceivingDetails::hasFinancePaymentsForDetail((int) $details->id, true)) {
+                    DB::rollBack();
+                    return $this->paidReceivingDetailResponse($details, 'menambahkan item atau mengubah faktur');
+                }
+            }
 
             if (!$details) {
                 $details = new ReceivingDetails([
