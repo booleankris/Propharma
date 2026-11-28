@@ -531,6 +531,7 @@ class PayablesReceivablesService
         }
 
         $amountsByDetailId = [];
+        $linesByDetailId = [];
         $paidCashByDetailId = [];
         $paidReturByDetailId = [];
         $latestPaymentDateByDetailId = [];
@@ -579,6 +580,7 @@ class PayablesReceivablesService
                         'extra_discount' => $line->extra_discount ?? 0,
                     ];
                 });
+                $linesByDetailId[$id] = $lines;
                 $amountsByDetailId[$id] = ReceivingInvoiceTotals::calculate($lines, $ppnByDetailId[$id] ?? 'TANPA');
             }
 
@@ -682,9 +684,16 @@ class PayablesReceivablesService
             $paidCashBank = (float) ($paidCashByDetailId[$detailId] ?? 0.0);
 
             $totalRetur = round(max($paidReturFinance, $sudahPotongTotal), 2);
-            $netTotal = round(max(0, $total - $totalRetur), 2);
-            $totalTerbayar = round(min($netTotal, $paidCashBank), 2);
-            $sisa = round(max(0, $netTotal - $totalTerbayar), 2);
+            $settlement = ReceivingInvoiceTotals::resolveSettlementAmounts(
+                $linesByDetailId[$detailId] ?? [],
+                $ppnByDetailId[$detailId] ?? 'TANPA',
+                $paidCashBank,
+                $totalRetur,
+                $amounts
+            );
+            $netTotal = $settlement['net_total'];
+            $totalTerbayar = $settlement['paid_applied'];
+            $sisa = $settlement['sisa'];
 
             $isLunas = ($sisa < 0.005 && $total > 0) || ((int) $h->rec_status === 3 && $sisa <= 0.005);
             $sisa = $isLunas ? 0 : $sisa;

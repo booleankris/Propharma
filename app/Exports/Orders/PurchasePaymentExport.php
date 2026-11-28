@@ -4,6 +4,7 @@ namespace App\Exports\Orders;
 
 use App\Models\Pharmacies;
 use App\Support\ReceivingDateFilter;
+use App\Support\ReceivingInvoiceTotals;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 use Maatwebsite\Excel\Concerns\FromArray;
@@ -181,27 +182,14 @@ class PurchasePaymentExport implements FromArray, WithStyles, WithColumnWidths, 
         }
 
         foreach ($invoices as &$inv) {
-            $dpp = round(max(0, $inv['subtotal'] - $inv['discount']));
-            $ppnType = $inv['ppn_type'];
-            $ppn = 0;
-            $jumlah = 0;
-
-            if ($ppnType === 'EXCLUDE') {
-                $ppn = floor($dpp * self::PPN);
-                $jumlah = $dpp + $ppn;
-            } elseif ($ppnType === 'INCLUDE') {
-                $jumlah = $dpp;
-                $hna = floor($dpp / (1 + self::PPN));
-                $ppn = $jumlah - $hna;
-                $dpp = $hna;
-            } else {  // TANPA
-                $ppn = 0;
-                $jumlah = $dpp;
-            }
-
-            $inv['dpp'] = (float) $dpp;
-            $inv['ppn'] = (float) $ppn;
-            $inv['jumlah'] = (float) $jumlah;
+            $calc = ReceivingInvoiceTotals::calculateFromSubtotalDiscount(
+                $inv['subtotal'],
+                $inv['discount'],
+                $inv['ppn_type']
+            );
+            $inv['dpp'] = $calc['subtotal'];
+            $inv['ppn'] = $calc['ppn'];
+            $inv['jumlah'] = $calc['total'];
         }
         unset($inv);
 

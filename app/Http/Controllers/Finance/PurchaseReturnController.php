@@ -547,10 +547,10 @@ class PurchaseReturnController extends Controller
             // Cek apakah saat penerimaan diterima dalam bentuk kemasan (pack)
             $isReceivedPack = $it->receipt_is_pack !== null ? (bool) $it->receipt_is_pack : (bool) $it->oi_pack;
 
-            // Hitung harga satuan faktur penerimaan (total baris dibagi qty baris)
+            // Hitung harga satuan faktur penerimaan (termasuk PPN agar retur langsung memotong tagihan final faktur)
             $qtyReceived = (float) ($it->qty_received ?: $it->qty ?: 1);
-            $lineAmounts = ReceivingInvoiceTotals::lineAmounts($it, $receivingDetail->invoice_ppn);
-            $consistentUnitPrice = $qtyReceived > 0 ? round($lineAmounts['total'] / $qtyReceived, 2) : (float) $it->raw_price;
+            $deductionLineTotal = ReceivingInvoiceTotals::linePayableDeductionTotal($it, $receivingDetail->invoice_ppn);
+            $consistentUnitPrice = $qtyReceived > 0 ? round($deductionLineTotal / $qtyReceived, 2) : (float) $it->raw_price;
 
             // Konversi harga & qty untuk Kemasan vs Eceran
             if ($isReceivedPack && $content > 1) {
@@ -585,7 +585,7 @@ class PurchaseReturnController extends Controller
                 'qty' => $defaultQty,
                 'raw_price' => $it->raw_price,
                 'unit_price' => $defaultPrice,
-                'total' => $lineAmounts['total'],
+                'total' => $deductionLineTotal,
                 'batch_id' => $it->batch_id,
                 'current_stock' => $currentStockUnit,
                 'current_stock_unit' => $currentStockUnit,

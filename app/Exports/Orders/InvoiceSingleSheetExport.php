@@ -3,9 +3,10 @@
 namespace App\Exports\Orders;
 
 use App\Models\Pharmacies;
+use App\Support\ReceivingDateFilter;
+use App\Support\ReceivingInvoiceTotals;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
-use App\Support\ReceivingDateFilter;
 use Maatwebsite\Excel\Concerns\FromArray;
 use Maatwebsite\Excel\Concerns\WithColumnWidths;
 use Maatwebsite\Excel\Concerns\WithStyles;
@@ -119,23 +120,14 @@ class InvoiceSingleSheetExport implements FromArray, WithStyles, WithColumnWidth
 
         $daily = [];
         foreach ($invoices as $inv) {
-            $dpp = round(max(0, $inv['subtotal'] - $inv['discount']));
-            $ppnType = $inv['ppn_type'];
-            $ppn = 0;
-            $jumlah = 0;
-
-            if ($ppnType === 'EXCLUDE') {
-                $ppn = floor($dpp * self::PPN);
-                $jumlah = $dpp + $ppn;
-            } elseif ($ppnType === 'INCLUDE') {
-                $jumlah = $dpp;
-                $hna = floor($dpp / (1 + self::PPN));
-                $ppn = $jumlah - $hna;
-                $dpp = $hna;
-            } else { // TANPA
-                $ppn = 0;
-                $jumlah = $dpp;
-            }
+            $calc = ReceivingInvoiceTotals::calculateFromSubtotalDiscount(
+                $inv['subtotal'],
+                $inv['discount'],
+                $inv['ppn_type']
+            );
+            $dpp = $calc['subtotal'];
+            $ppn = $calc['ppn'];
+            $jumlah = $calc['total'];
 
             $date = $inv['date'];
             if (!isset($daily[$date])) {
@@ -316,29 +308,16 @@ class InvoiceSingleSheetExport implements FromArray, WithStyles, WithColumnWidth
             $invoices[$key]['discount'] += ($nomDisc + $nomExtraDisc);
         }
 
-        // Kalkulasi DPP, PPN, dan Jumlah persis seperti di cetakan faktur penerimaan (printInvoice)
+        // Kalkulasi DPP, PPN, dan Jumlah persis mengikuti ReceivingInvoiceTotals
         foreach ($invoices as &$inv) {
-            $dpp = round(max(0, $inv['subtotal'] - $inv['discount']));
-            $ppnType = $inv['ppn_type'];
-            $ppn = 0;
-            $jumlah = 0;
-
-            if ($ppnType === 'EXCLUDE') {
-                $ppn = floor($dpp * self::PPN);
-                $jumlah = $dpp + $ppn;
-            } elseif ($ppnType === 'INCLUDE') {
-                $jumlah = $dpp;
-                $hna = floor($dpp / (1 + self::PPN));
-                $ppn = $jumlah - $hna;
-                $dpp = $hna;
-            } else { // TANPA
-                $ppn = 0;
-                $jumlah = $dpp;
-            }
-
-            $inv['dpp']    = (float) $dpp;
-            $inv['ppn']    = (float) $ppn;
-            $inv['jumlah'] = (float) $jumlah;
+            $calc = ReceivingInvoiceTotals::calculateFromSubtotalDiscount(
+                $inv['subtotal'],
+                $inv['discount'],
+                $inv['ppn_type']
+            );
+            $inv['dpp']    = $calc['subtotal'];
+            $inv['ppn']    = $calc['ppn'];
+            $inv['jumlah'] = $calc['total'];
         }
         unset($inv);
 
@@ -506,23 +485,14 @@ class InvoiceSingleSheetExport implements FromArray, WithStyles, WithColumnWidth
                 ];
             }
 
-            $dpp = round(max(0, $inv['subtotal'] - $inv['discount']));
-            $ppnType = $inv['ppn_type'];
-            $ppn = 0;
-            $jumlah = 0;
-
-            if ($ppnType === 'EXCLUDE') {
-                $ppn = floor($dpp * self::PPN);
-                $jumlah = $dpp + $ppn;
-            } elseif ($ppnType === 'INCLUDE') {
-                $jumlah = $dpp;
-                $hna = floor($dpp / (1 + self::PPN));
-                $ppn = $jumlah - $hna;
-                $dpp = $hna;
-            } else { // TANPA
-                $ppn = 0;
-                $jumlah = $dpp;
-            }
+            $calc = ReceivingInvoiceTotals::calculateFromSubtotalDiscount(
+                $inv['subtotal'],
+                $inv['discount'],
+                $inv['ppn_type']
+            );
+            $dpp = $calc['subtotal'];
+            $ppn = $calc['ppn'];
+            $jumlah = $calc['total'];
 
             $creditorsArr[$cKey]['dpp']    += $dpp;
             $creditorsArr[$cKey]['ppn']    += $ppn;

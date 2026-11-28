@@ -4471,15 +4471,15 @@ class FinanceController extends Controller
             $subtotal += $totalItem;
         }
         $ppnType = strtoupper(trim($detail->invoice_ppn ?? $detail->creditor?->ppn_type ?? 'TANPA'));
-        $totalInvoice = ReceivingInvoiceTotals::calculate($detail->receiving_items, $ppnType)['total'];
         $totalRetur = $this->getReceivingDetailReturTotal($detail);
-        $netInvoice = round(max(0, $totalInvoice - $totalRetur), 2);
 
         // Akumulasi yang sudah terbayar
         $alreadyPaid = (float) FinancePayment::where('receiving_detail_id', $detail->id)
             ->where('payment_type', '!=', 'RETUR')
             ->sum('amount');
-        $sisaHutang = round(max(0, $netInvoice - $alreadyPaid), 2);
+        $settlement = ReceivingInvoiceTotals::resolveSettlementAmounts($detail->receiving_items, $ppnType, $alreadyPaid, $totalRetur);
+        $netInvoice = $settlement['net_total'];
+        $sisaHutang = $settlement['sisa'];
 
         if (round($validated['amount'], 2) > $sisaHutang) {
             $formattedSisa = fmod($sisaHutang, 1) !== 0.0 ? number_format($sisaHutang, 2, ',', '.') : number_format($sisaHutang, 0, ',', '.');
@@ -4934,15 +4934,14 @@ class FinanceController extends Controller
                     $subtotal += $totalItem;
                 }
                 $ppnType = strtoupper(trim($detail->invoice_ppn ?? $detail->creditor?->ppn_type ?? 'TANPA'));
-                $totalInvoice = ReceivingInvoiceTotals::calculate($detail->receiving_items, $ppnType)['total'];
                 $totalRetur = $this->getReceivingDetailReturTotal($detail);
-                $netInvoice = round(max(0, $totalInvoice - $totalRetur), 2);
 
-                // Hitung sisa yang belum terbayar
+                // Hitung sisa yang belum terbayar (termasuk toleransi faktur lunas dengan rumus per-item lama)
                 $alreadyPaid = (float) FinancePayment::where('receiving_detail_id', $detail->id)
                     ->where('payment_type', '!=', 'RETUR')
                     ->sum('amount');
-                $remaining = round(max(0, $netInvoice - $alreadyPaid), 2);
+                $settlement = ReceivingInvoiceTotals::resolveSettlementAmounts($detail->receiving_items, $ppnType, $alreadyPaid, $totalRetur);
+                $remaining = $settlement['sisa'];
 
                 if ($remaining < 0.005) {
                     if ($detail->receiving && (int) $detail->receiving->status !== 3) {
@@ -5162,13 +5161,11 @@ class FinanceController extends Controller
                     $subtotal += (float) ($item->total ?? ($qty * $price));
                 }
                 $ppnType = strtoupper(trim($detail->invoice_ppn ?? $detail->creditor?->ppn_type ?? 'TANPA'));
-                $invoiceTotal = ReceivingInvoiceTotals::calculate($detail->receiving_items, $ppnType)['total'];
                 $totalRetur = $this->getReceivingDetailReturTotal($detail);
-                $netInvoice = round(max(0, $invoiceTotal - $totalRetur), 2);
                 $alreadyPaid = (float) FinancePayment::where('receiving_detail_id', $detail->id)
                     ->where('payment_type', '!=', 'RETUR')
                     ->sum('amount');
-                $remaining = round(max(0, $netInvoice - $alreadyPaid), 2);
+                $remaining = ReceivingInvoiceTotals::resolveSettlementAmounts($detail->receiving_items, $ppnType, $alreadyPaid, $totalRetur)['sisa'];
                 if ($remaining < 0.005) {
                     throw ValidationException::withMessages(['file' => "Baris {$entry['line']}: Faktur '{$detail->invoice_number}' sudah lunas."]);
                 }

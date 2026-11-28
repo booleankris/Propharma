@@ -17,6 +17,7 @@ use App\Models\ReceivingDetails;
 use App\Models\ReceivingItems;
 use App\Models\Transfers;
 use Barryvdh\DomPDF\Facade\Pdf;
+use App\Support\ReceivingInvoiceTotals;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -4281,33 +4282,18 @@ class ReceivingController extends Controller
     }
 
     /**
-     * Hitung ringkasan DPP, PPN, dan Total Tagihan per faktur mengikuti aturan Cetak Penerimaan (printReceiving).
+     * Hitung ringkasan DPP, PPN, dan Total Tagihan per faktur mengikuti aturan otoritatif faktur penerimaan.
      *
      * @return array{dpp_hna: float, ppn: float, grand_total: float}
      */
     public static function computeInvoiceSummaryFromTotals(float $subtotal, float $discount, ?string $ppnType = 'TANPA'): array
     {
-        $normalizedPpn = strtoupper(trim((string) ($ppnType ?: 'TANPA')));
-        $detailDpp = max(0.0, $subtotal - $discount);
-
-        if ($normalizedPpn === 'EXCLUDE') {
-            $detailPpn = floor($detailDpp * 0.11);
-            $detailGrandTotal = $detailDpp + $detailPpn;
-            $detailHna = $detailDpp;
-        } elseif ($normalizedPpn === 'INCLUDE') {
-            $detailGrandTotal = $detailDpp;
-            $detailHna = floor($detailDpp / 1.11);
-            $detailPpn = $detailGrandTotal - $detailHna;
-        } else {
-            $detailPpn = 0.0;
-            $detailGrandTotal = $detailDpp;
-            $detailHna = $detailDpp;
-        }
+        $summary = ReceivingInvoiceTotals::calculateFromSubtotalDiscount($subtotal, $discount, $ppnType);
 
         return [
-            'dpp_hna' => $detailHna,
-            'ppn' => $detailPpn,
-            'grand_total' => $detailGrandTotal,
+            'dpp_hna' => $summary['subtotal'],
+            'ppn' => $summary['ppn'],
+            'grand_total' => $summary['total'],
         ];
     }
 

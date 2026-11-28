@@ -1040,16 +1040,16 @@ class NeracaReportService
     private function computePayableDetailRemaining(ReceivingDetails $detail, float $returFromPr, $payments): float
     {
         $ppnType = strtoupper(trim((string) ($detail->invoice_ppn ?? $detail->creditor?->ppn_type ?? 'TANPA')));
-        $invoiceTotal = ReceivingInvoiceTotals::calculate($detail->receiving_items, $ppnType)['total'];
-
         $paidCashBank = (float) $payments->where('payment_type', '!=', 'RETUR')->sum('amount');
         $paidRetur = (float) $payments->where('payment_type', 'RETUR')->sum('amount');
         $totalReturDeduction = round(max($paidRetur, $returFromPr), 2);
-        $netTotal = round(max(0, $invoiceTotal - $totalReturDeduction), 2);
-        $paidApplied = round(min($netTotal, $paidCashBank), 2);
 
-        $sisa = round(max(0, $netTotal - $paidApplied), 2);
-        return $sisa < 0.005 ? 0.0 : $sisa;
+        return ReceivingInvoiceTotals::resolveSettlementAmounts(
+            $detail->receiving_items,
+            $ppnType,
+            $paidCashBank,
+            $totalReturDeduction
+        )['sisa'];
     }
 }
 

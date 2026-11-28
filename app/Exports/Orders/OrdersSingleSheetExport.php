@@ -4,6 +4,7 @@ namespace App\Exports\Orders;
 
 use App\Models\Pharmacies;
 use App\Support\ReceivingDateFilter;
+use App\Support\ReceivingInvoiceTotals;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Carbon;
 use Maatwebsite\Excel\Concerns\FromArray;
@@ -111,9 +112,10 @@ class OrdersSingleSheetExport implements FromArray, WithStyles, WithColumnWidths
 
         $rows = [$tableHeaders];
         $grandDpp = $grandPpn = $grandGross = $grandNomDisc = $grandNomExtraDisc = $grandTotal = 0;
+        $amountsByIdx = $this->calculateAmountsByInvoice($items);
 
-        foreach ($items as $item) {
-            $amounts = $this->calculateAmounts($item);
+        foreach ($items as $idx => $item) {
+            $amounts = $amountsByIdx[$idx];
             $qty = $amounts['qty'];
             $rawPrice = $amounts['rawPrice'];
             $gross = $amounts['gross'];
@@ -201,8 +203,11 @@ class OrdersSingleSheetExport implements FromArray, WithStyles, WithColumnWidths
      */
     public function financeRows(array $targetPharmacyIds): array
     {
-        return $this->purchaseItems($targetPharmacyIds)->map(function ($item) {
-            $amounts = $this->calculateAmounts($item);
+        $items = $this->purchaseItems($targetPharmacyIds);
+        $amountsByIdx = $this->calculateAmountsByInvoice($items);
+
+        return $items->map(function ($item, $idx) use ($amountsByIdx) {
+            $amounts = $amountsByIdx[$idx];
             return [
                 'date' => ReceivingDateFilter::format(null, $item->receiving_details_created_at),
                 'payment' => strtoupper(trim((string) ($item->invoice_payment ?? ''))),
@@ -253,6 +258,7 @@ class OrdersSingleSheetExport implements FromArray, WithStyles, WithColumnWidths
                 'receiving_items.batch as receiving_batch',
                 'batches.name as batch_name',
                 'receiving_items.expired_date',
+                'receiving_details.id as receiving_details_id',
                 'receiving_details.receiving_id',
                 'receiving_details.receiving_details_code',
                 'receiving_details.invoice_number',
@@ -279,27 +285,104 @@ class OrdersSingleSheetExport implements FromArray, WithStyles, WithColumnWidths
             ->get();
     }
 
-    private function calculateAmounts(object $item): array
+    /**
+     * Hitung PPN & DPP pada level total faktur (`receiving_details_id`), lalu rekonsiliasikan ke baris
+     * agar penjumlahan baris detail di Excel selalu 100% sama dengan Laporan Pembelian Faktur & Neraca.
+     *
+     * @return array<int|string, array<string, mixed>>
+     */
+    private function calculateAmountsByInvoice($items): array
     {
-        $qty = (float) ($item->qty_received ?? $item->qty ?? 0);
-        $rawPrice = (float) ($item->receiving_raw_price ?? $item->order_items_price ?? 0);
-        $gross = $qty * $rawPrice;
-        $disc = (float) ($item->discount ?? 0);
-        $extraDisc = (float) ($item->extra_discount ?? 0);
-        $nomDisc = ($disc <= 100 && $disc > 0) ? ($gross * $disc / 100) : $disc;
-        $nomExtraDisc = ($extraDisc <= 100 && $extraDisc > 0) ? ($gross * $extraDisc / 100) : $extraDisc;
-        $totalDisc = $nomDisc + $nomExtraDisc;
-        $persenDisc = $gross > 0 ? round(($totalDisc / $gross) * 100, 2) : 0;
-        $dpp = max(0, $gross - $nomDisc - $nomExtraDisc);
-        $ppn = 0;
-        $ppnType = strtoupper(trim($item->invoice_ppn ?? 'TANPA'));
-        if ($ppnType === 'EXCLUDE') {
-            $ppn = floor($dpp * self::PPN);
-        } elseif ($ppnType === 'INCLUDE') {
-            $ppn = floor($dpp - ($dpp / (1 + self::PPN)));
-            $dpp -= $ppn;
+        $baseByIdx = [];
+        $invoiceGroups = [];
+
+        foreach ($items as $idx => $item) {
+            $qty = (float) ($item->qty_received ?? $item->qty ?? 0);
+            $rawPrice = (float) ($item->receiving_raw_price ?? $item->order_items_price ?? 0);
+            $gross = $qty * $rawPrice;
+            $disc = (float) ($item->discount ?? 0);
+            $extraDisc = (float) ($item->extra_discount ?? 0);
+            $nomDisc = ($disc <= 100 && $disc > 0) ? ($gross * $disc / 100) : max(0.0, $disc);
+            $nomExtraDisc = ($extraDisc <= 100 && $extraDisc > 0) ? ($gross * $extraDisc / 100) : max(0.0, $extraDisc);
+            $totalDisc = $nomDisc + $nomExtraDisc;
+            $persenDisc = $gross > 0 ? round(($totalDisc / $gross) * 100, 2) : 0;
+            $net = max(0.0, $gross - $totalDisc);
+            $ppnType = strtoupper(trim((string) ($item->invoice_ppn ?? 'TANPA')));
+
+            $baseByIdx[$idx] = [
+                'qty' => $qty,
+                'rawPrice' => $rawPrice,
+                'gross' => $gross,
+                'nomDisc' => $nomDisc,
+                'nomExtraDisc' => $nomExtraDisc,
+                'totalDisc' => $totalDisc,
+                'persenDisc' => $persenDisc,
+                'net' => $net,
+                'ppnType' => $ppnType,
+            ];
+
+            $invKey = isset($item->receiving_details_id) && $item->receiving_details_id
+                ? (string) $item->receiving_details_id
+                : ('row-' . $idx);
+            if (!isset($invoiceGroups[$invKey])) {
+                $invoiceGroups[$invKey] = [
+                    'ppnType' => $ppnType,
+                    'gross' => 0.0,
+                    'discount' => 0.0,
+                    'net' => 0.0,
+                    'indices' => [],
+                ];
+            }
+            $invoiceGroups[$invKey]['gross'] += $gross;
+            $invoiceGroups[$invKey]['discount'] += $totalDisc;
+            $invoiceGroups[$invKey]['net'] += $net;
+            $invoiceGroups[$invKey]['indices'][] = $idx;
         }
-        return compact('qty', 'rawPrice', 'gross', 'nomDisc', 'nomExtraDisc', 'totalDisc', 'persenDisc', 'dpp', 'ppn') + ['jumlah' => $dpp + $ppn];
+
+        $result = [];
+        foreach ($invoiceGroups as $group) {
+            $summary = ReceivingInvoiceTotals::calculateFromSubtotalDiscount(
+                $group['gross'],
+                $group['discount'],
+                $group['ppnType']
+            );
+            $indices = $group['indices'];
+            $count = count($indices);
+            $sumNet = $group['net'];
+            $allocDpp = 0.0;
+            $allocPpn = 0.0;
+
+            foreach ($indices as $pos => $idx) {
+                $base = $baseByIdx[$idx];
+                $isLast = ($pos === $count - 1);
+
+                if ($isLast) {
+                    $rowDpp = round($summary['subtotal'] - $allocDpp, 2);
+                    $rowPpn = round($summary['ppn'] - $allocPpn, 2);
+                } else {
+                    $ratio = $sumNet > 0 ? ($base['net'] / $sumNet) : (1 / max(1, $count));
+                    $rowDpp = round($summary['subtotal'] * $ratio, 2);
+                    $rowPpn = round($summary['ppn'] * $ratio, 2);
+                    $allocDpp = round($allocDpp + $rowDpp, 2);
+                    $allocPpn = round($allocPpn + $rowPpn, 2);
+                }
+
+                $result[$idx] = [
+                    'qty' => $base['qty'],
+                    'rawPrice' => $base['rawPrice'],
+                    'gross' => $base['gross'],
+                    'nomDisc' => $base['nomDisc'],
+                    'nomExtraDisc' => $base['nomExtraDisc'],
+                    'totalDisc' => $base['totalDisc'],
+                    'persenDisc' => $base['persenDisc'],
+                    'dpp' => $rowDpp,
+                    'ppn' => $rowPpn,
+                    'jumlah' => round($rowDpp + $rowPpn, 2),
+                ];
+            }
+        }
+
+        return $result;
     }
 
     public function styles(Worksheet $sheet)

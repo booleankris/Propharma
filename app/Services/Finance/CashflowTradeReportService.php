@@ -83,8 +83,13 @@ class CashflowTradeReportService
             ? "COALESCE(CASE WHEN date LIKE '__/__/____' THEN substr(date, 7, 4) || '-' || substr(date, 4, 2) || '-' || substr(date, 1, 2) WHEN date LIKE '____-__-__' THEN substr(date, 1, 10) ELSE NULL END, DATE(created_at))"
             : "COALESCE(STR_TO_DATE(NULLIF(date, ''), '%d/%m/%Y'), STR_TO_DATE(NULLIF(date, ''), '%Y-%m-%d'), DATE(created_at))";
 
+        $eagerRelations = ['receiving_details.creditor', 'receiving_details.receiving'];
+        if (Schema::hasTable('order_items')) {
+            $eagerRelations[] = 'order_items:id,price';
+        }
+
         $items = ReceivingItems::query()
-            ->with(['receiving_details.creditor', 'receiving_details.receiving'])
+            ->with($eagerRelations)
             ->where(function ($dateQ) use ($start, $until, $startDate, $endDate, $receivingDateExpr) {
                 $dateQ->whereBetween('receiving_items.created_at', [$start, $until])
                     ->orWhere(function ($fallback) use ($start, $until) {
@@ -103,6 +108,7 @@ class CashflowTradeReportService
             ->orderBy('created_at')
             ->get();
 
+        $invoiceGroups = [];
         foreach ($items as $item) {
             $detail = $item->receiving_details;
             $receiving = $detail?->receiving;
@@ -139,10 +145,22 @@ class CashflowTradeReportService
                 $rows['entities'][$key] = $this->blankEntity($key, $name, array_keys($rows['dates']));
             }
 
-            $ppnType = mb_strtoupper(trim((string) ($detail?->invoice_ppn ?? $creditor?->ppn_type ?? 'TANPA')));
-            $amount = ReceivingInvoiceTotals::calculate([$item], $ppnType)['total'];
-            $rows['entities'][$key]['amounts'][$date] += $amount;
-            $rows['entities'][$key]['total'] += $amount;
+            $groupKey = $detail ? ('rd:' . $detail->id) : ('item:' . $item->id);
+            if (!isset($invoiceGroups[$groupKey])) {
+                $invoiceGroups[$groupKey] = [
+                    'entityKey' => $key,
+                    'date' => $date,
+                    'ppnType' => mb_strtoupper(trim((string) ($detail?->invoice_ppn ?? $creditor?->ppn_type ?? 'TANPA'))),
+                    'items' => [],
+                ];
+            }
+            $invoiceGroups[$groupKey]['items'][] = $item;
+        }
+
+        foreach ($invoiceGroups as $group) {
+            $amount = ReceivingInvoiceTotals::calculate($group['items'], $group['ppnType'])['total'];
+            $rows['entities'][$group['entityKey']]['amounts'][$group['date']] += $amount;
+            $rows['entities'][$group['entityKey']]['total'] += $amount;
         }
 
         $opening = $this->payableBalancesBefore($pharmacyIds, $startDate, $endDate);
@@ -311,8 +329,7 @@ class CashflowTradeReportService
         foreach ($details as $detail) {
             $code = (string) ($detail->creditor_code ?? '');
             $key = 'creditor:' . ($code !== '' ? $code : 'unknown');
-            $ppnType = mb_strtoupper(trim((string) ($detail->invoice_ppn ?? 'TANPA')));
-            $invoiceTotal = ReceivingInvoiceTotals::calculate($detail->receiving_items, $ppnType)['total'];
+            $ppnType = mb_strtoupper(trim((string) ($detail->invoice_ppn ?? $detail->creditor?->ppn_type ?? 'TANPA')));
 
             $returFromPr = 0.0;
             if (isset($returnsByDetailId[$detail->id])) {
@@ -325,7 +342,13 @@ class CashflowTradeReportService
             $paidRetur = (float) $detail->payments->where('payment_type', 'RETUR')->sum(fn($payment) => $this->number($payment->amount));
             $totalReturDeduction = max($paidRetur, $returFromPr);
 
-            $balances[$key] = ($balances[$key] ?? 0) + max(0, $invoiceTotal - $paidCashBank - $totalReturDeduction);
+            $sisa = ReceivingInvoiceTotals::resolveSettlementAmounts(
+                $detail->receiving_items,
+                $ppnType,
+                $paidCashBank,
+                $totalReturDeduction
+            )['sisa'];
+            $balances[$key] = ($balances[$key] ?? 0) + $sisa;
         }
 
         if (Schema::hasTable('finance_opening_invoices')) {
